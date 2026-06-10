@@ -28,11 +28,11 @@ export class PanelService {
     if (!er) throw new NotFoundException('ER não encontrado')
 
     const { start, end } = getBusinessDayRange()
-    const [calling, recentEvents, inService, waiting, finishedToday, calledToday] =
+    const [callingTickets, recentEvents, inService, waiting, finishedToday, calledToday] =
       await Promise.all([
-        this.prisma.ticket.findFirst({
+        this.prisma.ticket.findMany({
           where: { erId, state: TicketState.CALLING },
-          orderBy: { calledAt: 'desc' },
+          orderBy: { counter: { number: 'asc' } },
           include: {
             representative: { select: { fullName: true } },
             counter: { select: { number: true } },
@@ -95,13 +95,23 @@ export class PanelService {
     })
     const counterNumbers = new Map(counters.map((counter) => [counter.id, counter.number]))
 
-    const presentCall = (ticket: NonNullable<typeof calling>) => ({
+    const presentCall = (ticket: (typeof callingTickets)[number]) => ({
       ticketId: ticket.id,
       code: ticket.code,
       displayName: abbreviateName(ticket.representative.fullName),
       counterNumber: ticket.counter?.number ?? 0,
       calledAt: ticket.calledAt,
     })
+
+    // All tickets currently being called, one per counter, ordered by counter.
+    const calling = callingTickets.map(presentCall)
+    // The most recently called ticket (for highlight + telemetry / back-compat).
+    const current =
+      calling.length === 0
+        ? null
+        : [...calling].sort(
+            (a, b) => (b.calledAt?.getTime() ?? 0) - (a.calledAt?.getTime() ?? 0),
+          )[0]
 
     const seenTickets = new Set<string>()
     const recent = recentEvents
@@ -147,7 +157,8 @@ export class PanelService {
         : null
 
     return {
-      current: calling ? presentCall(calling) : null,
+      current,
+      calling,
       recent,
       inService: inService.map((ticket) => ({
         ticketId: ticket.id,
