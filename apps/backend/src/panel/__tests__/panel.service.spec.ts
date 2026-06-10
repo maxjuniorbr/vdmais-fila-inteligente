@@ -58,4 +58,39 @@ describe('PanelService', () => {
       }),
     ])
   })
+
+  it('returns every calling ticket (one per counter) and the most recent as current', async () => {
+    prisma.auditEvent.findMany.mockResolvedValue([])
+    prisma.ticket.findMany.mockImplementation((args: { where?: { state?: TicketState } }) => {
+      if (args?.where?.state === TicketState.CALLING) {
+        return Promise.resolve([
+          {
+            id: 'ticket-1',
+            code: 'A001',
+            calledAt: new Date('2026-06-10T12:00:00Z'),
+            representative: { fullName: 'Ana Paula Ferreira' },
+            counter: { number: 1 },
+          },
+          {
+            id: 'ticket-2',
+            code: 'A002',
+            calledAt: new Date('2026-06-10T12:01:00Z'),
+            representative: { fullName: 'Carla Mendes Costa' },
+            counter: { number: 2 },
+          },
+        ])
+      }
+      return Promise.resolve([])
+    })
+    const service = new PanelService(prisma as unknown as PrismaService)
+
+    const result = await service.getState('er-1')
+
+    expect(result.calling).toEqual([
+      expect.objectContaining({ code: 'A001', counterNumber: 1, displayName: 'Ana P.' }),
+      expect.objectContaining({ code: 'A002', counterNumber: 2, displayName: 'Carla M.' }),
+    ])
+    // Most recent calledAt wins as current (used for highlight + telemetry)
+    expect(result.current).toEqual(expect.objectContaining({ ticketId: 'ticket-2' }))
+  })
 })
