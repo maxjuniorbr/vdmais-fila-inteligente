@@ -272,15 +272,15 @@ export function PanelPage() {
 }
 
 const GB = {
-  bgDeep: '#1A0628',
-  bgHero: '#260A3A',
-  bgCol: '#21082F',
-  border: '#6B1F8A',
-  accent: '#D4A843',
-  textMain: '#F5F0FA',
-  textSub: '#C9B8D8',
-  textDim: '#7A5F8A',
-  rowDiv: '#3D1A52',
+  bgDeep: '#00301f', // verde profundo marca (canvas da TV)
+  bgHero: '#00422c', // cartão de chamada
+  bgCol: '#013a27', // blocos secundários
+  border: '#056b4c', // borda verde média
+  accent: '#d4a843', // dourado (acento)
+  textMain: '#ffffff',
+  textSub: '#d3ecdf', // verde 100
+  textDim: '#7fa593', // verde acinzentado para apoio
+  rowDiv: '#0a4d34', // divisor
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -474,16 +474,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sideLabel: {
     margin: 0,
-    fontSize: '1vw',
+    fontSize: '1.25vw',
     fontWeight: 700,
     letterSpacing: '0.18em',
     color: GB.accent,
     borderBottom: `1px solid ${GB.rowDiv}`,
-    paddingBottom: '0.5vh',
+    paddingBottom: '0.6vh',
   },
   sideDim: {
     color: GB.textDim,
-    fontSize: '1.1vw',
+    fontSize: '1.3vw',
     margin: 0,
   },
   nextList: {
@@ -496,39 +496,39 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'baseline',
     justifyContent: 'space-between',
-    padding: '0.4vh 0',
+    padding: '0.5vh 0',
     borderBottom: `1px solid ${GB.rowDiv}`,
   },
   nextCode: {
-    fontSize: '1.7vw',
+    fontSize: '2vw',
     fontWeight: 800,
     color: GB.textMain,
   },
   nextPos: {
-    fontSize: '1.1vw',
+    fontSize: '1.3vw',
     color: GB.textDim,
   },
   recentChips: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '0.5vw',
+    gap: '0.6vw',
     overflow: 'hidden',
-    maxHeight: '14vh',
+    maxHeight: '18vh',
   },
   recentChip: {
     display: 'inline-flex',
     alignItems: 'baseline',
-    gap: '0.4vw',
-    padding: '0.5vh 0.7vw',
+    gap: '0.5vw',
+    padding: '0.8vh 1vw',
     background: GB.bgHero,
     border: `1px solid ${GB.rowDiv}`,
     borderRadius: '999px',
-    fontSize: '1.2vw',
+    fontSize: '1.9vw',
     fontWeight: 800,
     color: GB.textSub,
   },
   recentChipCaixa: {
-    fontSize: '0.8vw',
+    fontSize: '1.05vw',
     fontWeight: 600,
     color: GB.textDim,
   },
