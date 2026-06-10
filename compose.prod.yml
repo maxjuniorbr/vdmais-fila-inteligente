@@ -1,0 +1,76 @@
+services:
+  migrate:
+    image: vdmais-fila-migration:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: migration
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    image: vdmais-fila-backend:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+      OBSERVABILITY_TOKEN: ${OBSERVABILITY_TOKEN:?OBSERVABILITY_TOKEN is required}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - '3000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    image: vdmais-fila-frontend:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - '${HTTP_PORT:-8080}:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/healthz']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true

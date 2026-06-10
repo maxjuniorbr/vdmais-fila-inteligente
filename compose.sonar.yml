@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  sonarqube:
+    image: docker.io/sonarqube:community
+    container_name: fila-sonarqube
+    restart: unless-stopped
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_logs:/opt/sonarqube/logs
+      - sonar_extensions:/opt/sonarqube/extensions
+
+  sonar-scanner:
+    image: docker.io/sonarsource/sonar-scanner-cli:latest
+    container_name: fila-sonar-scanner
+    depends_on:
+      - sonarqube
+    environment:
+      SONAR_HOST_URL: http://sonarqube:9000
+      SONAR_TOKEN: ${SONAR_TOKEN:-}
+    volumes:
+      - .:/usr/src
+    working_dir: /usr/src
+    profiles:
+      - scan
+
+volumes:
+  sonar_data:
+  sonar_logs:
+  sonar_extensions:

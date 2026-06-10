@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+
+# Kiro settings (pode conter API keys)
+.kiro/settings/
+
+# SonarQube local
+.scannerwork/
