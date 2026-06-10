@@ -1,0 +1,341 @@
+/*
+ * VD+ Fila Inteligente — tema a organização (white theme)
+ * Tokens de marca, reset, acessibilidade e utilitários responsivos.
+ */
+
+:root {
+  /* Verdes institucionais (marca — verde profundo Pantone 343 e apoios) */
+  --gb-green-900: #00301f;
+  --gb-green-800: #00422c;
+  --gb-green-700: #00543d; /* primário — contraste AAA com branco */
+  --gb-green-600: #056b4c;
+  --gb-green-500: #0d8a5f;
+  --gb-green-400: #2fae7d;
+  --gb-green-100: #d3ecdf;
+  --gb-green-50: #ecf7f1;
+
+  /* Apoio dourado (acentos pontuais, par clássico do verde marca) */
+  --gb-gold-600: #a87b2d;
+  --gb-gold-400: #d4a843;
+
+  /* Neutros */
+  --gb-ink: #1c2b25;
+  --gb-ink-soft: #44574e;
+  --gb-ink-muted: #6b7f75;
+  --gb-surface: #ffffff;
+  --gb-canvas: #f4f9f6;
+  --gb-border: #dbe8e1;
+  --gb-border-strong: #c2d6cb;
+
+  /* Feedback */
+  --gb-danger: #b3261e;
+  --gb-danger-soft: #fdeceb;
+  --gb-warning: #8a5a00;
+  --gb-warning-soft: #fff4dd;
+  --gb-success: #00543d;
+  --gb-success-soft: #ecf7f1;
+
+  --gb-radius: 12px;
+  --gb-shadow: 0 1px 2px rgba(0, 48, 31, 0.06), 0 4px 16px rgba(0, 48, 31, 0.05);
+  --gb-font: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--gb-font);
+  background: var(--gb-canvas);
+  color: var(--gb-ink);
+  line-height: 1.5;
+}
+
+/* ── Acessibilidade ───────────────────────────────────────────── */
+
+/* Foco visível consistente em todos os elementos interativos */
+:focus-visible {
+  outline: 3px solid var(--gb-green-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Conteúdo apenas para leitores de tela */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Link "pular para o conteúdo" */
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  z-index: 100;
+  padding: 0.6rem 1rem;
+  background: var(--gb-green-700);
+  color: #fff;
+  border-radius: 0 0 8px 0;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Controles de formulário ─────────────────────────────────── */
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+/* Alvo de toque mínimo de 44px (WCAG 2.5.5) para botões e campos */
+.gb-control {
+  min-height: 44px;
+}
+
+input.gb-control,
+select.gb-control,
+textarea.gb-control {
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+input.gb-control:focus,
+select.gb-control:focus,
+textarea.gb-control:focus {
+  outline: none;
+  border-color: var(--gb-green-500);
+  box-shadow: 0 0 0 3px rgba(13, 138, 95, 0.25);
+}
+
+button.gb-button {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 80ms ease;
+}
+
+button.gb-button:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+button.gb-button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.gb-action-link {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 80ms ease;
+}
+
+.gb-action-link:hover {
+  filter: brightness(1.04);
+}
+
+.gb-action-link:active {
+  transform: translateY(1px);
+}
+
+.gb-home-primary-link,
+.gb-home-access-card {
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 100ms ease;
+}
+
+.gb-home-primary-link:hover {
+  filter: brightness(1.08);
+}
+
+.gb-home-access-card:hover {
+  border-color: var(--gb-green-400) !important;
+  box-shadow: 0 10px 28px rgba(0, 48, 31, 0.1) !important;
+  transform: translateY(-2px);
+}
+
+/* ── Utilitários responsivos ─────────────────────────────────── */
+
+/* Grade da Operação: principal + lateral → empilha no mobile */
+.gb-grid-operation {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* Grade de métricas da Gestão */
+.gb-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+}
+
+/* Formulário em linha → empilha no mobile */
+.gb-inline-form {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.gb-inline-form > * {
+  min-width: 0;
+}
+
+.gb-admin-er-grid,
+.gb-admin-access-grid,
+.gb-admin-resource-grid,
+.gb-admin-summary-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.gb-admin-er-grid {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.gb-admin-access-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.gb-admin-resource-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.gb-admin-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gb-home-access-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .gb-grid-operation {
+    grid-template-columns: 1fr;
+  }
+
+  .gb-admin-resource-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gb-home-access-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .gb-topbar {
+    padding: 0.75rem 1rem !important;
+    flex-wrap: wrap;
+  }
+
+  .gb-page-content {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .gb-metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  .gb-admin-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gb-home-access-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gb-home-session,
+  .gb-home-panel-note {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .gb-home-session > a,
+  .gb-home-panel-note > a {
+    width: 100%;
+  }
+
+  .gb-home-session > div:last-child {
+    width: 100%;
+  }
+
+  .gb-home-session > div:last-child > a {
+    width: 100%;
+  }
+}
+
+/* ── Tabelas (Gestão) ────────────────────────────────────────── */
+
+.gb-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+.gb-table th {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gb-ink-muted);
+  border-bottom: 2px solid var(--gb-border-strong);
+  white-space: nowrap;
+}
+
+.gb-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--gb-border);
+  color: var(--gb-ink-soft);
+}
+
+.gb-table tbody tr:hover {
+  background: var(--gb-green-50);
+}
+
+.gb-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

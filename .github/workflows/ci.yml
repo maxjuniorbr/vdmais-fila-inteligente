@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fila
+          POSTGRES_PASSWORD: fila_dev_pass
+          POSTGRES_DB: fila_inteligente
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm exec --workspace=apps/backend prisma generate
+
+      - name: Run Prisma migrations
+        run: npm exec --workspace=apps/backend prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://fila:fila_dev_pass@localhost:5432/fila_inteligente
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm run test --workspace=apps/backend -- --watchman=false --runInBand
+        env:
+          DATABASE_URL: postgresql://fila:fila_dev_pass@localhost:5432/fila_inteligente
+          JWT_SECRET: ci-test-secret
+          JWT_EXPIRES_IN: 7d
+
+      - name: End-to-end tests
+        run: npm run test:e2e --workspace=apps/backend -- --watchman=false --runInBand
+        env:
+          DATABASE_URL: postgresql://fila:fila_dev_pass@localhost:5432/fila_inteligente
+          JWT_SECRET: ci-test-secret
+          JWT_EXPIRES_IN: 7d
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Build backend production image
+        run: docker build -f apps/backend/Dockerfile .
+
+      - name: Build migration production image
+        run: docker build --target migration -f apps/backend/Dockerfile .
+
+      - name: Build frontend production image
+        run: docker build -f apps/frontend/Dockerfile .
