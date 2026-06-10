@@ -10,7 +10,11 @@ export function useSocket(erId: string, clientType = 'dashboard') {
       return
     }
 
-    const s = io('/', {
+    // In production the socket connects directly to the backend (WebSocket
+    // cannot be proxied through Vercel). In dev it stays relative so the Vite
+    // proxy forwards /socket.io to localhost:3000.
+    const socketUrl = import.meta.env.VITE_API_URL || '/'
+    const s = io(socketUrl, {
       auth: { token: sessionStorage.getItem('token') },
       reconnectionAttempts: Infinity,
       reconnectionDelay: 2000,
