@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: docker.io/postgres:16-alpine
+    container_name: fila-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fila
+      POSTGRES_PASSWORD: fila_dev_pass
+      POSTGRES_DB: fila_inteligente
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fila -d fila_inteligente"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile.dev
+    container_name: fila-backend
+    restart: unless-stopped
+    env_file:
+      - ./apps/backend/.env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://fila:fila_dev_pass@postgres:5432/fila_inteligente
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile.dev
+    container_name: fila-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev -- --host
+
+volumes:
+  postgres_data:

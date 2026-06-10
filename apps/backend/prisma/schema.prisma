@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  REPRESENTATIVE
+  OPERATOR
+  ATTENDANT
+  MANAGER
+  ADMIN
+}
+
+enum TicketState {
+  WAITING    // Aguardando
+  CALLING    // Chamando
+  IN_SERVICE // Em atendimento
+  FINISHED   // Finalizado
+  NO_SHOW    // Não compareceu
+  CANCELLED  // Cancelado
+  PAUSED     // RE avisou que não está pronta; volta ao fim da fila ao retomar
+}
+
+enum EntryChannel {
+  QR_CODE
+  LINK
+  CHECKIN_ASSISTED
+}
+
+enum CounterState {
+  UNAVAILABLE
+  ACTIVE
+  CALLING
+  IN_SERVICE
+  PAUSED
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model Representative {
+  id           String   @id @default(cuid())
+  fullName     String
+  cpf          String   @unique
+  phone        String   @unique
+  birthDate    DateTime
+  reCode       String   @unique
+  passwordHash String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tickets     Ticket[]
+  auditEvents AuditEvent[]
+
+  @@map("representatives")
+}
+
+model ER {
+  id          String    @id @default(cuid())
+  name        String
+  qrCodeUrl   String?
+  isDayOpen   Boolean   @default(false)
+  dayOpenedAt DateTime?
+  dayClosedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  counters    Counter[]
+  operators   Operator[]
+  queues      Queue[]
+  tickets     Ticket[]
+  auditEvents AuditEvent[]
+
+  @@map("ers")
+}
+
+model Queue {
+  id           String    @id @default(cuid())
+  businessDate DateTime  @db.Date
+  nextSequence Int       @default(0)
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+
+  erId    String
+  er      ER       @relation(fields: [erId], references: [id])
+  tickets Ticket[]
+
+  @@unique([erId, businessDate])
+  @@map("queues")
+}
+
+model Counter {
+  id     String       @id @default(cuid())
+  number Int
+  state  CounterState @default(UNAVAILABLE)
+  erId   String
+  er     ER           @relation(fields: [erId], references: [id])
+
+  operatorId String?
+  operator   Operator? @relation(fields: [operatorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tickets Ticket[]
+
+  @@unique([erId, number])
+  @@map("counters")
+}
+
+model Operator {
+  id           String @id @default(cuid())
+  name         String
+  email        String @unique
+  passwordHash String
+  role         Role   @default(OPERATOR)
+
+  // Null for global staff (e.g. ADMIN), which is not tied to a single ER.
+  erId String?
+  er   ER?     @relation(fields: [erId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  counters        Counter[]
+  tickets         Ticket[]
+  assistedTickets Ticket[]     @relation("CheckinAttendant")
+  auditEvents     AuditEvent[]
+
+  @@map("operators")
+}
+
+model Ticket {
+  id            String       @id @default(cuid())
+  code          String // e.g. A023
+  state         TicketState  @default(WAITING)
+  entryChannel  EntryChannel
+  queuePosition Int
+
+  queueId String
+  queue   Queue  @relation(fields: [queueId], references: [id])
+
+  erId String
+  er   ER     @relation(fields: [erId], references: [id])
+
+  representativeId String
+  representative   Representative @relation(fields: [representativeId], references: [id])
+
+  counterId String?
+  counter   Counter? @relation(fields: [counterId], references: [id])
+
+  operatorId String?
+  operator   Operator? @relation(fields: [operatorId], references: [id])
+
+  checkinAttendantId String?
+  checkinAttendant   Operator? @relation("CheckinAttendant", fields: [checkinAttendantId], references: [id])
+
+  calledAt          DateTime?
+  serviceStartedAt  DateTime?
+  serviceFinishedAt DateTime?
+  noShowAt          DateTime?
+  cancelledAt       DateTime?
+  pausedAt          DateTime?  // set when state → PAUSED, cleared on resume
+  pausedSeconds     Int        @default(0) // cumulative paused time (excluded from wait metrics)
+  cancelReason      String?
+  restoreReason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditEvents AuditEvent[]
+
+  @@unique([queueId, queuePosition])
+  @@index([erId, state, queuePosition])
+  @@map("tickets")
+}
+
+model AuditEvent {
+  id               String          @id @default(cuid())
+  eventType        String
+  erId             String
+  er               ER              @relation(fields: [erId], references: [id])
+  ticketId         String?
+  ticket           Ticket?         @relation(fields: [ticketId], references: [id])
+  representativeId String?
+  representative   Representative? @relation(fields: [representativeId], references: [id])
+  operatorId       String?
+  operator         Operator?       @relation(fields: [operatorId], references: [id])
+  metadata         Json?
+  createdAt        DateTime        @default(now())
+
+  @@map("audit_events")
+}

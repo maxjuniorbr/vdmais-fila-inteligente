@@ -1,0 +1,27 @@
+{
+	"servers": {
+		"render": {
+			"type": "http",
+			"url": "https://mcp.render.com/mcp",
+			"headers": {
+				"Authorization": "Bearer ${input:render_api_key}"
+			}
+		},
+		"vercel": {
+			"type": "http",
+			"url": "https://mcp.vercel.com"
+		},
+		"supabase": {
+			"type": "http",
+			"url": "https://mcp.supabase.com/mcp"
+		}
+	},
+	"inputs": [
+		{
+			"id": "render_api_key",
+			"type": "promptString",
+			"description": "Render API Key",
+			"password": true
+		}
+	]
+}
