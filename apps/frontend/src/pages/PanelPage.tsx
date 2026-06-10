@@ -140,7 +140,8 @@ export function PanelPage() {
   }, [calling, erId])
 
   const callCount = calling.length
-  const columns = callCount <= 1 ? 1 : callCount <= 4 ? 2 : 3
+  // TV-friendly column counts: 1→1, 2→2, 3→3, 4→2x2, 5/6→3 cols.
+  const columns = callCount <= 1 ? 1 : callCount === 2 || callCount === 4 ? 2 : 3
   // Font scales down as more counters call at once so cards never overflow.
   const codeSize = callCount <= 1 ? 'min(11vw, 17vh)' : callCount <= 2 ? 'min(7vw, 12vh)' : 'min(5vw, 9vh)'
   const nameSize = callCount <= 2 ? 'min(2.6vw, 4vh)' : 'min(1.8vw, 3vh)'
