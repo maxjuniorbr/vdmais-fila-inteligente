@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { CounterState, Role } from '@prisma/client'
+import { CounterState, Prisma, Role } from '@prisma/client'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { PanelGateway } from '../panel/panel.gateway'
 
@@ -48,35 +48,51 @@ export class CounterService {
       throw new ConflictException('A operadora já possui outro caixa aberto')
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.counter.update({
-        where: { id: counterId },
-        data: { state: CounterState.ACTIVE, operatorId: user.userId },
-      })
-      await tx.auditEvent.create({
-        data: {
-          eventType: 'counter_assigned',
-          erId: counter.erId,
-          operatorId: user.userId,
-          metadata: { counterId, counterNumber: counter.number },
-        },
-      })
-      await tx.auditEvent.create({
-        data: {
-          eventType: 'counter_opened',
-          erId: counter.erId,
-          operatorId: user.userId,
-          metadata: { counterId, counterNumber: counter.number },
-        },
-      })
-      return result
-    })
+    try {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const assignment = await tx.counter.updateMany({
+          where: {
+            id: counterId,
+            state: CounterState.UNAVAILABLE,
+            operatorId: null,
+          },
+          data: { state: CounterState.ACTIVE, operatorId: user.userId },
+        })
+        if (assignment.count !== 1) {
+          throw new ConflictException('O caixa já está aberto')
+        }
 
-    this.panelGateway.emitToER(counter.erId, 'counter.opened', {
-      counterId,
-      number: counter.number,
-    })
-    return updated
+        const result = await tx.counter.findUniqueOrThrow({ where: { id: counterId } })
+        await tx.auditEvent.create({
+          data: {
+            eventType: 'counter_assigned',
+            erId: counter.erId,
+            operatorId: user.userId,
+            metadata: { counterId, counterNumber: counter.number },
+          },
+        })
+        await tx.auditEvent.create({
+          data: {
+            eventType: 'counter_opened',
+            erId: counter.erId,
+            operatorId: user.userId,
+            metadata: { counterId, counterNumber: counter.number },
+          },
+        })
+        return result
+      })
+
+      this.panelGateway.emitToER(counter.erId, 'counter.opened', {
+        counterId,
+        number: counter.number,
+      })
+      return updated
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('A operadora já possui outro caixa aberto')
+      }
+      throw error
+    }
   }
 
   async pauseCounter(counterId: string, user: AuthenticatedUser, reason: string) {

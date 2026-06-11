@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
-import { timingSafeEqual } from 'crypto'
+import { timingSafeEqual } from 'node:crypto'
 import { Response } from 'express'
 import { PrismaService } from '../prisma/prisma.service'
 import { ObservabilityService } from './observability.service'
