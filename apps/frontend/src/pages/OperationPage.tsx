@@ -192,6 +192,7 @@ export function OperationPage() {
               </p>
 
               <Select
+                label="Caixa de atendimento"
                 style={{ borderRadius: 10 }}
                 value={counterId}
                 onChange={(event) => selectCounter(event.target.value)}
@@ -225,6 +226,8 @@ export function OperationPage() {
                   {currentCounter.state === 'ACTIVE' && (
                     <>
                       <Input
+                        label="Motivo da pausa"
+                        containerStyle={{ flex: 1, minWidth: 160, marginBottom: 0 }}
                         style={{ flex: 1, minWidth: 160, borderRadius: 10 }}
                         placeholder="Motivo da pausa"
                         value={pauseReason}

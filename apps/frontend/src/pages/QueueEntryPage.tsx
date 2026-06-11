@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { clearSession } from '../auth/session'
 import { Alert } from '../components/Alert'
@@ -9,6 +9,7 @@ import { layout } from '../styles/layout'
 import { brand } from '../styles/brand'
 
 type Mode = 'login' | 'register'
+const ACCESS_MODES: Mode[] = ['login', 'register']
 
 interface PublicER {
   id: string
@@ -23,6 +24,14 @@ export function QueueEntryPage() {
   const isLink = searchParams.get('source') === 'link'
   const sourceQuery = isLink ? '?source=link' : ''
   const [mode, setMode] = useState<Mode>('login')
+  const loginTabId = useId()
+  const registerTabId = useId()
+  const loginPanelId = useId()
+  const registerPanelId = useId()
+  const tabRefs = useRef<Record<Mode, HTMLButtonElement | null>>({
+    login: null,
+    register: null,
+  })
   const [er, setER] = useState<PublicER | null>(null)
   const [loadingER, setLoadingER] = useState(true)
   const [erConfirmed, setERConfirmed] = useState(false)
@@ -85,6 +94,31 @@ export function QueueEntryPage() {
 
     sessionStorage.setItem(`queue-entry:${erId}`, isLink ? 'LINK' : 'QR_CODE')
     return true
+  }
+
+  function selectMode(nextMode: Mode, moveFocus = false) {
+    setMode(nextMode)
+    if (moveFocus) tabRefs.current[nextMode]?.focus()
+  }
+
+  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, currentMode: Mode) {
+    const currentIndex = ACCESS_MODES.indexOf(currentMode)
+    let nextMode: Mode | null = null
+
+    if (event.key === 'ArrowRight') {
+      nextMode = ACCESS_MODES[(currentIndex + 1) % ACCESS_MODES.length]
+    } else if (event.key === 'ArrowLeft') {
+      nextMode = ACCESS_MODES[(currentIndex - 1 + ACCESS_MODES.length) % ACCESS_MODES.length]
+    } else if (event.key === 'Home') {
+      nextMode = ACCESS_MODES[0]
+    } else if (event.key === 'End') {
+      nextMode = ACCESS_MODES[ACCESS_MODES.length - 1]
+    }
+
+    if (nextMode) {
+      event.preventDefault()
+      selectMode(nextMode, true)
+    }
   }
 
   async function handleLogin(e: React.SyntheticEvent) {
@@ -182,28 +216,47 @@ export function QueueEntryPage() {
       <section style={styles.card}>
         <div style={styles.tabs} role="tablist" aria-label="Forma de acesso">
           <button
+            id={loginTabId}
+            ref={(element) => {
+              tabRefs.current.login = element
+            }}
             type="button"
             role="tab"
             aria-selected={mode === 'login'}
+            aria-controls={loginPanelId}
+            tabIndex={mode === 'login' ? 0 : -1}
             className="gb-button"
             style={{ ...styles.tab, ...(mode === 'login' ? styles.tabActive : null) }}
-            onClick={() => setMode('login')}
+            onClick={() => selectMode('login')}
+            onKeyDown={(event) => handleTabKeyDown(event, 'login')}
           >
             Já tenho cadastro
           </button>
           <button
+            id={registerTabId}
+            ref={(element) => {
+              tabRefs.current.register = element
+            }}
             type="button"
             role="tab"
             aria-selected={mode === 'register'}
+            aria-controls={registerPanelId}
+            tabIndex={mode === 'register' ? 0 : -1}
             className="gb-button"
             style={{ ...styles.tab, ...(mode === 'register' ? styles.tabActive : null) }}
-            onClick={() => setMode('register')}
+            onClick={() => selectMode('register')}
+            onKeyDown={(event) => handleTabKeyDown(event, 'register')}
           >
             Criar cadastro
           </button>
         </div>
 
-        {mode === 'login' ? (
+        <div
+          id={loginPanelId}
+          role="tabpanel"
+          aria-labelledby={loginTabId}
+          hidden={mode !== 'login'}
+        >
           <form onSubmit={handleLogin} style={{ marginTop: '1.25rem' }}>
             <Input
               label="CPF ou Código RE"
@@ -229,7 +282,14 @@ export function QueueEntryPage() {
               {loading ? 'Entrando...' : 'Entrar na fila'}
             </Button>
           </form>
-        ) : (
+        </div>
+
+        <div
+          id={registerPanelId}
+          role="tabpanel"
+          aria-labelledby={registerTabId}
+          hidden={mode !== 'register'}
+        >
           <form onSubmit={handleRegister} style={{ marginTop: '1.25rem' }}>
             {(
               [
@@ -260,7 +320,7 @@ export function QueueEntryPage() {
               {loading ? 'Cadastrando...' : 'Criar cadastro e entrar'}
             </Button>
           </form>
-        )}
+        </div>
       </section>
     </main>
   )

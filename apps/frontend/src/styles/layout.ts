@@ -250,17 +250,6 @@ export const layout: Record<string, CSSProperties> = {
     fontWeight: 500,
   },
 
-  // Confirmation overlay backdrop
-  overlay: {
-    position: 'fixed',
-    inset: 0,
-    zIndex: 50,
-    display: 'grid',
-    placeItems: 'center',
-    padding: '1rem',
-    background: 'rgba(0, 48, 31, 0.55)',
-  },
-
   // Confirmation modal card
   modal: {
     display: 'grid',
