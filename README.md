@@ -20,17 +20,21 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 
 > 📖 Para entender o passo a passo de cada perfil de usuário (RE, operadora, atendente, gestora, admin), veja o **[Guia de uso por persona](./docs/guia-personas.md)**.
 
+## Documentação complementar
+
+- [Guia de uso por persona](./docs/guia-personas.md)
+- [MVP — escopo e validação](./docs/mvp.md)
+- [Stack técnica do MVP](./docs/stack-mvp.md)
+- [Deploy do MVP](./docs/deployment-mvp.md)
+- [Diretrizes e heurísticas de design](./docs/diretrizes-heuristicas.md)
+
 ---
 
-## Tecnologias
+## Escopo deste README
 
-| Camada    | Stack                                              |
-| --------- | -------------------------------------------------- |
-| Backend   | NestJS 11, Prisma 6, Socket.IO, JWT, bcrypt        |
-| Frontend  | React 19, Vite 8, React Router 7, Socket.IO Client |
-| Banco     | PostgreSQL 16                                      |
-| Qualidade | Jest, ESLint, Prettier, SonarQube e GitHub Actions |
-| Infra     | Docker/Podman Compose, imagens Node.js 22 e Nginx  |
+Este README cobre apenas setup local, execução e comandos de desenvolvimento.
+Decisões de produto, stack, deploy e jornada de uso ficam centralizadas nos
+documentos da seção **Documentação complementar**.
 
 ---
 
@@ -161,67 +165,6 @@ npm run dev:frontend
 
 ---
 
-## Rotas da aplicação
-
-| URL                       | Descrição                                                            | Perfil        |
-| ------------------------- | -------------------------------------------------------------------- | ------------- |
-| `/`                       | Menu principal para os acessos internos                              | Equipe        |
-| `/fila/:erId`             | Entrada presencial por QR Code                                       | RE            |
-| `/fila/:erId?source=link` | Entrada pelo link alternativo, com confirmação do ER                 | RE            |
-| `/fila/:erId/senha`       | Senha ativa, posição, pausa, retomada e saída da fila                | RE            |
-| `/operacao`               | Chamada, rechamada, início, finalização, não comparecimento e controle do caixa | Operadora     |
-| `/checkin`                | Busca/cadastro da RE e entrada assistida na fila                     | Atendente     |
-| `/gestao`                 | Fila, métricas, caixas e abertura/encerramento da operação           | Gestora/Admin |
-| `/painel/:erId`           | Painel público de chamadas para TV/display                           | Público       |
-| `/admin`                  | Configuração de ERs, acessos, caixas e contas de equipe              | Administrador |
-
-O menu principal em `/` apresenta somente os acessos internos. A fila da RE não aparece nele porque sua entrada deve ocorrer pelo QR Code ou link específico de um ER. Quando uma sessão de equipe já existe no navegador, o menu destaca as áreas permitidas para o perfil. O administrador pode acessar tanto **Administração** quanto **Gestão da fila**; na Gestão, deve selecionar o ER que deseja acompanhar.
-
-Os links do portal navegam na mesma aba, preservando o comportamento esperado de um menu interno. Abertura em nova aba é usada somente em ações explícitas que favorecem contexto paralelo, como testar links ou abrir o painel de TV a partir da Administração.
-
----
-
-## Preparação de um ER
-
-Depois de criar a conta administrativa:
-
-1. Acesse `/` e escolha **Administração** ou entre diretamente em `/admin`.
-2. Clique em **Gerenciar ER**.
-3. Cadastre os caixas físicos que serão usados no atendimento.
-4. Crie ao menos uma conta de **Gestora** e uma de **Operadora**.
-5. Crie uma conta de **Atendente** caso o ER utilize check-in assistido.
-6. Copie ou teste os acessos apresentados na seção **Acessos do ER**:
-   - **QR Code presencial:** endereço principal para gerar o QR Code exposto dentro do ER;
-   - **Link alternativo:** contém `?source=link`, exige confirmação do ER e registra corretamente esse canal;
-   - **Painel de TV:** endereço público que deve ser aberto no navegador conectado à TV.
-7. A gestora acessa `/gestao` e abre a operação do dia.
-8. As operadoras acessam `/operacao`, selecionam e abrem seus caixas.
-
-O nome do ER pode ser alterado na própria tela de gerenciamento. Os estados dos caixas e da operação também aparecem nessa área.
-
----
-
-## Execução com containers
-
-Para desenvolvimento, o fluxo recomendado é executar apenas o PostgreSQL pelo Compose e iniciar a aplicação com `npm run dev`, preservando o recarregamento automático.
-
-O ambiente de produção usa `compose.prod.yml`, executa as migrations antes do backend e publica o frontend na porta `8080` por padrão:
-
-```bash
-DATABASE_URL="postgresql://usuario:senha@host:5432/fila_inteligente?schema=public" \
-JWT_SECRET="um-segredo-longo-e-aleatorio" \
-FRONTEND_URL="https://fila.exemplo.com" \
-OBSERVABILITY_TOKEN="outro-token-longo-e-aleatorio" \
-docker compose -f compose.prod.yml up --build -d
-```
-
-Use `HTTP_PORT` para alterar a porta publicada e `IMAGE_TAG` para definir a etiqueta das imagens:
-
-```bash
-HTTP_PORT=8081 IMAGE_TAG=v1.0.0 docker compose -f compose.prod.yml up -d
-```
-
----
 
 ## Comandos úteis
 
@@ -294,41 +237,9 @@ vdmais-fila-inteligente/
 
 ---
 
-## Variáveis de ambiente (backend)
+## Referências operacionais
 
-| Variável              | Descrição                                                  | Padrão/uso                  |
-| --------------------- | ---------------------------------------------------------- | --------------------------- |
-| `DATABASE_URL`        | String de conexão com PostgreSQL                           | Obrigatória                 |
-| `NODE_ENV`            | Ambiente de execução (`development`, `test`, `production`) | Obrigatória em produção     |
-| `JWT_SECRET`          | Segredo para assinatura dos tokens JWT (mín. 32 chars fora de dev/test) | Obrigatória    |
-| `JWT_EXPIRES_IN`      | Expiração do token (`15m`, `8h`, `7d`, por exemplo)        | `8h` no Compose prod        |
-| `PORT`                | Porta do servidor NestJS                                   | `3000`                      |
-| `FRONTEND_URL`        | Origem permitida no CORS                                   | `http://localhost:5173`     |
-| `OBSERVABILITY_TOKEN` | Token Bearer de `/observability/metrics`; sem ele o endpoint retorna 401 | Obrigatória |
-| `CALL_TIMEOUT_MINUTES` | Tolerância (min) para encerrar automaticamente uma senha presa em chamada | `10` (padrão) |
-| `ADMIN_EMAIL`         | E-mail usado pelo seed administrativo                      | Usado somente no seed       |
-| `ADMIN_PASSWORD`      | Senha inicial do administrador, com no mínimo 8 caracteres | Usado somente no seed       |
-| `ADMIN_NAME`          | Nome da conta administrativa inicial                       | `Administrador`             |
-
-### Saúde e observabilidade
-
-- `GET /health/live`: indica que o processo está em execução.
-- `GET /health/ready`: verifica a conexão com o PostgreSQL.
-- `GET /observability/metrics`: métricas no formato Prometheus; envie `Authorization: Bearer <OBSERVABILITY_TOKEN>`. O endpoint retorna 401 se o token não estiver configurado no servidor.
-
----
-
-## Fluxo rápido de teste manual
-
-1. **Administrador:** acesse `/`, escolha **Administração**, crie o ER, os caixas e as contas de equipe; copie os três acessos da unidade.
-2. **Gestora:** acesse `/gestao` e abra a operação do dia.
-3. **Painel de TV:** abra `/painel/<erId>` em tela cheia. O quadro "Chamando agora" mostra uma chamada por caixa (a mais recente pisca); "Próximas senhas" faz rodízio automático quando há mais de 7 aguardando.
-4. **Operadora:** acesse `/operacao`, selecione um caixa livre e clique em **Assumir e abrir caixa**.
-5. **RE pelo QR Code:** acesse `/fila/<erId>`, faça login ou cadastro e entre na fila.
-6. **RE pelo link alternativo:** use `/fila/<erId>?source=link` e confirme o ER antes de continuar.
-7. **Check-in assistido:** acesse `/checkin` com uma conta de atendente, localize ou cadastre a RE e gere sua senha.
-8. **Atendimento:** a operadora chama a próxima senha. Se a RE não aparecer de imediato, pode usar **Rechamar** (segunda chamada, re-anuncia no painel) antes de iniciar o atendimento ou marcar não comparecimento.
-
-Na tela da senha, a RE pode pausar sua participação, retomá-la no fim da fila ou sair da fila. Se fechar a página e retornar pelo mesmo acesso, o sistema recupera a senha ativa após a autenticação.
-
-> 📖 O **[Guia de uso por persona](./docs/guia-personas.md)** detalha a jornada completa de cada perfil.
+- Rotas, papéis e fluxo manual de uso: [Guia de uso por persona](./docs/guia-personas.md)
+- Escopo funcional e limites do produto: [MVP — escopo e validação](./docs/mvp.md)
+- Stack e decisões técnicas: [Stack técnica do MVP](./docs/stack-mvp.md)
+- Deploy, variáveis de produção, observabilidade e rollback: [Deploy do MVP](./docs/deployment-mvp.md)
