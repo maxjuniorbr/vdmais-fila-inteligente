@@ -9,6 +9,10 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - Saída real da fila via cancelamento próprio
 - Operação por caixa logado com chamada atômica do próximo (sem conflito entre operadoras)
 - Segunda chamada (rechamada) da senha em chamada, antes de marcar não comparecimento
+- Abertura do dia com saneamento automático: sobras de um dia não encerrado são fechadas e os caixas liberados, evitando travar a operação do novo dia
+- Restauração de senha não comparecida ou cancelada antes do atendimento, preservando a regra de uma senha ativa por RE
+- Tempo limite de chamada: senhas paradas em chamada além da tolerância são marcadas como não comparecimento automaticamente, liberando o caixa
+- Encerramento do dia auto-finaliza atendimentos em aberto; gestora pode liberar caixas órfãos deixados por operadoras que saíram sem fechar
 - Painel TV/display com quadro "Chamando agora" multicaixa (cartão piscante na chamada mais recente), próximas senhas com rodízio automático, atendimentos em andamento e tempos médios
 - Gestão com métricas de espera, atendimento, canais de entrada, caixas e não comparecimentos
 - Administração de ERs, caixas e contas de equipe, com ações para copiar e testar os acessos
@@ -35,6 +39,20 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - **Node.js** >= 22
 - **npm** >= 10
 - **Docker Compose** ou **Podman Compose**
+- **nvm** (recomendado para padronizar versão do Node)
+
+Padronização de versão local com nvm:
+
+```bash
+nvm use
+```
+
+> O repositório possui arquivo `.nvmrc` com a versão alvo. Se a versão ainda não estiver instalada na máquina:
+
+```bash
+nvm install
+nvm use
+```
 
 Verificar:
 
@@ -287,6 +305,7 @@ vdmais-fila-inteligente/
 | `PORT`                | Porta do servidor NestJS                                   | `3000`                      |
 | `FRONTEND_URL`        | Origem permitida no CORS                                   | `http://localhost:5173`     |
 | `OBSERVABILITY_TOKEN` | Token Bearer de `/observability/metrics`; sem ele o endpoint retorna 401 | Obrigatória |
+| `CALL_TIMEOUT_MINUTES` | Tolerância (min) para encerrar automaticamente uma senha presa em chamada | `10` (padrão) |
 | `ADMIN_EMAIL`         | E-mail usado pelo seed administrativo                      | Usado somente no seed       |
 | `ADMIN_PASSWORD`      | Senha inicial do administrador, com no mínimo 8 caracteres | Usado somente no seed       |
 | `ADMIN_NAME`          | Nome da conta administrativa inicial                       | `Administrador`             |

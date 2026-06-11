@@ -91,6 +91,10 @@ Relacionamento e precisa ser atendida.
      faz o cartão piscar de novo no painel), **sem mexer na fila**.
    - **Não compareceu:** encerra a senha como _não compareceu_ e libera o caixa.
 
+> Se a senha ficar em chamada além da tolerância (padrão 10 min) sem ação, o
+> sistema a marca como _não compareceu_ automaticamente e libera o caixa, para
+> que ele não fique preso.
+
 **Pausa do caixa:**
 
 - **Pausar caixa** (com motivo) quando precisar de um intervalo — o caixa deixa
@@ -133,11 +137,15 @@ os indicadores.
 
 1. Faz login com a conta de **gestora** (e seleciona o ER, se necessário).
 2. **Abrir operação** no início do dia — é o que habilita as REs a entrarem na
-   fila e as operadoras a chamarem.
+   fila e as operadoras a chamarem. Se a operação do dia anterior tiver ficado
+   **sem encerramento**, a abertura **saneia** as sobras: senhas pendentes do dia
+   anterior são encerradas automaticamente (a RE já não está na loja) e os caixas
+   são liberados, desbloqueando a operação do novo dia.
 3. Durante o dia, acompanha em tempo real:
    - **Métricas:** aguardando, pausados, espera média/mediana, atendimento
      médio/mediano, tempo entre chamada e início, finalizados, não
-     comparecimentos, cancelamentos, restaurações, caixas ativos/pausados;
+     comparecimentos, cancelamentos, restaurações, encerramentos automáticos na
+     virada de dia, caixas ativos/pausados;
    - **Distribuição:** por canal de entrada, por hora, horários de pico,
      atendimentos por caixa e por operadora;
    - **Fila e caixas:** quem está aguardando, em chamada e em atendimento.
@@ -146,10 +154,20 @@ os indicadores.
 **Exceções que a gestora resolve:**
 
 - **Cancelar** qualquer senha com motivo.
-- **Restaurar** uma senha marcada como _não compareceu_ — volta para o **fim**
-  da fila (diferente da rechamada da operadora, que é uma segunda chamada da
-  senha que ainda está em chamada).
+- **Restaurar** uma senha que ficou como _não compareceu_ — ou que foi
+  _cancelada antes do atendimento_ (ex.: cancelamento indevido). A senha volta
+  para o **fim** da fila (diferente da rechamada da operadora, que é uma segunda
+  chamada da senha que ainda está em chamada). Senhas canceladas **após o início
+  do atendimento** não podem ser restauradas, e a restauração é bloqueada se a RE
+  já tiver outra senha ativa.
 - **Corrigir** um atendimento que ficou em aberto (finalizar ou cancelar).
+- **Liberar caixa** quando uma operadora abandona o caixa (saiu sem fechar, a
+  sessão expirou). A senha em aberto é resolvida automaticamente (finalizada ou
+  marcada como não compareceu) e o caixa volta a ficar disponível.
+
+> Ao **encerrar a operação do dia**, atendimentos que ficaram em aberto são
+> finalizados automaticamente, e senhas em chamada paradas além da tolerância
+> são encerradas como não comparecimento por um processo automático.
 
 ---
 
@@ -203,10 +221,18 @@ nascimento.
 Aguardando → Chamando → Em atendimento → Finalizado
                  │              
                  ├─→ Não compareceu  (operadora; pode restaurar → Aguardando, no fim)
+                 ├─→ Não compareceu  (automático: tempo limite de chamada excedido)
                  └─→ Rechamar        (operadora; segunda chamada, continua Chamando)
 
-Aguardando → Pausado → Aguardando (RE pausa/retoma; volta ao fim da fila)
+Aguardando → Pausado → Aguardando (RE pausa/retoma; volta ao fim da fila de hoje)
 Aguardando/Pausado → Cancelado    (RE sai da fila, ou staff cancela com motivo)
+Cancelado (antes do atendimento) → Aguardando (gestora restaura → fim da fila)
+
+Encerramento do dia: Em atendimento em aberto → Finalizado (automático)
+Liberação de caixa (gestora): senha em aberto resolvida + caixa liberado
+Virada de dia sem encerramento: senhas pendentes do dia anterior →
+Não compareceu (encerramento automático, evento ticket_force_closed);
+caixas liberados (counters_reset_for_day)
 ```
 
 ---
