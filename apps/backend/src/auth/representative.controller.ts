@@ -24,7 +24,6 @@ export class RepresentativeController {
     })
   }
 
-  /** Search by CPF, phone number, or RE code. Used by attendants for assisted check-in. */
   @Get('search')
   @Roles('ATTENDANT', 'MANAGER')
   async search(@Query('q') q: string) {

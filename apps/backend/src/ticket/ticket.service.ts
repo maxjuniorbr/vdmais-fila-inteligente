@@ -392,11 +392,6 @@ export class TicketService {
     }
   }
 
-  /**
-   * Segunda chamada: re-anuncia uma senha que JÁ está em chamada (CALLING) no
-   * caixa da operadora, sem alterar a fila nem o caixa. Apenas atualiza o
-   * horário da chamada para re-destacar no painel e registra o evento.
-   */
   async recall(ticketId: string, user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
       throw new ForbiddenException('Somente operadoras podem rechamar senhas')
@@ -749,7 +744,6 @@ export class TicketService {
     const businessDate = getBusinessDate()
 
     const { updated, queueId } = await this.prisma.$transaction(async (tx) => {
-      // Accumulate paused duration before resuming
       const now = new Date()
       const additionalPausedSeconds = ticket.pausedAt
         ? Math.round((now.getTime() - ticket.pausedAt.getTime()) / 1000)

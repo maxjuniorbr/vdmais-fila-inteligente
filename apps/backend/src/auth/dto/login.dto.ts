@@ -4,7 +4,7 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
-  credential!: string // CPF or reCode
+  credential!: string
 
   @IsString()
   @IsNotEmpty()

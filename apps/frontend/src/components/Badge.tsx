@@ -24,10 +24,6 @@ const TONE_STYLE: Record<Tone, CSSProperties> = {
   },
 }
 
-/**
- * Small count/status badge — pill shape, muted background.
- * Used to show counts next to section headers.
- */
 export function Badge({ children, style, tone = 'neutral' }: Readonly<BadgeProps>) {
   return <span style={{ ...layout.countBadge, ...TONE_STYLE[tone], ...style }}>{children}</span>
 }

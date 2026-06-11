@@ -2,13 +2,9 @@ import type { SelectHTMLAttributes } from 'react'
 import { layout } from '../styles/layout'
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  /** Optional label displayed above the select */
   label?: string
 }
 
-/**
- * Design-system select. Consistent styling with Input component.
- */
 export function Select({ label, style, className, children, ...rest }: Readonly<SelectProps>) {
   const selectStyle = { ...layout.formInput, ...style }
   const cls = ['gb-control', className].filter(Boolean).join(' ')

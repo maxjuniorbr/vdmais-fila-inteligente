@@ -40,7 +40,6 @@ import { AdminModule } from './admin/admin.module'
     AdminModule,
   ],
   providers: [
-    // Apply throttle globally; individual controllers can override with @Throttle()
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

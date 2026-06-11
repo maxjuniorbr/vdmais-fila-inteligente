@@ -68,8 +68,6 @@ describe('CounterService', () => {
     tx.ticket.findFirst.mockResolvedValue(null)
   })
 
-  // ── openCounter ─────────────────────────────────────────────
-
   it('opens an UNAVAILABLE counter and assigns the operator', async () => {
     const result = await service.openCounter('counter-1', operator)
 
@@ -137,8 +135,6 @@ describe('CounterService', () => {
     await expect(service.openCounter('counter-1', manager)).rejects.toThrow(ForbiddenException)
   })
 
-  // ── pauseCounter ─────────────────────────────────────────────
-
   it('pauses an ACTIVE counter owned by the operator', async () => {
     prisma.counter.findUnique.mockResolvedValue({
       ...counterBase,
@@ -177,8 +173,6 @@ describe('CounterService', () => {
     await expect(service.pauseCounter('counter-1', operator, 'x')).rejects.toThrow(BadRequestException)
   })
 
-  // ── resumeCounter ─────────────────────────────────────────────
-
   it('resumes a PAUSED counter owned by the operator', async () => {
     prisma.counter.findUnique.mockResolvedValue({
       ...counterBase,
@@ -206,8 +200,6 @@ describe('CounterService', () => {
 
     await expect(service.resumeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
   })
-
-  // ── closeCounter ─────────────────────────────────────────────
 
   it('closes an ACTIVE counter with no open tickets', async () => {
     prisma.counter.findUnique.mockResolvedValue({
@@ -248,8 +240,6 @@ describe('CounterService', () => {
 
     await expect(service.closeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
   })
-
-  // ── forceReleaseCounter (gestora/admin) ──────────────────────
 
   it('force-releases a counter and marks a CALLING ticket as no-show', async () => {
     prisma.counter.findUnique.mockResolvedValue({
