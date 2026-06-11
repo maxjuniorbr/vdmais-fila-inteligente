@@ -26,7 +26,7 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - [MVP — escopo e validação](./docs/mvp.md)
 - [Stack técnica do MVP](./docs/stack-mvp.md)
 - [Deploy do MVP](./docs/deployment-mvp.md)
-- [Diretrizes e heurísticas de design](./docs/diretrizes-heuristicas.md)
+- [Diretrizes de design e UX](./.kiro/steering/frontend-design.md) (Kiro AI steering)
 
 ---
 
@@ -227,7 +227,11 @@ vdmais-fila-inteligente/
 │       └── src/
 │           ├── components/ # Design system compartilhado
 │           ├── pages/      # Páginas por rota
-│           └── styles/     # Tokens e estilos globais
+│           ├── styles/     # Tokens e estilos globais
+│           │   ├── brand.ts    # Fonte canônica dos tokens de design (TypeScript)
+│           │   └── theme.css   # Espelho dos tokens como CSS custom properties (var(--gb-*))
+│           └── utils/
+│               └── format.ts   # Formatação central de datas/horas/durações (formatDate, formatTime, formatDuration)
 ├── compose.dev.yml        # Orquestração local
 ├── compose.prod.yml       # Orquestração de produção
 ├── compose.sonar.yml      # SonarQube local
