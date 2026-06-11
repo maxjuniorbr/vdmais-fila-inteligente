@@ -1,3 +1,5 @@
+# MVP 0 — Escopo e validação
+
 ## Relação com o MVP Full
 
 O **MVP Full** continua sendo o alvo do produto e deve representar a visão completa discutida até aqui: fila virtual, previsibilidade, segmentação de jornadas, Pedido Expresso, regras avançadas, dados operacionais e evolução da gestão de fluxo dos ERs.

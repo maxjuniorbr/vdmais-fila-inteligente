@@ -1,3 +1,5 @@
+# Stack técnica do MVP 0
+
 ## Contexto
 
 Este registro define a stack mínima recomendada para o **MVP 0 — Fila Digital Presencial Operável**, considerando que a organização já utiliza **React** no front-end e **Node.js com NestJS** no BFF.
