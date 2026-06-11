@@ -455,7 +455,6 @@ describe('TicketService', () => {
       const result = await service.recall('ticket-1', operator)
 
       expect(result.state).toBe(TicketState.CALLING)
-      // só atualiza o horário da chamada; não mexe em estado/fila/caixa
       expect(tx.ticket.updateMany).toHaveBeenCalledWith({
         where: { id: 'ticket-1', state: TicketState.CALLING, operatorId: 'op-1' },
         data: { calledAt: expect.any(Date) },
@@ -586,7 +585,7 @@ describe('TicketService', () => {
   })
 
   describe('resumeTicket', () => {
-    const pausedAt = new Date(Date.now() - 120_000) // paused 2 minutes ago
+    const pausedAt = new Date(Date.now() - 120_000)
 
     it('transitions a PAUSED ticket back to WAITING, accumulates pausedSeconds and clears pausedAt', async () => {
       prisma.ticket.findUnique.mockResolvedValue({

@@ -14,31 +14,17 @@ const FOCUSABLE_SELECTOR = [
 ].join(',')
 
 interface ConfirmDialogProps {
-  /** Dialog title */
   title: string
-  /** Brief description / subtitle shown below the title */
   description?: string
-  /** Label for the text area placeholder */
   reasonPlaceholder?: string
-  /** Whether reason is mandatory (default: true) */
   reasonRequired?: boolean
-  /** Loading state — disables buttons */
   loading?: boolean
-  /** Confirm button label */
   confirmLabel?: string
-  /** Cancel/close button label */
   cancelLabel?: string
-  /** Called with the reason text when the user confirms */
   onConfirm: (reason: string) => void
-  /** Called when the user closes/cancels the dialog */
   onClose: () => void
 }
 
-/**
- * Reusable confirmation modal with an optional mandatory reason field.
- * Accessible modal with focus containment, background inertness and focus
- * restoration. Used for cancel, restore, and correction flows.
- */
 export function ConfirmDialog({
   title,
   description,

@@ -5,16 +5,11 @@ import { BrandMark } from './BrandMark'
 interface AppHeaderProps {
   title: string
   subtitle?: string
-  /** Right-aligned content (extra buttons, status, etc.) rendered before the logout button */
   actions?: ReactNode
   onLogout?: () => void
   logoutLabel?: string
 }
 
-/**
- * Shared full-width top bar used across all staff-facing screens.
- * Brand-green bar: emblem + title/subtitle on the left, actions + logout on the right.
- */
 export function AppHeader({
   title,
   subtitle,

@@ -1,6 +1,5 @@
 import { ConfigService } from '@nestjs/config'
 
-/** Segredos notoriamente fracos que nunca podem ser usados fora de dev/test. */
 const WEAK_JWT_SECRETS = new Set([
   'change-me',
   'change-me-in-production',

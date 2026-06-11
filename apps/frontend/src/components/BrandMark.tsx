@@ -2,16 +2,10 @@ import type { CSSProperties } from 'react'
 import { brand } from '../styles/brand'
 
 interface BrandMarkProps {
-  /** Render on dark (green) background — switches to white/gold */
   onDark?: boolean
-  /** Size of the leaf emblem in px */
   size?: number
 }
 
-/**
- * VD+ Fila Inteligente brand mark — a organização visual language.
- * A minimal leaf emblem + wordmark, usable on light or dark surfaces.
- */
 export function BrandMark({ onDark = false, size = 30 }: Readonly<BrandMarkProps>) {
   const emblemBg = onDark ? 'rgba(255,255,255,0.14)' : brand.green50
   const leafColor = onDark ? '#ffffff' : brand.green700
