@@ -1,6 +1,6 @@
 ---
 agent: 'agent'
-description: 'Validates, analyzes changes, creates well-scoped commits, and runs post-commit quality gates (SonarCloud, Sentry, secrets, schema drift).'
+description: 'Validates, analyzes changes, creates well-scoped commits, and runs post-commit quality gates (lint/build/test, secrets, SonarQube, Prisma schema drift).'
 argument-hint: '(no arguments — analyzes staged + unstaged changes)'
 ---
 
@@ -10,8 +10,11 @@ You are a Commit Assistant. Your job is to validate, analyze, and commit changes
 
 **NEVER commit API keys, tokens, passwords, or any secret/credential to the repository.**
 Before staging any file, check that no secret values are being introduced.
-If a change contains what looks like an API key, token, or credential — STOP immediately and do NOT proceed with the commit.
-Secrets must live exclusively in `.env.local` or EAS environment variables, never in source code.
+If a change contains what looks like a secret — STOP immediately and do NOT commit.
+Secrets must live exclusively in `apps/backend/.env` (gitignored) or the platform's
+environment/secrets manager, never in source code. Relevant variables for this repo:
+`DATABASE_URL`, `JWT_SECRET`, `OBSERVABILITY_TOKEN`, and any Supabase key
+(`sb_secret_*`, `service_role`).
 
 ## Steps
 
@@ -21,10 +24,11 @@ Run all commands and check results:
 
 ```
 npm run lint
-npm run typecheck
+npm run build
 npm test
 ```
 
+- `npm run build` runs the type check (`tsc -b` for the frontend, `nest build` for the backend).
 - If **any fails**, stop immediately. Show the error output and do NOT commit.
 
 ### 2. Analyze the working tree
@@ -69,16 +73,23 @@ If multiple commits are needed, execute them in dependency order (base changes f
 
 After committing, run these checks. If any fails, warn but do NOT revert the commit.
 
-1. **Schema drift:** if `supabase/migrations/**` changed, verify `src/types/database.types.ts` was regenerated.
-2. **Secrets scan:** grep the diff for `SUPABASE_SERVICE_ROLE`, `API_KEY`, `Bearer `, tokens. If found, STOP and instruct the user to revert + rotate.
-3. **SonarCloud:** query `mcp_sonarqube_search_sonar_issues_in_projects` scoped to committed files. Warn on new HIGH/BLOCKER.
-4. **Sentry:** query `mcp_sentry_search_issues` for unresolved regressions in touched areas. Warn on unacknowledged issues.
+1. **Prisma schema drift:** if `apps/backend/prisma/schema.prisma` or
+   `apps/backend/prisma/migrations/**` changed, follow `.kiro/steering/database-migrations.md`:
+   confirm the migration was applied to the target database (parity before release) and that
+   the Prisma client is regenerated (`prisma generate` runs in the backend `prebuild`/`pretest`).
+2. **Secrets scan:** grep the diff for `DATABASE_URL`, `JWT_SECRET`, `OBSERVABILITY_TOKEN`,
+   `sb_secret`, `service_role`, `Bearer `, and generic API-key patterns. If a real value is
+   found, STOP and instruct the user to revert + rotate.
+3. **SonarQube:** query `mcp_sonarqube_search_sonar_issues_in_projects` scoped to the
+   committed files (project `vdmais-fila-inteligente`). Warn on new HIGH/BLOCKER issues.
 
 ### 6. Verify
 
 Run `git log --oneline -5` at the end to confirm the commits were created.
 
 ## Commit Rules (Strict)
+
+These mirror the enforced `.githooks/commit-msg` hook.
 
 - **Format:** `<type>: <description>` (single line only, no body).
 - **Allowed Types:** `feat` (feature), `fix` (bug fix), `refactor` (code restructuring), `style` (visuals/formatting), `chore` (maintenance/config), `docs` (documentation), `test` (tests).

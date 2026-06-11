@@ -2,8 +2,12 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../temp"
 		}
 	],
 	"settings": {
+		"typescript.autoClosingTags": false
 	}
 }
