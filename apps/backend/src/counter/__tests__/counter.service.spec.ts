@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common'
-import { CounterState, Role } from '@prisma/client'
+import { CounterState, Prisma, Role } from '@prisma/client'
 import { PanelGateway } from '../../panel/panel.gateway'
 import { PrismaService } from '../../prisma/prisma.service'
 import { CounterService } from '../counter.service'
@@ -26,7 +26,6 @@ const prisma = {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
     findMany: jest.fn(),
-    update: jest.fn(),
   },
   auditEvent: { create: jest.fn() },
   ticket: { findFirst: jest.fn() },
@@ -34,7 +33,11 @@ const prisma = {
 }
 
 const tx = {
-  counter: { update: jest.fn() },
+  counter: {
+    update: jest.fn(),
+    updateMany: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+  },
   auditEvent: { create: jest.fn() },
   ticket: { findFirst: jest.fn() },
 }
@@ -53,7 +56,12 @@ describe('CounterService', () => {
     )
     prisma.counter.findUnique.mockResolvedValue({ ...counterBase })
     prisma.counter.findFirst.mockResolvedValue(null)
-    tx.counter.update.mockResolvedValue({ ...counterBase, state: CounterState.ACTIVE, operatorId: 'op-1' })
+    tx.counter.updateMany.mockResolvedValue({ count: 1 })
+    tx.counter.findUniqueOrThrow.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.ACTIVE,
+      operatorId: 'op-1',
+    })
     tx.auditEvent.create.mockResolvedValue({})
     tx.ticket.findFirst.mockResolvedValue(null)
   })
@@ -63,8 +71,12 @@ describe('CounterService', () => {
   it('opens an UNAVAILABLE counter and assigns the operator', async () => {
     const result = await service.openCounter('counter-1', operator)
 
-    expect(tx.counter.update).toHaveBeenCalledWith({
-      where: { id: 'counter-1' },
+    expect(tx.counter.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'counter-1',
+        state: CounterState.UNAVAILABLE,
+        operatorId: null,
+      },
       data: { state: CounterState.ACTIVE, operatorId: 'op-1' },
     })
     expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'counter.opened', expect.any(Object))
@@ -87,6 +99,29 @@ describe('CounterService', () => {
     prisma.counter.findFirst.mockResolvedValue({ id: 'other-counter' })
 
     await expect(service.openCounter('counter-1', operator)).rejects.toThrow(ConflictException)
+  })
+
+  it('rejects openCounter if another request acquired the counter first', async () => {
+    tx.counter.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(service.openCounter('counter-1', operator)).rejects.toThrow(
+      'O caixa já está aberto',
+    )
+    expect(tx.auditEvent.create).not.toHaveBeenCalled()
+  })
+
+  it('converts the database uniqueness violation into an operator conflict', async () => {
+    tx.counter.updateMany.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.3',
+        meta: { target: ['operatorId'] },
+      }),
+    )
+
+    await expect(service.openCounter('counter-1', operator)).rejects.toThrow(
+      'A operadora já possui outro caixa aberto',
+    )
   })
 
   it('does not let a manager open a counter', async () => {
