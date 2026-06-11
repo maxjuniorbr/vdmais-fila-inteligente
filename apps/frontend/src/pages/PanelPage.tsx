@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { AppHeader } from '../components/AppHeader'
 import { useSocket } from '../hooks/useSocket'
+import { brand } from '../styles/brand'
 
 interface Call {
   ticketId: string
@@ -26,7 +28,6 @@ interface WaitingTicket {
 interface PanelState {
   current: Call | null
   calling: Call[]
-  recent: Call[]
   inService: InService[]
   waiting: WaitingTicket[]
   avgServiceSeconds: number | null
@@ -45,20 +46,27 @@ const REFRESH_EVENTS = [
 ]
 
 function formatDuration(seconds: number): string {
-  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+  if (seconds < 60) return `${seconds}s`
+  return `${Math.round(seconds / 60)} min`
 }
+
+// "Próximas senhas": total de linhas visíveis e quantas rotacionam abaixo da
+// primeira (que fica sempre fixa, indicando quem é a próxima a ser chamada).
+const NEXT_VISIBLE = 7
+const NEXT_WINDOW = NEXT_VISIBLE - 1
+const NEXT_ROTATE_MS = 5000
 
 export function PanelPage() {
   const { erId } = useParams<{ erId: string }>()
   const socket = useSocket(erId ?? '', 'panel')
   const [current, setCurrent] = useState<Call | null>(null)
   const [calling, setCalling] = useState<Call[]>([])
-  const [recent, setRecent] = useState<Call[]>([])
   const [inService, setInService] = useState<InService[]>([])
   const [waiting, setWaiting] = useState<WaitingTicket[]>([])
   const [avgServiceSeconds, setAvgServiceSeconds] = useState<number | null>(null)
   const [avgWaitSeconds, setAvgWaitSeconds] = useState<number | null>(null)
   const [clock, setClock] = useState(() => new Date())
+  const [nextPage, setNextPage] = useState(0)
   const displayedCalls = useRef(new Set<string>())
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -82,11 +90,23 @@ export function PanelPage() {
     }
   }, [])
 
-  // Wall clock for the header
+  // Relógio de parede do cabeçalho (atualiza a cada segundo)
   useEffect(() => {
-    const id = setInterval(() => setClock(new Date()), 30000)
+    const id = setInterval(() => setClock(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
+
+  // Avança o rodízio das próximas senhas (só quando há mais do que cabem)
+  useEffect(() => {
+    const poolSize = Math.max(0, waiting.length - 1)
+    const pages = Math.max(1, Math.ceil(poolSize / NEXT_WINDOW))
+    if (pages <= 1) {
+      setNextPage(0)
+      return
+    }
+    const id = setInterval(() => setNextPage((p) => (p + 1) % pages), NEXT_ROTATE_MS)
+    return () => clearInterval(id)
+  }, [waiting.length])
 
   const fetchPanelState = useCallback(async () => {
     if (!erId) return
@@ -96,7 +116,6 @@ export function PanelPage() {
       const state = (await response.json()) as PanelState
       setCurrent(state.current)
       setCalling(state.calling ?? [])
-      setRecent(state.recent)
       setInService(state.inService)
       setWaiting(state.waiting ?? [])
       setAvgServiceSeconds(state.avgServiceSeconds ?? null)
@@ -140,6 +159,29 @@ export function PanelPage() {
   }, [calling, erId])
 
   const callCount = calling.length
+  // Previsão de espera por posição: tempo médio de atendimento dividido
+  // pelos guichês ocupados — é o que permite à revendedora se planejar.
+  const busyCounters = Math.max(1, inService.length + calling.length)
+  const etaFor = (position: number): string | null => {
+    if (avgServiceSeconds === null) return null
+    const minutes = Math.max(1, Math.round((position * avgServiceSeconds) / busyCounters / 60))
+    return `~${minutes} min`
+  }
+  const lastPosition = waiting.length > 0 ? waiting[waiting.length - 1].position : 0
+  const joinEta = etaFor(lastPosition + 1)
+
+  // Rodízio das "próximas senhas": a 1ª fica fixa (próxima a chamar) e as demais
+  // alternam em janelas, para que toda a fila apareça ao longo do tempo.
+  const rotatingPool = waiting.slice(1)
+  const rotatingPages = Math.max(1, Math.ceil(rotatingPool.length / NEXT_WINDOW))
+  const needsRotation = waiting.length > NEXT_VISIBLE
+  const activePage = needsRotation ? nextPage % rotatingPages : 0
+  const displayedWaiting = needsRotation
+    ? [
+        waiting[0],
+        ...rotatingPool.slice(activePage * NEXT_WINDOW, activePage * NEXT_WINDOW + NEXT_WINDOW),
+      ]
+    : waiting.slice(0, NEXT_VISIBLE)
   // TV-friendly column counts: 1→1, 2→2, 3→3, 4→2x2, 5/6→3 cols.
   const columns = callCount <= 1 ? 1 : callCount === 2 || callCount === 4 ? 2 : 3
   // Font scales down as more counters call at once so cards never overflow.
@@ -149,19 +191,35 @@ export function PanelPage() {
 
   return (
     <main style={styles.page}>
-      {/* ── Cabeçalho ─────────────────────────────────────────── */}
-      <header style={styles.header}>
-        <span style={styles.brand}>FILA INTELIGENTE</span>
-        <span style={styles.clock}>
-          {clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-        </span>
-      </header>
+      {/* Keyframes do efeito de "piscar" ao chamar (respeita prefers-reduced-motion via theme.css) */}
+      <style>{CALL_PULSE_KEYFRAMES}</style>
+      {/* ── Cabeçalho (mesmo padrão das demais telas) ─────────── */}
+      <AppHeader
+        title="Painel de Atendimento"
+        subtitle="Acompanhe a chamada da sua senha"
+        actions={
+          <span style={styles.clock}>
+            <span style={styles.clockDate}>
+              {clock.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              })}
+            </span>
+            <span style={styles.clockTime}>
+              {clock.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })}
+            </span>
+          </span>
+        }
+      />
 
       <div style={styles.body}>
         {/* ── Área principal ──────────────────────────────────── */}
         <section style={styles.main}>
-          <p style={styles.sectionLabel}>CHAMANDO AGORA</p>
-
           {callCount === 0 ? (
             <div style={styles.heroEmpty}>
               <span style={styles.heroEmptyText}>Aguardando próxima chamada</span>
@@ -169,13 +227,13 @@ export function PanelPage() {
           ) : (
             <div style={{ ...styles.callGrid, gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
               {calling.map((call) => {
-                const isLatest = current?.ticketId === call.ticketId && callCount > 1
+                const isCurrent = current?.ticketId === call.ticketId
                 return (
                   <article
                     key={call.ticketId}
                     style={{
                       ...styles.callCard,
-                      ...(isLatest ? styles.callCardLatest : null),
+                      ...(isCurrent ? styles.callCardActive : null),
                     }}
                   >
                     <span style={{ ...styles.callCode, fontSize: codeSize }}>{call.code}</span>
@@ -215,36 +273,44 @@ export function PanelPage() {
         {/* ── Sidebar ─────────────────────────────────────────── */}
         <aside style={styles.sidebar}>
           <div style={styles.sideBlock}>
-            <p style={styles.sideLabel}>PRÓXIMAS SENHAS</p>
+            <div style={styles.sideHead}>
+              <span style={styles.sideLabel}>PRÓXIMAS SENHAS</span>
+              {waiting.length > 0 && (
+                <span style={styles.sideCount}>{waiting.length} na fila</span>
+              )}
+            </div>
             {waiting.length === 0 ? (
               <p style={styles.sideDim}>Fila vazia</p>
             ) : (
               <div style={styles.nextList}>
-                {waiting.slice(0, 5).map((ticket) => (
-                  <div key={ticket.ticketId} style={styles.nextRow}>
-                    <span style={styles.nextCode}>{ticket.code}</span>
-                    <span style={styles.nextPos}>#{ticket.position}</span>
-                  </div>
-                ))}
-                {waiting.length > 5 && (
-                  <p style={styles.sideDim}>+{waiting.length - 5} aguardando</p>
+                {displayedWaiting.map((ticket, index) => {
+                  const eta = etaFor(ticket.position)
+                  const isNext = index === 0
+                  return (
+                    <div
+                      key={ticket.ticketId}
+                      style={{ ...styles.nextRow, ...(isNext ? styles.nextRowFirst : null) }}
+                    >
+                      <span style={{ ...styles.nextCode, ...(isNext ? styles.nextCodeFirst : null) }}>
+                        {ticket.code}
+                      </span>
+                      <span style={styles.nextMeta}>
+                        {isNext ? (
+                          <span style={styles.nextTag}>PRÓXIMA</span>
+                        ) : (
+                          eta && <span style={styles.nextEta}>{eta}</span>
+                        )}
+                        <span style={styles.nextPos}>{ticket.position}º</span>
+                      </span>
+                    </div>
+                  )
+                })}
+                {needsRotation && (
+                  <p style={styles.queueFooter}>
+                    Rodízio das próximas · {waiting.length} na fila
+                    {joinEta ? ` · última espera ${joinEta}` : ''}
+                  </p>
                 )}
-              </div>
-            )}
-          </div>
-
-          <div style={styles.sideBlock}>
-            <p style={styles.sideLabel}>CHAMADAS RECENTES</p>
-            {recent.length === 0 ? (
-              <p style={styles.sideDim}>Nenhuma chamada</p>
-            ) : (
-              <div style={styles.recentChips}>
-                {recent.slice(0, 6).map((call) => (
-                  <span key={call.ticketId} style={styles.recentChip}>
-                    <strong>{call.code}</strong>
-                    <span style={styles.recentChipCaixa}>CX {call.counterNumber}</span>
-                  </span>
-                ))}
               </div>
             )}
           </div>
@@ -271,16 +337,25 @@ export function PanelPage() {
   )
 }
 
-const GB = {
-  bgDeep: '#00301f', // verde profundo marca (canvas da TV)
-  bgHero: '#00422c', // cartão de chamada
-  bgCol: '#013a27', // blocos secundários
-  border: '#056b4c', // borda verde média
-  accent: '#d4a843', // dourado (acento)
-  textMain: '#ffffff',
-  textSub: '#d3ecdf', // verde 100
-  textDim: '#7fa593', // verde acinzentado para apoio
-  rowDiv: '#0a4d34', // divisor
+const CALL_PULSE_KEYFRAMES = `
+@keyframes gbPanelCall {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 84, 61, 0); }
+  50% { box-shadow: 0 0 0 10px rgba(0, 84, 61, 0.16); }
+}`
+
+const C = {
+  canvas: brand.canvas, // fundo suave esverdeado, como nas demais telas
+  surface: brand.surface, // cartões e blocos
+  surfaceAlt: brand.green50, // chips / faixas — verde bem suave
+  border: brand.border, // borda com tom da marca
+  borderStrong: brand.borderStrong,
+  ink: brand.ink, // texto principal (senha)
+  inkSoft: brand.inkSoft, // texto secundário (nome)
+  inkMuted: brand.inkMuted, // rótulos / apoio
+  accent: brand.green700, // verde primário GB — destino/realce
+  accentSoft: brand.green50,
+  accentBorder: brand.green100,
+  shadow: brand.shadow,
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -289,58 +364,48 @@ const styles: Record<string, React.CSSProperties> = {
     inset: 0,
     display: 'flex',
     flexDirection: 'column',
-    padding: '1.2vw',
-    gap: '1vh',
     boxSizing: 'border-box',
-    background: GB.bgDeep,
-    color: GB.textMain,
-    fontFamily: "'Segoe UI', Arial, sans-serif",
+    background: C.canvas,
+    color: C.ink,
+    fontFamily: brand.font,
     overflow: 'hidden',
   },
 
-  /* Header */
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexShrink: 0,
-    padding: '0 0.5vw',
-  },
-  brand: {
-    fontSize: '1.4vw',
-    fontWeight: 800,
-    letterSpacing: '0.3em',
-    color: GB.accent,
-  },
+  /* Relógio no cabeçalho (slot de ações do AppHeader) */
   clock: {
-    fontSize: '1.6vw',
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '0.75rem',
+    fontVariantNumeric: 'tabular-nums',
+  },
+  clockDate: {
+    fontSize: '1rem',
+    fontWeight: 600,
+    color: brand.green100,
+  },
+  clockTime: {
+    fontSize: '1.5rem',
     fontWeight: 700,
-    color: GB.textSub,
+    color: '#ffffff',
+    letterSpacing: '0.02em',
   },
 
-  /* Body split */
+  /* Split principal */
   body: {
     flex: 1,
     minHeight: 0,
     display: 'grid',
     gridTemplateColumns: '70% 1fr',
     gap: '1.2vw',
+    padding: '1.4vw',
   },
 
-  /* Main column */
+  /* Coluna principal */
   main: {
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: '1vh',
-  },
-  sectionLabel: {
-    margin: 0,
-    fontSize: '1.3vw',
-    fontWeight: 700,
-    letterSpacing: '0.25em',
-    color: GB.accent,
-    flexShrink: 0,
+    gap: '1.2vh',
   },
   callGrid: {
     flex: 1,
@@ -356,21 +421,22 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: '1vh',
     padding: '1.5vh 1.5vw',
-    background: GB.bgHero,
-    border: `3px solid ${GB.border}`,
+    background: C.surface,
+    border: `1px solid ${C.border}`,
     borderRadius: '1vw',
+    boxShadow: C.shadow,
     overflow: 'hidden',
     boxSizing: 'border-box',
   },
-  callCardLatest: {
-    borderColor: GB.accent,
-    boxShadow: `0 0 0 2px ${GB.accent}, 0 0 24px rgba(212,168,67,0.35)`,
+  callCardActive: {
+    borderColor: C.accent,
+    animation: 'gbPanelCall 1.3s ease-in-out infinite',
   },
   callCode: {
     fontWeight: 900,
     lineHeight: 1,
-    color: GB.textMain,
-    letterSpacing: '0.04em',
+    color: C.ink,
+    letterSpacing: '0.02em',
     maxWidth: '100%',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -378,7 +444,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   callName: {
     fontWeight: 600,
-    color: GB.textSub,
+    color: C.inkSoft,
     maxWidth: '100%',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -387,8 +453,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   callCaixa: {
     fontWeight: 800,
-    color: GB.accent,
-    letterSpacing: '0.1em',
+    color: C.accent,
+    letterSpacing: '0.08em',
     whiteSpace: 'nowrap',
   },
   heroEmpty: {
@@ -396,25 +462,25 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: GB.bgHero,
-    border: `3px solid ${GB.rowDiv}`,
+    background: C.surface,
+    border: `1px dashed ${C.borderStrong}`,
     borderRadius: '1vw',
   },
   heroEmptyText: {
-    fontSize: '2.4vw',
-    color: GB.textDim,
+    fontSize: '2.2vw',
+    color: C.inkMuted,
     fontWeight: 600,
   },
 
-  /* In-service strip */
+  /* Faixa "em atendimento" */
   inServiceStrip: {
     flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     gap: '1vw',
-    padding: '1vh 1.2vw',
-    background: GB.bgCol,
-    border: `1px solid ${GB.rowDiv}`,
+    padding: '1.1vh 1.2vw',
+    background: C.surface,
+    border: `1px solid ${C.border}`,
     borderRadius: '0.8vw',
     minHeight: 0,
     overflow: 'hidden',
@@ -422,12 +488,13 @@ const styles: Record<string, React.CSSProperties> = {
   stripLabel: {
     fontSize: '0.95vw',
     fontWeight: 700,
-    letterSpacing: '0.18em',
-    color: GB.textDim,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    color: C.inkMuted,
     flexShrink: 0,
   },
   stripDim: {
-    color: GB.textDim,
+    color: C.inkMuted,
     fontSize: '1.4vw',
   },
   stripChips: {
@@ -440,18 +507,19 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-flex',
     alignItems: 'baseline',
     gap: '0.4vw',
-    padding: '0.5vh 0.8vw',
-    background: GB.bgHero,
+    padding: '0.6vh 0.9vw',
+    background: C.surfaceAlt,
+    border: `1px solid ${C.border}`,
     borderRadius: '0.5vw',
-    fontSize: '1.4vw',
+    fontSize: '1.5vw',
     fontWeight: 800,
-    color: GB.textMain,
+    color: C.ink,
     flexShrink: 0,
   },
   serviceChipCaixa: {
-    fontSize: '0.85vw',
+    fontSize: '0.9vw',
     fontWeight: 600,
-    color: GB.textDim,
+    color: C.inkMuted,
   },
 
   /* Sidebar */
@@ -459,85 +527,120 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: '1vh',
-    background: GB.bgCol,
-    border: `1px solid ${GB.rowDiv}`,
+    gap: '1.4vh',
+    background: C.surface,
+    border: `1px solid ${C.border}`,
     borderRadius: '0.8vw',
-    padding: '1.5vh 1vw',
+    padding: '1.6vh 1.1vw',
+    boxShadow: C.shadow,
     overflow: 'hidden',
   },
   sideBlock: {
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.6vh',
+    gap: '0.8vh',
+  },
+  sideHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottom: `1px solid ${C.border}`,
+    paddingBottom: '0.6vh',
   },
   sideLabel: {
     margin: 0,
-    fontSize: '1.25vw',
+    fontSize: '1.05vw',
     fontWeight: 700,
-    letterSpacing: '0.18em',
-    color: GB.accent,
-    borderBottom: `1px solid ${GB.rowDiv}`,
-    paddingBottom: '0.6vh',
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    color: C.inkSoft,
+  },
+  sideCount: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '1.7vw',
+    padding: '0 0.7vw',
+    borderRadius: '999px',
+    background: C.accentSoft,
+    color: C.accent,
+    fontSize: '0.95vw',
+    fontWeight: 800,
+    whiteSpace: 'nowrap',
+  },
+  queueFooter: {
+    margin: 0,
+    paddingTop: '0.6vh',
+    fontSize: '1.05vw',
+    fontWeight: 600,
+    color: C.inkSoft,
   },
   sideDim: {
-    color: GB.textDim,
+    color: C.inkMuted,
     fontSize: '1.3vw',
     margin: 0,
   },
   nextList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.4vh',
+    gap: '0.3vh',
     overflow: 'hidden',
   },
   nextRow: {
     display: 'flex',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '0.5vh 0',
-    borderBottom: `1px solid ${GB.rowDiv}`,
+    padding: '0.6vh 0.6vw',
+    borderBottom: `1px solid ${C.border}`,
+  },
+  nextRowFirst: {
+    background: C.accentSoft,
+    borderBottom: 'none',
+    boxShadow: `inset 0 0 0 1px ${C.accentBorder}`,
+    borderRadius: '0.5vw',
+    padding: '0.9vh 0.8vw',
   },
   nextCode: {
     fontSize: '2vw',
     fontWeight: 800,
-    color: GB.textMain,
+    color: C.ink,
+  },
+  nextCodeFirst: {
+    color: C.accent,
+  },
+  nextMeta: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.7vw',
+  },
+  nextTag: {
+    fontSize: '0.85vw',
+    fontWeight: 800,
+    letterSpacing: '0.12em',
+    color: C.surface,
+    background: C.accent,
+    borderRadius: '999px',
+    padding: '0.4vh 0.7vw',
+  },
+  nextEta: {
+    fontSize: '1.2vw',
+    fontWeight: 700,
+    color: C.inkSoft,
+    fontVariantNumeric: 'tabular-nums',
   },
   nextPos: {
     fontSize: '1.3vw',
-    color: GB.textDim,
-  },
-  recentChips: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.6vw',
-    overflow: 'hidden',
-    maxHeight: '18vh',
-  },
-  recentChip: {
-    display: 'inline-flex',
-    alignItems: 'baseline',
-    gap: '0.5vw',
-    padding: '0.8vh 1vw',
-    background: GB.bgHero,
-    border: `1px solid ${GB.rowDiv}`,
-    borderRadius: '999px',
-    fontSize: '1.9vw',
-    fontWeight: 800,
-    color: GB.textSub,
-  },
-  recentChipCaixa: {
-    fontSize: '1.05vw',
     fontWeight: 600,
-    color: GB.textDim,
+    color: C.inkMuted,
+    fontVariantNumeric: 'tabular-nums',
   },
 
-  /* Averages */
+  /* Tempos médios */
   avgBlock: {
     marginTop: 'auto',
     paddingTop: '1vh',
-    borderTop: `1px solid ${GB.rowDiv}`,
+    borderTop: `1px solid ${C.border}`,
     display: 'flex',
     flexDirection: 'column',
     gap: '0.8vh',
@@ -549,14 +652,15 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '0.2vh',
   },
   avgLabel: {
-    fontSize: '0.85vw',
-    letterSpacing: '0.12em',
-    color: GB.textDim,
+    fontSize: '0.9vw',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: C.inkMuted,
     fontWeight: 700,
   },
   avgValue: {
     fontSize: '1.8vw',
     fontWeight: 800,
-    color: GB.accent,
+    color: C.accent,
   },
 }
