@@ -257,16 +257,83 @@ describe('TicketService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
-  it('only restores NO_SHOW tickets', async () => {
+  it('only restores NO_SHOW or pre-service CANCELLED tickets', async () => {
     prisma.ticket.findUnique.mockResolvedValue({
       ...ticketBase,
-      state: TicketState.CANCELLED,
+      state: TicketState.FINISHED,
     })
+    tx.ticket.findFirst.mockResolvedValue(null)
     tx.ticket.updateMany.mockResolvedValue({ count: 0 })
 
     await expect(service.restore('ticket-1', 'motivo', manager)).rejects.toThrow(
       BadRequestException,
     )
+  })
+
+  it('restores a CANCELLED ticket that never entered service', async () => {
+    prisma.ticket.findUnique.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.CANCELLED,
+      serviceStartedAt: null,
+      cancelledAt: new Date(),
+      cancelReason: 'cadastro incorreto',
+    })
+    tx.ticket.findFirst.mockResolvedValue(null)
+    tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 7 })
+    tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+    tx.ticket.findUniqueOrThrow.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.WAITING,
+      queuePosition: 7,
+    })
+
+    const result = await service.restore('ticket-1', 'RE retornou', manager)
+
+    expect(result.state).toBe(TicketState.WAITING)
+    expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'ticket-1',
+        OR: [
+          { state: TicketState.NO_SHOW },
+          { state: TicketState.CANCELLED, serviceStartedAt: null },
+        ],
+      },
+      data: expect.objectContaining({
+        state: TicketState.WAITING,
+        cancelledAt: null,
+        cancelReason: null,
+      }),
+    })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'ticket_restored',
+        metadata: expect.objectContaining({ fromState: TicketState.CANCELLED }),
+      }),
+    })
+  })
+
+  it('refuses to restore a CANCELLED ticket already started in service', async () => {
+    prisma.ticket.findUnique.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.CANCELLED,
+      serviceStartedAt: new Date(),
+    })
+
+    await expect(service.restore('ticket-1', 'motivo', manager)).rejects.toThrow(
+      BadRequestException,
+    )
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('blocks restore when the representative already has an active ticket', async () => {
+    prisma.ticket.findUnique.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.NO_SHOW,
+    })
+    tx.ticket.findFirst.mockResolvedValue({ code: 'A099' })
+
+    await expect(service.restore('ticket-1', 'motivo', manager)).rejects.toThrow(ConflictException)
+    expect(tx.ticket.updateMany).not.toHaveBeenCalled()
   })
 
   it('finishes an IN_SERVICE ticket and resets the counter to ACTIVE', async () => {
@@ -483,6 +550,7 @@ describe('TicketService', () => {
         state: TicketState.PAUSED,
         pausedAt: new Date(),
         representative: { fullName: 'Maria Teste' },
+        er: { pauseTimeoutSeconds: 300 },
       })
 
       const result = await service.pauseTicket('ticket-1', 'rep-1')
@@ -499,6 +567,7 @@ describe('TicketService', () => {
       })
       expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.paused', expect.objectContaining({ ticketId: 'ticket-1' }))
       expect(result.state).toBe(TicketState.PAUSED)
+      expect(result.pauseTimeoutSeconds).toBe(300)
     })
 
     it('rejects pause if ticket belongs to another representative', async () => {
@@ -526,7 +595,7 @@ describe('TicketService', () => {
         pausedAt,
         pausedSeconds: 0,
       })
-      tx.queue.update.mockResolvedValue({ id: 'queue-1', nextSequence: 5 })
+      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 5 })
       tx.ticket.updateMany.mockResolvedValue({ count: 1 })
       tx.ticket.findUniqueOrThrow.mockResolvedValue({
         ...ticketBase,
@@ -571,7 +640,7 @@ describe('TicketService', () => {
         pausedAt: null,
         pausedSeconds: 0,
       })
-      tx.queue.update.mockResolvedValue({ id: 'queue-1', nextSequence: 2 })
+      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 2 })
       tx.ticket.updateMany.mockResolvedValue({ count: 1 })
       tx.ticket.findUniqueOrThrow.mockResolvedValue({
         ...ticketBase,

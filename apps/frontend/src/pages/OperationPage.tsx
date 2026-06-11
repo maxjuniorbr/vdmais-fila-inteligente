@@ -53,6 +53,8 @@ const QUEUE_EVENTS = [
   'counter.paused',
   'counter.resumed',
   'counter.closed',
+  'day.opened',
+  'day.closed',
 ]
 
 export function OperationPage() {
@@ -466,7 +468,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: '0.6rem',
     flexWrap: 'wrap',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     marginTop: '0.9rem',
   },
   ticketActions: {

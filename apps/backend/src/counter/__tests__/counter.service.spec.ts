@@ -27,6 +27,7 @@ const prisma = {
     findFirst: jest.fn(),
     findMany: jest.fn(),
   },
+  eR: { findUnique: jest.fn() },
   auditEvent: { create: jest.fn() },
   ticket: { findFirst: jest.fn() },
   $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => cb(tx)),
@@ -39,7 +40,7 @@ const tx = {
     findUniqueOrThrow: jest.fn(),
   },
   auditEvent: { create: jest.fn() },
-  ticket: { findFirst: jest.fn() },
+  ticket: { findFirst: jest.fn(), update: jest.fn() },
 }
 
 const panel = { emitToER: jest.fn() }
@@ -56,6 +57,7 @@ describe('CounterService', () => {
     )
     prisma.counter.findUnique.mockResolvedValue({ ...counterBase })
     prisma.counter.findFirst.mockResolvedValue(null)
+    prisma.eR.findUnique.mockResolvedValue({ isDayOpen: true })
     tx.counter.updateMany.mockResolvedValue({ count: 1 })
     tx.counter.findUniqueOrThrow.mockResolvedValue({
       ...counterBase,
@@ -99,6 +101,13 @@ describe('CounterService', () => {
     prisma.counter.findFirst.mockResolvedValue({ id: 'other-counter' })
 
     await expect(service.openCounter('counter-1', operator)).rejects.toThrow(ConflictException)
+  })
+
+  it('rejects openCounter when the operation of the day is not open', async () => {
+    prisma.eR.findUnique.mockResolvedValue({ isDayOpen: false })
+
+    await expect(service.openCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('rejects openCounter if another request acquired the counter first', async () => {
@@ -238,5 +247,112 @@ describe('CounterService', () => {
     })
 
     await expect(service.closeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+  })
+
+  // ── forceReleaseCounter (gestora/admin) ──────────────────────
+
+  it('force-releases a counter and marks a CALLING ticket as no-show', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.CALLING,
+      operatorId: 'op-1',
+    })
+    tx.ticket.findFirst.mockResolvedValue({
+      id: 'ticket-1',
+      state: 'CALLING',
+      code: 'A001',
+    })
+    tx.counter.update.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+    })
+
+    const result = await service.forceReleaseCounter('counter-1', manager)
+
+    expect(tx.ticket.update).toHaveBeenCalledWith({
+      where: { id: 'ticket-1' },
+      data: expect.objectContaining({ state: 'NO_SHOW' }),
+    })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: 'ticket_marked_no_show' }),
+    })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: 'counter_force_released' }),
+    })
+    expect(tx.counter.update).toHaveBeenCalledWith({
+      where: { id: 'counter-1' },
+      data: { state: CounterState.UNAVAILABLE, operatorId: null },
+    })
+    expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.no_show', expect.any(Object))
+    expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'counter.closed', expect.any(Object))
+    expect(result.state).toBe(CounterState.UNAVAILABLE)
+  })
+
+  it('force-releases a counter and finishes an IN_SERVICE ticket', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.IN_SERVICE,
+      operatorId: 'op-1',
+    })
+    tx.ticket.findFirst.mockResolvedValue({ id: 'ticket-1', state: 'IN_SERVICE', code: 'A001' })
+    tx.counter.update.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+    })
+
+    await service.forceReleaseCounter('counter-1', manager)
+
+    expect(tx.ticket.update).toHaveBeenCalledWith({
+      where: { id: 'ticket-1' },
+      data: expect.objectContaining({ state: 'FINISHED' }),
+    })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: 'service_force_finished' }),
+    })
+    expect(panel.emitToER).toHaveBeenCalledWith(
+      'er-1',
+      'ticket.service_finished',
+      expect.any(Object),
+    )
+  })
+
+  it('force-releases an idle counter without an open ticket', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.ACTIVE,
+      operatorId: 'op-1',
+    })
+    tx.ticket.findFirst.mockResolvedValue(null)
+    tx.counter.update.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+    })
+
+    await service.forceReleaseCounter('counter-1', manager)
+
+    expect(tx.ticket.update).not.toHaveBeenCalled()
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'counter_force_released',
+        metadata: expect.objectContaining({ hadOpenTicket: false }),
+      }),
+    })
+  })
+
+  it('does not let an operator force-release a counter', async () => {
+    await expect(service.forceReleaseCounter('counter-1', operator)).rejects.toThrow(
+      ForbiddenException,
+    )
+  })
+
+  it('blocks force-release of a counter from another ER', async () => {
+    prisma.counter.findUnique.mockResolvedValue({ ...counterBase, erId: 'er-2' })
+
+    await expect(service.forceReleaseCounter('counter-1', manager)).rejects.toThrow(
+      ForbiddenException,
+    )
   })
 })

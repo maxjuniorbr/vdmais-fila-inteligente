@@ -19,6 +19,7 @@ interface ERSummary {
   name: string
   qrCodeUrl: string | null
   isDayOpen: boolean
+  pauseTimeoutSeconds: number
   createdAt: string
   _count: { counters: number; operators: number }
 }
@@ -447,14 +448,23 @@ function EditERForm({
   onError: (message: string | null) => void
 }>) {
   const [name, setName] = useState(er.name)
+  const [pauseMinutes, setPauseMinutes] = useState(String(Math.round(er.pauseTimeoutSeconds / 60)))
   const [loading, setLoading] = useState(false)
-  const unchanged = name.trim() === er.name
+  const parsedMinutes = Number(pauseMinutes)
+  const minutesValid = Number.isFinite(parsedMinutes) && parsedMinutes >= 0 && parsedMinutes <= 1440
+  const nextTimeoutSeconds = Math.round(parsedMinutes * 60)
+  const unchanged =
+    name.trim() === er.name && nextTimeoutSeconds === er.pauseTimeoutSeconds && minutesValid
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault()
+    if (!minutesValid) {
+      onError('Informe um tempo de pausa entre 0 e 1440 minutos')
+      return
+    }
     setLoading(true)
     try {
-      await api.patch(`/admin/ers/${er.id}`, { name })
+      await api.patch(`/admin/ers/${er.id}`, { name, pauseTimeoutSeconds: nextTimeoutSeconds })
       onError(null)
       await onUpdated()
     } catch (err: unknown) {
@@ -473,6 +483,18 @@ function EditERForm({
         onChange={(event) => setName(event.target.value)}
         minLength={2}
         maxLength={120}
+        required
+      />
+      <Input
+        label="Tempo limite de pausa (min)"
+        title="Tempo que uma senha pode ficar pausada antes de ser cancelada. Use 0 para desativar."
+        containerStyle={{ flex: '0 1 200px', marginBottom: 0 }}
+        type="number"
+        min={0}
+        max={1440}
+        step={1}
+        value={pauseMinutes}
+        onChange={(event) => setPauseMinutes(event.target.value)}
         required
       />
       <Button type="submit" disabled={loading || unchanged}>
