@@ -12,11 +12,12 @@
     "dev:frontend": "wait-on http-get://127.0.0.1:3000/health/ready && npm run dev --workspace=apps/frontend",
     "build": "npm run build --workspace=apps/backend && npm run build --workspace=apps/frontend",
     "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\" --ignore-path .gitignore",
     "sonar:up": "docker compose -f compose.sonar.yml up -d sonarqube",
     "sonar:down": "docker compose -f compose.sonar.yml down",
-    "sonar:coverage": "npm run test:cov --workspace=apps/backend",
+    "sonar:coverage": "npm run test:cov --workspace=apps/backend && npm run test:cov --workspace=apps/frontend",
     "sonar:scan": "docker compose -f compose.sonar.yml run --rm sonar-scanner",
     "sonar": "npm run sonar:coverage && npm run sonar:scan"
   },
