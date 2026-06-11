@@ -109,11 +109,12 @@ Uso:
 
 Uso:
 
-- exibir senha chamada;
+- exibir as senhas chamadas, uma por caixa em chamada (a mais recente piscando);
 - exibir primeiro nome + inicial;
 - exibir caixa destino;
-- exibir chamadas recentes;
-- exibir atendimentos em andamento.
+- exibir próximas senhas (com rodízio automático quando excedem a tela);
+- exibir atendimentos em andamento;
+- exibir tempos médios de espera e atendimento.
 
 A TV pode ser uma rota React em tela cheia:
 
@@ -333,19 +334,27 @@ Endpoints mínimos:
 ```
 POST /auth/register
 POST /auth/login
-POST /queues/:erId/tickets
-GET  /queues/:erId/status
-POST /operators/counters/open
-POST /operators/counters/pause
-POST /operators/counters/resume
+POST /auth/staff-login
+POST /tickets                       # cria senha (RE ou check-in assistido)
+GET  /queues/:erId/overview
+POST /counters/:counterId/open
+POST /counters/:counterId/pause
+POST /counters/:counterId/resume
+POST /counters/:counterId/close
 POST /queues/:erId/call-next
 POST /tickets/:ticketId/start-service
 POST /tickets/:ticketId/finish-service
 POST /tickets/:ticketId/no-show
-POST /tickets/:ticketId/cancel
-POST /tickets/:ticketId/restore
-GET  /manager/:erId/dashboard
-GET  /panel/:erId
+POST /tickets/:ticketId/recall       # segunda chamada (senha em chamada)
+POST /tickets/:ticketId/cancel       # cancelamento por staff (com motivo)
+POST /tickets/:ticketId/restore      # restaura no-show (gestora) → fim da fila
+POST /tickets/:ticketId/correct      # corrige atendimento em aberto (gestora)
+POST /tickets/:ticketId/pause        # RE pausa a própria senha
+POST /tickets/:ticketId/resume       # RE retoma → fim da fila
+POST /tickets/:ticketId/self-cancel  # RE sai da fila
+GET  /tickets/my-active              # senha ativa da RE no ER
+GET  /metrics/:erId/daily
+GET  /panel/:erId/state
 ```
 
 WebSocket:

@@ -7,10 +7,14 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - Entrada na fila por QR Code, link alternativo ou check-in assistido
 - Pausa voluntária da senha pela RE (volta ao fim da fila ao retomar; tempo pausado excluído das métricas)
 - Saída real da fila via cancelamento próprio
-- Painel TV/display com fila de espera, senhas em atendimento e tempo médio (posições relativas, sem lacunas)
+- Operação por caixa logado com chamada atômica do próximo (sem conflito entre operadoras)
+- Segunda chamada (rechamada) da senha em chamada, antes de marcar não comparecimento
+- Painel TV/display com quadro "Chamando agora" multicaixa (cartão piscante na chamada mais recente), próximas senhas com rodízio automático, atendimentos em andamento e tempos médios
 - Gestão com métricas de espera, atendimento, canais de entrada, caixas e não comparecimentos
 - Administração de ERs, caixas e contas de equipe, com ações para copiar e testar os acessos
 - Trilha de auditoria completa de todos os eventos do ciclo de vida da senha
+
+> 📖 Para entender o passo a passo de cada perfil de usuário (RE, operadora, atendente, gestora, admin), veja o **[Guia de uso por persona](./docs/guia-personas.md)**.
 
 ---
 
@@ -147,7 +151,7 @@ npm run dev:frontend
 | `/fila/:erId`             | Entrada presencial por QR Code                                       | RE            |
 | `/fila/:erId?source=link` | Entrada pelo link alternativo, com confirmação do ER                 | RE            |
 | `/fila/:erId/senha`       | Senha ativa, posição, pausa, retomada e saída da fila                | RE            |
-| `/operacao`               | Chamada, início, finalização, não comparecimento e controle do caixa | Operadora     |
+| `/operacao`               | Chamada, rechamada, início, finalização, não comparecimento e controle do caixa | Operadora     |
 | `/checkin`                | Busca/cadastro da RE e entrada assistida na fila                     | Atendente     |
 | `/gestao`                 | Fila, métricas, caixas e abertura/encerramento da operação           | Gestora/Admin |
 | `/painel/:erId`           | Painel público de chamadas para TV/display                           | Público       |
@@ -299,11 +303,13 @@ vdmais-fila-inteligente/
 
 1. **Administrador:** acesse `/`, escolha **Administração**, crie o ER, os caixas e as contas de equipe; copie os três acessos da unidade.
 2. **Gestora:** acesse `/gestao` e abra a operação do dia.
-3. **Painel de TV:** abra `/painel/<erId>` em tela cheia.
+3. **Painel de TV:** abra `/painel/<erId>` em tela cheia. O quadro "Chamando agora" mostra uma chamada por caixa (a mais recente pisca); "Próximas senhas" faz rodízio automático quando há mais de 7 aguardando.
 4. **Operadora:** acesse `/operacao`, selecione um caixa livre e clique em **Assumir e abrir caixa**.
 5. **RE pelo QR Code:** acesse `/fila/<erId>`, faça login ou cadastro e entre na fila.
 6. **RE pelo link alternativo:** use `/fila/<erId>?source=link` e confirme o ER antes de continuar.
 7. **Check-in assistido:** acesse `/checkin` com uma conta de atendente, localize ou cadastre a RE e gere sua senha.
-8. **Atendimento:** a operadora chama a próxima senha, inicia o atendimento e o finaliza ou registra o não comparecimento.
+8. **Atendimento:** a operadora chama a próxima senha. Se a RE não aparecer de imediato, pode usar **Rechamar** (segunda chamada, re-anuncia no painel) antes de iniciar o atendimento ou marcar não comparecimento.
 
 Na tela da senha, a RE pode pausar sua participação, retomá-la no fim da fila ou sair da fila. Se fechar a página e retornar pelo mesmo acesso, o sistema recupera a senha ativa após a autenticação.
+
+> 📖 O **[Guia de uso por persona](./docs/guia-personas.md)** detalha a jornada completa de cada perfil.
