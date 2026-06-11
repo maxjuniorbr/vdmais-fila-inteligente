@@ -62,6 +62,7 @@ const tx = {
     create: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
+    aggregate: jest.fn(),
     findUniqueOrThrow: jest.fn(),
   },
   counter: { update: jest.fn() },
@@ -266,6 +267,169 @@ describe('TicketService', () => {
     await expect(service.restore('ticket-1', 'motivo', manager)).rejects.toThrow(
       BadRequestException,
     )
+  })
+
+  it('finishes an IN_SERVICE ticket and resets the counter to ACTIVE', async () => {
+    prisma.ticket.findUnique.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.IN_SERVICE,
+      counterId: 'counter-1',
+      operatorId: 'op-1',
+    })
+    tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+    tx.counter.update.mockResolvedValue({ state: CounterState.ACTIVE })
+    tx.ticket.findUniqueOrThrow.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.FINISHED,
+      serviceFinishedAt: new Date(),
+    })
+
+    const result = await service.finishService('ticket-1', operator)
+
+    expect(result.state).toBe(TicketState.FINISHED)
+    expect(tx.counter.update).toHaveBeenCalledWith({
+      where: { id: 'counter-1' },
+      data: { state: CounterState.ACTIVE },
+    })
+    expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.service_finished', expect.any(Object))
+  })
+
+  it('marks a CALLING ticket as NO_SHOW and resets counter', async () => {
+    prisma.ticket.findUnique.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.CALLING,
+      counterId: 'counter-1',
+      operatorId: 'op-1',
+    })
+    tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+    tx.counter.update.mockResolvedValue({ state: CounterState.ACTIVE })
+    tx.ticket.findUniqueOrThrow.mockResolvedValue({ ...ticketBase, state: TicketState.NO_SHOW })
+
+    const result = await service.noShow('ticket-1', operator)
+
+    expect(result.state).toBe(TicketState.NO_SHOW)
+    expect(tx.counter.update).toHaveBeenCalledWith({
+      where: { id: 'counter-1' },
+      data: { state: CounterState.ACTIVE },
+    })
+    expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.no_show', expect.any(Object))
+  })
+
+  it('cancels an active ticket and resets the counter', async () => {
+    const cancelledTicket = {
+      ...ticketBase,
+      state: TicketState.CANCELLED,
+      cancelReason: 'duplicata',
+      cancelledAt: new Date(),
+      erId: 'er-1',
+      code: 'A001',
+    }
+    prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
+    tx.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
+    tx.ticket.update.mockResolvedValue(cancelledTicket)
+    tx.auditEvent.create.mockResolvedValue({})
+
+    const result = await service.cancel('ticket-1', 'duplicata', manager)
+
+    expect(result.state).toBe(TicketState.CANCELLED)
+    expect(tx.ticket.update).toHaveBeenCalledWith({
+      where: { id: 'ticket-1' },
+      data: expect.objectContaining({ state: TicketState.CANCELLED }),
+    })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: 'ticket_cancelled' }),
+    })
+    expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.cancelled', expect.any(Object))
+  })
+
+  it('restores a NO_SHOW ticket to WAITING at the end of the queue', async () => {
+    prisma.ticket.findUnique.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.NO_SHOW,
+      erId: 'er-1',
+    })
+    tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 5 })
+    tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+    tx.ticket.findUniqueOrThrow.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.WAITING,
+      queuePosition: 5,
+    })
+
+    const result = await service.restore('ticket-1', 'gestor autorizou', manager)
+
+    expect(result.state).toBe(TicketState.WAITING)
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: 'ticket_restored' }),
+    })
+    expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.restored', expect.any(Object))
+  })
+
+  describe('recall', () => {
+    it('re-announces a CALLING ticket without changing the queue (second call)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.CALLING,
+        counterId: 'counter-1',
+        operatorId: 'op-1',
+        calledAt: new Date(Date.now() - 60_000),
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.CALLING,
+        counterId: 'counter-1',
+        operatorId: 'op-1',
+        calledAt: new Date(),
+        representative: { fullName: 'Maria Teste' },
+        counter: { number: 1 },
+      })
+
+      const result = await service.recall('ticket-1', operator)
+
+      expect(result.state).toBe(TicketState.CALLING)
+      // só atualiza o horário da chamada; não mexe em estado/fila/caixa
+      expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+        where: { id: 'ticket-1', state: TicketState.CALLING, operatorId: 'op-1' },
+        data: { calledAt: expect.any(Date) },
+      })
+      expect(tx.auditEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ eventType: 'ticket_recalled' }),
+      })
+      expect(panel.emitToER).toHaveBeenCalledWith(
+        'er-1',
+        'ticket.called',
+        expect.objectContaining({ ticketId: 'ticket-1', counterNumber: 1 }),
+      )
+    })
+
+    it('rejects recall of a ticket that is not CALLING', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        counterId: 'counter-1',
+        operatorId: 'op-1',
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+
+      await expect(service.recall('ticket-1', operator)).rejects.toThrow(BadRequestException)
+    })
+
+    it('does not let an operator recall a ticket assigned to another operator', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.CALLING,
+        counterId: 'counter-1',
+        operatorId: 'another-op',
+      })
+
+      await expect(service.recall('ticket-1', operator)).rejects.toThrow(ForbiddenException)
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('does not let a representative recall a ticket', async () => {
+      await expect(service.recall('ticket-1', representative)).rejects.toThrow(ForbiddenException)
+    })
   })
 
   it('supports audited manager correction of an open service', async () => {

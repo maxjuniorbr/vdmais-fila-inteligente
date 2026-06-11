@@ -304,7 +304,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
     assignedOperatorToken = assigned[0].operatorId === operator1Id ? operator1Token : operator2Token
   })
 
-  it('preserves no-show metrics and recent calls after restoration', async () => {
+  it('preserves no-show metrics and re-queues the ticket after restoration', async () => {
     await request(app.getHttpServer())
       .post(`/tickets/${restoredTicketId}/no-show`)
       .set('Authorization', `Bearer ${assignedOperatorToken}`)
@@ -324,12 +324,9 @@ describe('Full queue journey and concurrency (e2e)', () => {
     expect(metrics.body.noShowByChannel.LINK).toBeGreaterThanOrEqual(1)
 
     const panel = await request(app.getHttpServer()).get(`/panel/${erId}/state`).expect(200)
-    expect(panel.body.recent).toEqual(
+    expect(panel.body.waiting).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          ticketId: restoredTicketId,
-          displayName: 'Concorrência E.',
-        }),
+        expect.objectContaining({ ticketId: restoredTicketId }),
       ]),
     )
   })
@@ -487,7 +484,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
     expect(serialized).not.toContain('phone')
     expect(serialized).not.toContain('reCode')
     expect(serialized).not.toContain('representativeId')
-    const displayedCall = response.body.current ?? response.body.recent[0]
+    const displayedCall = response.body.current ?? response.body.calling[0]
     expect(displayedCall.displayName).toMatch(/^[^\s]+ [A-ZÁ-Ú]\.$/i)
   })
 
