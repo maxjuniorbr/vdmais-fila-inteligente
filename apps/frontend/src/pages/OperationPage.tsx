@@ -316,6 +316,13 @@ export function OperationPage() {
                       </Button>
                       <Button
                         variant="secondary"
+                        onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/recall`))}
+                        disabled={loading}
+                      >
+                        Rechamar
+                      </Button>
+                      <Button
+                        variant="secondary"
                         onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/no-show`))}
                         disabled={loading}
                       >
@@ -418,7 +425,9 @@ export function OperationPage() {
             <div style={styles.chipRow}>
               {overview?.recent.slice(0, 8).map((ticket) => (
                 <span key={ticket.id} style={styles.chip}>
-                  <StatusDot color={brand.green400} />
+                  <StatusDot
+                    color={ticket.state === 'NO_SHOW' ? brand.warning : brand.green400}
+                  />
                   <strong>{ticket.code}</strong>
                   <span style={styles.chipState}>{ticketStateLabel(ticket.state)}</span>
                 </span>

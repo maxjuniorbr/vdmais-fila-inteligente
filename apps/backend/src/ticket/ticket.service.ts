@@ -9,6 +9,7 @@ import { CounterState, EntryChannel, Prisma, Role, TicketState } from '@prisma/c
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { getBusinessDate } from '../common/business-date'
 import { PanelGateway } from '../panel/panel.gateway'
+import { abbreviateName } from '../panel/panel.presenter'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateTicketDto } from './dto/create-ticket.dto'
 import { CorrectionAction, CorrectTicketDto } from './dto/ticket-action.dto'
@@ -358,6 +359,58 @@ export class TicketService {
       }
       throw error
     }
+  }
+
+  /**
+   * Segunda chamada: re-anuncia uma senha que JÁ está em chamada (CALLING) no
+   * caixa da operadora, sem alterar a fila nem o caixa. Apenas atualiza o
+   * horário da chamada para re-destacar no painel e registra o evento.
+   */
+  async recall(ticketId: string, user: AuthenticatedUser) {
+    if (user.role !== Role.OPERATOR) {
+      throw new ForbiddenException('Somente operadoras podem rechamar senhas')
+    }
+    const ticket = await this._getTicket(ticketId)
+    this._assertAssignedOperator(ticket, user)
+    const now = new Date()
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.ticket.updateMany({
+        where: { id: ticketId, state: TicketState.CALLING, operatorId: user.userId },
+        data: { calledAt: now },
+      })
+      if (result.count !== 1) {
+        throw new BadRequestException('A senha deve estar em chamada para ser rechamada')
+      }
+
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_recalled',
+          erId: ticket.erId,
+          ticketId,
+          operatorId: user.userId,
+          metadata: { counterId: ticket.counterId },
+        },
+      })
+      return tx.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: {
+          representative: { select: { fullName: true } },
+          counter: { select: { number: true } },
+        },
+      })
+    })
+
+    // Reaproveita o evento 'ticket.called' (já tratado pelos clientes) para
+    // re-destacar a senha no painel — o painel não precisa de ajuste.
+    this.panelGateway.emitToER(ticket.erId, 'ticket.called', {
+      ticketId,
+      code: updated.code,
+      displayName: abbreviateName(updated.representative.fullName),
+      counterNumber: updated.counter?.number ?? 0,
+      calledAt: updated.calledAt,
+    })
+    return updated
   }
 
   async startService(ticketId: string, user: AuthenticatedUser) {

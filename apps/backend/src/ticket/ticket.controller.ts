@@ -44,6 +44,12 @@ export class TicketController {
     return this.ticketService.restore(id, dto.reason, req.user)
   }
 
+  @Post(':id/recall')
+  @Roles('OPERATOR')
+  recall(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.ticketService.recall(id, req.user)
+  }
+
   @Post(':id/correct')
   @Roles('MANAGER')
   correct(
