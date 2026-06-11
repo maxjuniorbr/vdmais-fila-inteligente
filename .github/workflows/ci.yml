@@ -60,12 +60,23 @@ jobs:
           JWT_SECRET: ci-test-secret-minimum-32-characters-long
           JWT_EXPIRES_IN: 7d
 
+      - name: Frontend tests
+        run: npm run test --workspace=apps/frontend
+
       - name: End-to-end tests
         run: npm run test:e2e --workspace=apps/backend -- --watchman=false --runInBand
         env:
           DATABASE_URL: postgresql://fila:fila_dev_pass@localhost:5432/fila_inteligente
           JWT_SECRET: ci-test-secret-minimum-32-characters-long
           JWT_EXPIRES_IN: 7d
+
+      - name: Install browser for frontend E2E
+        run: npx playwright install --with-deps chromium
+
+      - name: Frontend browser E2E
+        run: npm run test:e2e --workspace=apps/frontend
+        env:
+          CI: true
 
       - name: Dependency audit
         run: npm audit --audit-level=high || true
