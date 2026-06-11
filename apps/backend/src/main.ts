@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
-import { ValidationPipe } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { validationExceptionFactory } from './common/validation-exception.factory'
@@ -27,7 +27,7 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3000
   await app.listen(port)
-  console.log(`Backend running on port ${port}`)
+  Logger.log(`Backend running on port ${port}`, 'Bootstrap')
 }
 
 bootstrap()
