@@ -249,10 +249,15 @@ Estados mínimos:
     
     Evento de exceção. Uma senha marcada como “não compareceu” pode ser restaurada manualmente por perfil autorizado.
     
+8. **Pausado**  
+    
+    A RE avisa que não está pronta e pausa a própria senha. Ela sai temporariamente da fila sem perder o cadastro. Ao retomar, volta para o **fim** da fila. O tempo pausado é excluído das métricas de espera.
+    
 
 Observação:
 
-> Restaurado deve ser tratado preferencialmente como evento. Após restauração, a senha volta para Aguardando.
+> Restaurado deve ser tratado preferencialmente como evento. Após restauração, a senha volta para Aguardando (no fim da fila).
+> Pausado é controlado pela própria RE (pausar/retomar); ao retomar, a senha recebe nova posição no fim da fila.
 > 
 
 ---
@@ -321,6 +326,20 @@ Mitigações para esquecimento:
 - bloqueio para chamar próximo enquanto houver atendimento aberto;
 - opção de correção pela gestora.
 
+### 8.5 Rechamar (segunda chamada)
+
+Quando a senha está em **Chamando** e a RE não comparece de imediato, a operadora
+pode **rechamar** antes de marcar não comparecimento.
+
+1. Operadora clica em **Rechamar**.
+2. A senha permanece em **Chamando**, no mesmo caixa (não altera a fila).
+3. O horário da chamada é atualizado e o painel **re-anuncia** a senha (o cartão
+   volta a piscar).
+
+> Rechamar é uma segunda chance para quem está por perto mas não ouviu a primeira
+> chamada. Não confundir com **Restaurar** (que age sobre senha já marcada como
+> não compareceu e a recoloca no fim da fila).
+
 ---
 
 ## 9. Fluxos de exceção
@@ -329,16 +348,19 @@ Mitigações para esquecimento:
 
 1. Operadora chama a senha.
 2. TV exibe a chamada.
-3. RE não aparece dentro da tolerância definida.
-4. Operadora clica em **Não compareceu**.
-5. Senha muda para **Não compareceu**.
-6. Caixa volta para **Ativo**.
-7. Operadora chama próximo.
+3. A operadora pode **rechamar** (segunda chamada) se julgar necessário.
+4. RE não aparece dentro da tolerância definida.
+5. Operadora clica em **Não compareceu**.
+6. Senha muda para **Não compareceu** (estado terminal).
+7. Caixa volta para **Ativo**.
+8. Operadora chama próximo.
 
-Regra padrão:
+Regra (MVP 0):
 
-> RE que não compareceu deve entrar novamente na fila.
-> 
+> O não comparecimento **não recoloca a senha na fila automaticamente**. A senha
+> fica como **Não compareceu** e só retorna se um perfil autorizado (gestora)
+> usar **Restaurar** (volta para o fim da fila). A rechamada cobre o caso de
+> atraso curto antes da desistência.
 
 ### 9.2 Restauração manual
 
@@ -399,6 +421,23 @@ Motivos possíveis de pausa:
 - fechamento de caixa;
 - outro.
 
+### 9.5 Pausa da senha pela RE
+
+1. Na tela da própria senha, a RE clica em **Não estou pronta** (pausar).
+2. A senha muda para **Pausado** e sai temporariamente da fila.
+3. Quando estiver pronta, a RE clica em **Retomar**.
+4. A senha volta para **Aguardando**, no **fim** da fila (nova posição).
+5. O tempo pausado é descontado das métricas de espera.
+
+### 9.6 Saída da fila pela RE
+
+1. Na tela da própria senha, a RE clica em **Sair da fila**.
+2. A senha é **cancelada** (estado **Cancelado**) e não volta à fila.
+3. Para ser atendida, a RE precisa entrar novamente e gerar nova senha.
+
+> Diferente do cancelamento por staff (9.3), aqui a própria RE cancela sua senha
+> ativa (aguardando ou pausada).
+
 ---
 
 ## 10. TV / painel de chamada
@@ -426,27 +465,36 @@ Não exibir:
 - informações comerciais;
 - status cadastral.
 
-Estrutura sugerida:
+Estrutura atual do painel:
 
 ### Chamando agora
 
+Um cartão por caixa em chamada (1 grande; vários em grade, lado a lado). A
+chamada **mais recente pisca** para chamar atenção. É aqui que aparece a segunda
+chamada (rechamada).
+
 - A023 — Maria S. — Caixa 04
 
-### Chamadas recentes
-
-- A022 — Ana C. — Caixa 02
-- A021 — Joana M. — Caixa 01
-- A020 — Carla R. — Caixa 05
-
 ### Em atendimento
+
+Senhas que já foram para o caixa (apenas senha + caixa, sem nome).
 
 - A018 — Caixa 03
 - A019 — Caixa 06
 
-Diretriz:
+### Próximas senhas
 
-> Mostrar pessoas em atendimento é útil para transparência e percepção de fluxo, mas não deve expor dados sensíveis nem tempo individual de atendimento.
-> 
+A fila à frente. A **primeira fica fixa** (próxima a ser chamada) e as demais
+entram em **rodízio automático** quando há mais senhas do que cabem na tela,
+para que toda a fila apareça ao longo do tempo.
+
+### Tempos médios
+
+Espera média e atendimento médio do dia.
+
+> Nota: a lista de "Chamadas recentes" foi removida do painel. Quem perdeu a
+> própria chamada é coberto pela **rechamada** na tela da operadora. O cabeçalho
+> do painel traz título e relógio (data + hora com segundos).
 
 ---
 
@@ -463,11 +511,11 @@ Funcionalidades mínimas:
 - chamar próximo;
 - ver senha chamada;
 - iniciar atendimento;
+- rechamar (segunda chamada da senha em chamada);
 - finalizar atendimento;
 - marcar não compareceu;
 - cancelar senha, se autorizado;
 - restaurar senha, se autorizado;
-- visualizar chamadas recentes;
 - visualizar atendimentos em andamento;
 - visualizar tempo da senha atual;
 - visualizar tempo do atendimento atual.
@@ -481,11 +529,11 @@ Tela mínima:
 - tempo em atendimento;
 - botão **Chamar próximo**;
 - botão **Iniciar atendimento**;
+- botão **Rechamar**;
 - botão **Finalizar atendimento**;
 - botão **Não compareceu**;
 - botão **Pausar/Retomar**;
-- lista curta de aguardando;
-- chamadas recentes.
+- lista curta de aguardando, pausados e em atendimento.
 
 Permissões sugeridas:
 
@@ -493,6 +541,7 @@ Permissões sugeridas:
 
 - chamar próximo;
 - iniciar atendimento;
+- rechamar (segunda chamada);
 - finalizar atendimento;
 - marcar não compareceu;
 - pausar/retomar próprio caixa.
@@ -523,7 +572,7 @@ Funcionalidades mínimas:
 - ver caixas ativos;
 - ver caixas pausados;
 - ver atendimentos em andamento;
-- ver chamadas recentes;
+- ver senhas pausadas pela RE;
 - ver senhas não comparecidas;
 - ver senhas canceladas;
 - restaurar senha com motivo;
@@ -534,6 +583,7 @@ Funcionalidades mínimas:
 Indicadores mínimos:
 
 - total de REs aguardando;
+- total de senhas pausadas;
 - maior tempo de espera atual;
 - tempo médio de espera do dia;
 - tempo médio de atendimento do dia;
@@ -636,6 +686,10 @@ authentication_failed
 manual_checkin_started
 manual_checkin_completed
 manual_override_performed
+ticket_paused
+ticket_resumed
+ticket_recalled
+service_force_finished
 panel_connected
 panel_disconnected
 panel_updated
@@ -652,7 +706,8 @@ daily_queue_closed
 
 - total de senhas criadas;
 - total aguardando;
-- tempo médio de espera;
+- total pausadas (pausa da RE);
+- tempo médio de espera (descontado o tempo pausado);
 - tempo mediano de espera;
 - maior tempo de espera atual;
 - tempo de espera por faixa horária;
@@ -698,7 +753,7 @@ O MVP 0 será bem-sucedido se:
 7. O sistema registrar não comparecimento.
 8. O sistema permitir cancelamento com motivo.
 9. A gestora conseguir restaurar senha manualmente com justificativa.
-10. A operação conseguir visualizar fila, caixas, atendimentos e chamadas recentes.
+10. A operação conseguir visualizar fila, caixas, atendimentos em andamento e próximas senhas.
 11. O sistema calcular tempo médio de espera e atendimento.
 12. A solução não aumentar significativamente o esforço da operadora no caixa.
 
