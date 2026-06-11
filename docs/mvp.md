@@ -239,7 +239,9 @@ Estados mínimos:
     
 5. **Não compareceu**  
     
-    RE foi chamada, mas não compareceu dentro da janela operacional.
+    RE foi chamada, mas não compareceu dentro da janela operacional. Pode ser
+    registrado pela operadora ou **automaticamente** quando a senha excede o
+    tempo limite de chamada (ver 9.8).
     
 6. **Cancelado**  
     
@@ -257,8 +259,15 @@ Estados mínimos:
 Observação:
 
 > Restaurado deve ser tratado preferencialmente como evento. Após restauração, a senha volta para Aguardando (no fim da fila).
-> Pausado é controlado pela própria RE (pausar/retomar); ao retomar, a senha recebe nova posição no fim da fila.
-> 
+> Pausado é controlado pela própria RE (pausar/retomar); ao retomar, a senha recebe nova posição no fim da fila e é sempre vinculada à fila do **dia atual**.
+
+> **Encerramento automático na virada de dia.** Senhas que ficaram em
+> **Aguardando**, **Chamando**, **Em atendimento** ou **Pausado** de um dia que
+> não foi encerrado são fechadas automaticamente quando a operação do dia
+> seguinte é aberta. A RE já não está mais na loja, então essas senhas vão para
+> **Não compareceu** com o evento de auditoria `ticket_force_closed`
+> (motivo `day_rollover`). Esse evento permite **quantificar** o arrasto e
+> **mantê-las fora** dos indicadores de não comparecimento e cancelamento do dia.
 
 ---
 
@@ -364,23 +373,31 @@ Regra (MVP 0):
 
 ### 9.2 Restauração manual
 
-1. RE aparece depois da chamada perdida.
-2. Operadora ou gestora localiza senha marcada como **Não compareceu**.
+1. RE aparece depois da chamada perdida (ou houve um cancelamento indevido antes
+   do atendimento).
+2. Operadora ou gestora localiza a senha marcada como **Não compareceu** ou
+   **Cancelado**.
 3. Perfil autorizado clica em **Restaurar senha**.
 4. Sistema exige motivo.
 5. Sistema registra operador, horário e justificativa.
 6. Senha volta para **Aguardando**.
 
-Recomendação para MVP 0:
+Regras da restauração:
 
-> Restauração volta ao fim da fila.
-> 
+> - **Não compareceu** pode sempre ser restaurada.
+> - **Cancelado** só pode ser restaurada se a senha **nunca entrou em
+>   atendimento** (`serviceStartedAt` vazio). Senhas canceladas após o início do
+>   atendimento permanecem terminais, para não contaminar as métricas de
+>   atendimento.
+> - A restauração **não acontece** se a RE já tiver outra senha ativa no ER —
+>   isso preserva a regra "uma senha ativa por RE por ER".
+> - A senha restaurada volta sempre para o **fim** da fila do dia atual.
 
 Motivos possíveis:
 
 - RE estava no salão e não ouviu chamada;
 - falha de TV/painel;
-- erro operacional;
+- erro operacional (inclusive cancelamento indevido antes do atendimento);
 - orientação da gestora;
 - outro.
 
@@ -402,8 +419,9 @@ Regra:
 
 - cancelamento exige motivo;
 - registra usuário responsável;
-- senha cancelada não volta à fila;
-- se necessário, nova senha deve ser criada.
+- uma senha cancelada **antes do atendimento** pode ser restaurada por perfil
+  autorizado (ver 9.2); cancelada **após o início do atendimento**, é terminal;
+- se a restauração não for possível, uma nova senha deve ser criada.
 
 ### 9.4 Caixa pausado
 
@@ -437,6 +455,58 @@ Motivos possíveis de pausa:
 
 > Diferente do cancelamento por staff (9.3), aqui a própria RE cancela sua senha
 > ativa (aguardando ou pausada).
+
+### 9.7 Abertura do dia e saneamento da operação anterior
+
+A operação de cada dia é aberta pela gestora. Ao abrir o dia, o sistema:
+
+1. Verifica se já existe operação **aberta hoje**. Se sim, retorna conflito
+   (não reabre).
+2. Caso a operação de um dia anterior tenha ficado **sem encerramento**,
+   encerra automaticamente as senhas pendentes daquele dia (ver nota de
+   encerramento automático na seção 7).
+3. **Libera todos os caixas do ER** (volta para *indisponível*, sem operadora).
+   Um novo dia sempre começa com os caixas fechados — isso elimina caixas que
+   ficaram presos a operadoras que saíram sem fechar o caixa.
+4. Cria/abre a fila do dia atual.
+
+> Isso evita o cenário em que, ao abrir o app num novo dia sem ter encerrado o
+> anterior, a operação ficava travada (não dava para chamar nem para reabrir o
+> dia). O saneamento desbloqueia a operação e deixa registro auditável do que
+> foi encerrado (`ticket_force_closed`, `counters_reset_for_day`).
+
+### 9.8 Tempo limite da chamada (não comparecimento automático)
+
+Uma senha não pode ficar presa em **Chamando** indefinidamente (a RE não
+compareceu, ou a operadora saiu sem registrar o não comparecimento, travando o
+caixa).
+
+1. O sistema verifica periodicamente as senhas em **Chamando**.
+2. Quando uma senha passa da tolerância configurável (`CALL_TIMEOUT_MINUTES`,
+   padrão 10 minutos), ela é marcada como **Não compareceu** automaticamente.
+3. O caixa é liberado (volta para **Ativo**) e o painel é atualizado.
+4. O evento `ticket_auto_no_show` registra o encerramento; ele **conta** como
+   não comparecimento nas métricas.
+
+> A rechamada (8.5) continua sendo a forma de dar uma segunda chance dentro da
+> janela. O tempo limite só age quando a senha é abandonada além da tolerância.
+
+### 9.9 Encerramento do dia com atendimento em aberto
+
+Ao encerrar a operação, atendimentos que ficaram **Em atendimento** (a operadora
+esqueceu de finalizar) são **auto-finalizados** como **Finalizado**, com o evento
+`service_force_finished` — que é contabilizado normalmente como atendimento
+concluído. Assim não restam senhas órfãs e as métricas do dia ficam corretas.
+Senhas ainda **Aguardando**, **Chamando** ou **Pausado** continuam **bloqueando**
+o encerramento (não se encerra com gente na fila); para a chamada abandonada,
+valem o tempo limite (9.8) e a liberação de caixa pela gestora (9.4).
+
+### 9.10 Liberação de caixa pela gestora
+
+Quando uma operadora abandona o caixa no meio do expediente (saiu sem fechar,
+sessão expirou), a gestora pode **liberar o caixa**: a senha em aberto é
+resolvida (em atendimento → finalizada; em chamada → não compareceu) e o caixa
+volta a ficar disponível, sem operadora. Registrado em `counter_force_released`.
 
 ---
 
@@ -558,6 +628,7 @@ Permissões sugeridas:
 - restaurar senha;
 - cancelar qualquer senha;
 - visualizar todos os caixas;
+- liberar caixa (forçado) quando a operadora abandona o caixa;
 - corrigir atendimento em aberto;
 - encerrar fila do dia;
 - consultar indicadores.
@@ -577,6 +648,7 @@ Funcionalidades mínimas:
 - ver senhas canceladas;
 - restaurar senha com motivo;
 - cancelar senha com motivo;
+- liberar caixa órfão (forçado);
 - abrir/encerrar operação do dia;
 - consultar métricas básicas.
 
@@ -593,6 +665,7 @@ Indicadores mínimos:
 - atendimentos finalizados;
 - não comparecimentos;
 - cancelamentos;
+- senhas encerradas automaticamente na virada de dia;
 - volume por hora.
 
 ---
@@ -689,6 +762,10 @@ manual_override_performed
 ticket_paused
 ticket_resumed
 ticket_recalled
+ticket_force_closed
+ticket_auto_no_show
+counter_force_released
+counters_reset_for_day
 service_force_finished
 panel_connected
 panel_disconnected
@@ -715,7 +792,8 @@ daily_queue_closed
 - tentativas de duplicidade;
 - senhas canceladas;
 - senhas não comparecidas;
-- senhas restauradas.
+- senhas restauradas;
+- senhas encerradas automaticamente na virada de dia (`ticket_force_closed`).
 
 ### Atendimento
 
