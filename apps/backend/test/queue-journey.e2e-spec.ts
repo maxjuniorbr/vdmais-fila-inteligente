@@ -477,6 +477,13 @@ describe('Full queue journey and concurrency (e2e)', () => {
   })
 
   it('exposes only sanitized queue data on the public TV endpoint', async () => {
+    // Ensure a ticket is being called so the panel exposes a CALLING entry to validate.
+    await request(app.getHttpServer())
+      .post(`/queues/${erId}/call-next`)
+      .set('Authorization', `Bearer ${operator1Token}`)
+      .send({ counterId: counter1Id })
+      .expect(201)
+
     const response = await request(app.getHttpServer()).get(`/panel/${erId}/state`).expect(200)
 
     const serialized = JSON.stringify(response.body)
@@ -485,6 +492,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
     expect(serialized).not.toContain('reCode')
     expect(serialized).not.toContain('representativeId')
     const displayedCall = response.body.current ?? response.body.calling[0]
+    expect(displayedCall).toBeDefined()
     expect(displayedCall.displayName).toMatch(/^[^\s]+ [A-ZÁ-Ú]\.$/i)
   })
 
