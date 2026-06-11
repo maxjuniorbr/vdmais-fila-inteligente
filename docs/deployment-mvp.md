@@ -37,6 +37,9 @@ deploy no ambiente corporativo deve promover essas mesmas imagens, sem reconstru
 ambiente de container único. Em produção corporativa, prefira banco gerenciado e ingress
 HTTPS.
 
+> Regras operacionais de migrations (paridade, pipeline e segurança) vivem no AI
+> steering `.kiro/steering/database-migrations.md`.
+
 ## Observabilidade
 
 - Logs HTTP são emitidos em JSON para stdout, sem corpo, credenciais ou dados da RE.
