@@ -30,6 +30,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -53,15 +55,22 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Unit tests
-        run: npm run test --workspace=apps/backend -- --watchman=false --runInBand
+      - name: Backend tests with coverage
+        run: npm run test:cov --workspace=apps/backend -- --watchman=false --runInBand
         env:
           DATABASE_URL: postgresql://fila:fila_dev_pass@localhost:5432/fila_inteligente
           JWT_SECRET: ci-test-secret-minimum-32-characters-long
           JWT_EXPIRES_IN: 7d
 
-      - name: Frontend tests
-        run: npm run test --workspace=apps/frontend
+      - name: Frontend tests with coverage
+        run: npm run test:cov --workspace=apps/frontend
+
+      - name: New code coverage gate
+        env:
+          COVERAGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          git diff --unified=0 --diff-filter=ACMR "$COVERAGE_BASE" -- apps/backend/src apps/frontend/src |
+            npm run coverage:changed -- --base-label "$COVERAGE_BASE"
 
       - name: End-to-end tests
         run: npm run test:e2e --workspace=apps/backend -- --watchman=false --runInBand
@@ -79,4 +88,4 @@ jobs:
           CI: true
 
       - name: Dependency audit
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high

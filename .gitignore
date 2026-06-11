@@ -17,3 +17,7 @@ test-results/
 
 # SonarQube local
 .scannerwork/
+.sonarlint/
+
+# Editor settings
+.vscode/
