@@ -52,6 +52,15 @@ describe('QueueEntryPage accessibility', () => {
     fireEvent.keyDown(registerTab, { key: 'Home' })
     expect(loginTab).toHaveFocus()
     expect(loginTab).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.keyDown(loginTab, { key: 'ArrowLeft' })
+    expect(registerTab).toHaveFocus()
+
+    fireEvent.keyDown(registerTab, { key: 'End' })
+    expect(registerTab).toHaveFocus()
+
+    fireEvent.click(loginTab)
+    expect(loginTab).toHaveAttribute('aria-selected', 'true')
   })
 
   it('has no detectable axe violations in both tab panels', async () => {
