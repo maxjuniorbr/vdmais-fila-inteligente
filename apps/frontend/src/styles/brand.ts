@@ -17,7 +17,7 @@ export const brand = {
 
   ink: '#1c2b25',
   inkSoft: '#44574e',
-  inkMuted: '#6b7f75',
+  inkMuted: '#5f7369',
   surface: '#ffffff',
   canvas: '#f4f9f6',
   border: '#dbe8e1',
