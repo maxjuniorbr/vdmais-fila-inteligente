@@ -18,9 +18,13 @@ describe('Full queue journey and concurrency (e2e)', () => {
   let counter2Id: string
   let operator1Id: string
   let operator2Id: string
+  let raceOperator1Id: string
+  let raceOperator2Id: string
   let managerToken: string
   let operator1Token: string
   let operator2Token: string
+  let raceOperator1Token: string
+  let raceOperator2Token: string
   let representativeToken: string
   let ticketId: string
   let restoredTicketId: string
@@ -56,7 +60,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
     otherErId = otherEr.id
 
     const passwordHash = await bcrypt.hash('senha123', 10)
-    const [manager, admin, operator1, operator2] = await Promise.all([
+    const [manager, admin, operator1, operator2, raceOperator1, raceOperator2] = await Promise.all([
       prisma.operator.create({
         data: {
           name: 'Gestora E2E',
@@ -93,9 +97,29 @@ describe('Full queue journey and concurrency (e2e)', () => {
           erId,
         },
       }),
+      prisma.operator.create({
+        data: {
+          name: 'Operadora Concorrência Um',
+          email: `race_operator1_${suffix}@test.local`,
+          passwordHash,
+          role: Role.OPERATOR,
+          erId,
+        },
+      }),
+      prisma.operator.create({
+        data: {
+          name: 'Operadora Concorrência Dois',
+          email: `race_operator2_${suffix}@test.local`,
+          passwordHash,
+          role: Role.OPERATOR,
+          erId,
+        },
+      }),
     ])
     operator1Id = operator1.id
     operator2Id = operator2.id
+    raceOperator1Id = raceOperator1.id
+    raceOperator2Id = raceOperator2.id
 
     const [counter1, counter2] = await Promise.all([
       prisma.counter.create({ data: { number: 1, erId } }),
@@ -115,6 +139,8 @@ describe('Full queue journey and concurrency (e2e)', () => {
     managerToken = await login(manager.email)
     operator1Token = await login(operator1.email)
     operator2Token = await login(operator2.email)
+    raceOperator1Token = await login(raceOperator1.email)
+    raceOperator2Token = await login(raceOperator2.email)
     adminToken = await login(admin.email)
 
     await request(app.getHttpServer())
@@ -175,6 +201,57 @@ describe('Full queue journey and concurrency (e2e)', () => {
       })
       .expect(200)
     representativeToken = login.body.access_token
+  })
+
+  it('allows only one operator to acquire a counter concurrently', async () => {
+    const counter = await prisma.counter.create({ data: { number: 3, erId } })
+
+    const responses = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/counters/${counter.id}/open`)
+        .set('Authorization', `Bearer ${raceOperator1Token}`),
+      request(app.getHttpServer())
+        .post(`/counters/${counter.id}/open`)
+        .set('Authorization', `Bearer ${raceOperator2Token}`),
+    ])
+
+    expect(responses.map((response) => response.status).sort((a, b) => a - b)).toEqual([201, 409])
+    const assigned = await prisma.counter.findUniqueOrThrow({ where: { id: counter.id } })
+    expect([raceOperator1Id, raceOperator2Id]).toContain(assigned.operatorId)
+
+    const ownerToken =
+      assigned.operatorId === raceOperator1Id ? raceOperator1Token : raceOperator2Token
+    await request(app.getHttpServer())
+      .post(`/counters/${counter.id}/close`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(201)
+  })
+
+  it('allows an operator to acquire only one of two counters concurrently', async () => {
+    const [firstCounter, secondCounter] = await Promise.all([
+      prisma.counter.create({ data: { number: 4, erId } }),
+      prisma.counter.create({ data: { number: 5, erId } }),
+    ])
+
+    const responses = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/counters/${firstCounter.id}/open`)
+        .set('Authorization', `Bearer ${raceOperator1Token}`),
+      request(app.getHttpServer())
+        .post(`/counters/${secondCounter.id}/open`)
+        .set('Authorization', `Bearer ${raceOperator1Token}`),
+    ])
+
+    expect(responses.map((response) => response.status).sort((a, b) => a - b)).toEqual([201, 409])
+    const assigned = await prisma.counter.findMany({
+      where: { operatorId: raceOperator1Id },
+    })
+    expect(assigned).toHaveLength(1)
+
+    await request(app.getHttpServer())
+      .post(`/counters/${assigned[0].id}/close`)
+      .set('Authorization', `Bearer ${raceOperator1Token}`)
+      .expect(201)
   })
 
   it('creates one active ticket and blocks a duplicate', async () => {
@@ -294,7 +371,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
         .send({ counterId: counter2Id }),
     ])
 
-    expect(responses.map((response) => response.status).sort()).toEqual([201, 400])
+    expect(responses.map((response) => response.status).sort((a, b) => a - b)).toEqual([201, 400])
     const assigned = await prisma.ticket.findMany({
       where: { id: created.body.id, state: TicketState.CALLING },
     })
