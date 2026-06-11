@@ -44,7 +44,6 @@ export class PanelService {
         },
         select: { serviceStartedAt: true, serviceFinishedAt: true },
       }),
-      // Tickets called today: used to calculate avg wait (createdAt → calledAt)
       this.prisma.ticket.findMany({
         where: {
           erId,
@@ -63,7 +62,6 @@ export class PanelService {
       calledAt: ticket.calledAt,
     })
 
-    // All tickets currently being called, one per counter, ordered by counter.
     const calling = callingTickets.map(presentCall)
     // The most recently called ticket (for highlight + telemetry / back-compat).
     const current =

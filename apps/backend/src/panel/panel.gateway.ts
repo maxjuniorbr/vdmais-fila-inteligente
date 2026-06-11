@@ -21,10 +21,6 @@ export class PanelGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server
 
-  /**
-   * Emit a named event to all clients subscribed to a given ER room.
-   * Clients join by calling `joinER` with the erId.
-   */
   emitToER(erId: string, event: string, payload: unknown) {
     const room = this.server.to(`er:${erId}`)
     room.emit(event, payload)

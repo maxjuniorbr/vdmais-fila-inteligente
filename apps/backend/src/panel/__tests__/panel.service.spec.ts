@@ -54,7 +54,6 @@ describe('PanelService', () => {
       expect.objectContaining({ code: 'A001', counterNumber: 1, displayName: 'Ana P.' }),
       expect.objectContaining({ code: 'A002', counterNumber: 2, displayName: 'Carla M.' }),
     ])
-    // Most recent calledAt wins as current (used for highlight + telemetry)
     expect(result.current).toEqual(expect.objectContaining({ ticketId: 'ticket-2' }))
   })
 })

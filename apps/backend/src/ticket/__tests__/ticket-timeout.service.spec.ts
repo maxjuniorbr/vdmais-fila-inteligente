@@ -104,7 +104,6 @@ describe('TicketTimeoutService.sweepExpiredCalls', () => {
 
     await service.sweepExpiredCalls(now)
 
-    // default 10 minutes
     expect(prisma.ticket.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
