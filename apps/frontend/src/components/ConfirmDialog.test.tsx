@@ -29,6 +29,10 @@ describe('ConfirmDialog', () => {
     fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
     expect(closeButton).toHaveFocus()
 
+    reason.setAttribute('disabled', '')
+    closeButton.setAttribute('disabled', '')
+    expect(fireEvent.keyDown(dialog, { key: 'Tab' })).toBe(false)
+
     fireEvent(dialog, new Event('cancel', { cancelable: true }))
     expect(onClose).toHaveBeenCalledOnce()
 
