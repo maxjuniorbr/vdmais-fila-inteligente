@@ -17,6 +17,7 @@ import { StaffLoginForm } from '../components/StaffLoginForm'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
+import { formatDuration } from '../utils/format'
 import { counterStateLabel, entryChannelLabel, ticketStateLabel } from '../utils/labels'
 
 interface Ticket {
@@ -158,11 +159,6 @@ const REFRESH_EVENTS = [
 
 function elapsedMinutes(from: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(from).getTime()) / 60000))
-}
-
-function formatSeconds(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}m ${seconds % 60}s`
 }
 
 function formatRecord(
@@ -395,12 +391,12 @@ export function ManagerPage() {
                 [
                   ['Aguardando', metrics.totalWaiting],
                   ['Pausados', metrics.totalPaused],
-                  ['Maior espera', formatSeconds(metrics.maxCurrentWaitSeconds)],
-                  ['Espera média', formatSeconds(metrics.avgWaitSeconds)],
-                  ['Mediana da espera', formatSeconds(metrics.medianWaitSeconds)],
-                  ['Atendimento médio', formatSeconds(metrics.avgServiceSeconds)],
-                  ['Mediana atendimento', formatSeconds(metrics.medianServiceSeconds)],
-                  ['Chamada até início', formatSeconds(metrics.avgCallToStartSeconds)],
+                  ['Maior espera', formatDuration(metrics.maxCurrentWaitSeconds)],
+                  ['Espera média', formatDuration(metrics.avgWaitSeconds)],
+                  ['Mediana da espera', formatDuration(metrics.medianWaitSeconds)],
+                  ['Atendimento médio', formatDuration(metrics.avgServiceSeconds)],
+                  ['Mediana atendimento', formatDuration(metrics.medianServiceSeconds)],
+                  ['Chamada até início', formatDuration(metrics.avgCallToStartSeconds)],
                   ['Atendimentos iniciados', metrics.totalStarted],
                   ['Finalizados', metrics.totalFinished],
                   ['Em atendimento', metrics.openServices],
@@ -433,7 +429,7 @@ export function ManagerPage() {
                   .map(([hour, total]) => `${hour}h: ${total}`)
                   .join(' | ') || 'Nenhum atendimento finalizado'}
               </p>
-              <p>Espera média por hora: {formatRecord(metrics.waitSecondsByHour, formatSeconds)}</p>
+              <p>Espera média por hora: {formatRecord(metrics.waitSecondsByHour, formatDuration)}</p>
               <p>
                 Horários de pico:{' '}
                 {metrics.peakHours.map((hour) => `${hour}h`).join(', ') || 'Sem dados'}
@@ -441,7 +437,7 @@ export function ManagerPage() {
               <p>Atendimentos por caixa: {formatRecord(metrics.serviceByCounter)}</p>
               <p>Atendimentos por operadora: {formatRecord(metrics.serviceByOperator)}</p>
               <p>Chamadas por operadora: {formatRecord(metrics.callsByOperator)}</p>
-              <p>Pausa por caixa: {formatRecord(metrics.pauseSecondsByCounter, formatSeconds)}</p>
+              <p>Pausa por caixa: {formatRecord(metrics.pauseSecondsByCounter, formatDuration)}</p>
             </section>
           </>
         )}
@@ -614,36 +610,36 @@ const styles: Record<string, React.CSSProperties> = {
   content: {
     maxWidth: 1100,
     margin: '0 auto',
-    padding: '1.5rem 1.5rem 3rem',
+    padding: `${brand.spacing[24]}px ${brand.spacing[24]}px ${brand.spacing[48]}px`,
   },
   metrics: {
-    marginBottom: '1rem',
+    marginBottom: `${brand.spacing[16]}px`,
   },
   cardTitle: {
-    margin: '0 0 0.75rem',
-    fontSize: '1.05rem',
+    margin: `0 0 ${brand.spacing[12]}px`,
+    fontSize: brand.typography.subtitle.fontSize,
     color: brand.green800,
   },
   adminContext: {
     margin: '-0.35rem 0 1rem',
     color: brand.inkMuted,
-    fontSize: '0.88rem',
+    fontSize: brand.typography.bodySmall.fontSize,
   },
   counterGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: '0.5rem',
+    gap: `${brand.spacing[8]}px`,
   },
   counter: {
     display: 'grid',
-    gap: '0.25rem',
-    padding: '0.75rem',
+    gap: `${brand.spacing[4]}px`,
+    padding: `${brand.spacing[12]}px`,
     background: brand.green50,
     border: `1px solid ${brand.border}`,
-    borderRadius: 8,
+    borderRadius: brand.radius.medium,
   },
   counterState: {
-    fontSize: '0.8rem',
+    fontSize: brand.typography.auxiliar.fontSize,
     fontWeight: 700,
     letterSpacing: '0.06em',
     color: brand.green700,
@@ -655,8 +651,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '1rem',
-    padding: '0.5rem 0',
+    gap: `${brand.spacing[16]}px`,
+    padding: `${brand.spacing[8]}px 0`,
     borderBottom: `1px solid ${brand.warningBorder}`,
     flexWrap: 'wrap',
   },

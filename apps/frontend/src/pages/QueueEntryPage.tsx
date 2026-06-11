@@ -337,18 +337,18 @@ const styles: Record<string, React.CSSProperties> = {
   brandHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.85rem',
-    marginBottom: '1.25rem',
+    gap: `${brand.spacing[8]}px`,
+    marginBottom: `${brand.spacing[20]}px`,
   },
   title: {
     margin: 0,
-    fontSize: '1.45rem',
+    fontSize: brand.typography.title.fontSize,
     color: brand.green800,
     lineHeight: 1.15,
   },
   subtitle: {
     margin: '0.15rem 0 0',
-    fontSize: '0.95rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     color: brand.inkMuted,
   },
   muted: {
@@ -357,13 +357,13 @@ const styles: Record<string, React.CSSProperties> = {
   statusCard: {
     ...layout.card,
     display: 'grid',
-    gap: '0.75rem',
+    gap: `${brand.spacing[12]}px`,
   },
   statusBadge: {
     justifySelf: 'start',
     padding: '0.35rem 0.8rem',
     borderRadius: 999,
-    fontSize: '0.85rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     fontWeight: 700,
   },
   statusOpen: {
@@ -394,20 +394,20 @@ const styles: Record<string, React.CSSProperties> = {
   tabs: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: 4,
-    padding: 4,
+    gap: brand.spacing[4],
+    padding: brand.spacing[4],
     background: brand.green50,
-    borderRadius: 12,
+    borderRadius: brand.radius.large,
   },
   tab: {
     padding: '0.6rem 0.5rem',
     minHeight: 44,
     border: 'none',
-    borderRadius: 9,
+    borderRadius: brand.radius.medium,
     background: 'transparent',
     color: brand.inkSoft,
     fontWeight: 600,
-    fontSize: '0.92rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     cursor: 'pointer',
   },
   tabActive: {

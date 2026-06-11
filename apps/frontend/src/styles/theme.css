@@ -37,7 +37,32 @@
 
   --gb-radius: 12px;
   --gb-shadow: 0 1px 2px rgba(0, 48, 31, 0.06), 0 4px 16px rgba(0, 48, 31, 0.05);
-  --gb-font: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --gb-font: 'IBM Plex Sans', sans-serif;
+
+  /* Tokens adicionados — espelham brand.ts */
+  --gb-border-muted: #94a3b8;
+
+  --gb-radius-small:  4px;
+  --gb-radius-medium: 8px;
+  --gb-radius-large:  16px;
+  --gb-radius-pill:   40px;
+
+  --gb-spacing-4:  4px;
+  --gb-spacing-8:  8px;
+  --gb-spacing-12: 12px;
+  --gb-spacing-16: 16px;
+  --gb-spacing-20: 20px;
+  --gb-spacing-24: 24px;
+  --gb-spacing-32: 32px;
+  --gb-spacing-48: 48px;
+
+  --gb-font-size-display:   2.4rem;
+  --gb-font-size-heading:   1.35rem;
+  --gb-font-size-title:     1.25rem;
+  --gb-font-size-subtitle:  1.05rem;
+  --gb-font-size-body-lg:   1rem;
+  --gb-font-size-body-sm:   0.9rem;
+  --gb-font-size-auxiliar:  0.72rem;
 }
 
 *,

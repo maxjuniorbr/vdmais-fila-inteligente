@@ -1,12 +1,7 @@
 import type { CSSProperties } from 'react'
 import { brand } from './brand'
 
-/**
- * Shared layout tokens — tema white Grupo Boticário (verde institucional).
- * All staff-facing pages spread from this object and override only what differs.
- */
 export const layout: Record<string, CSSProperties> = {
-  // App shell — full-height canvas behind every staff page
   shell: {
     minHeight: '100vh',
     background: brand.canvas,
@@ -14,7 +9,6 @@ export const layout: Record<string, CSSProperties> = {
     color: brand.ink,
   },
 
-  // Full-width sticky top bar (shared across staff screens)
   topbar: {
     position: 'sticky',
     top: 0,
@@ -22,98 +16,92 @@ export const layout: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '1rem',
-    padding: '0.9rem 2rem',
+    gap: `${brand.spacing[16]}px`,
+    padding: `${brand.spacing[16]}px ${brand.spacing[32]}px`,
     background: brand.green700,
     borderBottom: `3px solid ${brand.gold400}`,
     color: '#ffffff',
   },
   topbarTitle: {
     margin: 0,
-    fontSize: '1.25rem',
+    fontSize: brand.typography.title.fontSize,
     fontWeight: 700,
     color: '#ffffff',
     lineHeight: 1.15,
   },
   topbarSubtitle: {
-    fontSize: '0.8rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     color: brand.green100,
     letterSpacing: '0.02em',
   },
   topbarButton: {
-    padding: '0.55rem 1.1rem',
+    padding: `${brand.spacing[8]}px ${brand.spacing[16]}px`,
     minHeight: 44,
     border: '1px solid rgba(255, 255, 255, 0.45)',
-    borderRadius: 10,
+    borderRadius: brand.radius.medium,
     background: 'transparent',
     color: '#ffffff',
     fontWeight: 600,
-    fontSize: '0.9rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     cursor: 'pointer',
   },
 
-  // Page wrappers
   page: {
     maxWidth: 1100,
-    margin: '2rem auto',
-    padding: '0 1rem',
+    margin: `${brand.spacing[32]}px auto`,
+    padding: `0 ${brand.spacing[16]}px`,
     fontFamily: brand.font,
   },
   pageNarrow: {
     maxWidth: 720,
-    margin: '2rem auto',
-    padding: '0 1rem',
+    margin: `${brand.spacing[32]}px auto`,
+    padding: `0 ${brand.spacing[16]}px`,
     fontFamily: brand.font,
   },
   pageForm: {
     maxWidth: 460,
-    margin: '2rem auto',
-    padding: '0 1rem',
+    margin: `${brand.spacing[32]}px auto`,
+    padding: `0 ${brand.spacing[16]}px`,
     fontFamily: brand.font,
   },
 
-  // Header bar
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '1rem',
+    marginBottom: `${brand.spacing[16]}px`,
   },
 
-  // Action button rows
   actions: {
     display: 'flex',
-    gap: '0.5rem',
+    gap: `${brand.spacing[8]}px`,
     flexWrap: 'wrap',
   },
 
-  // Section card
   card: {
     background: brand.surface,
     border: `1px solid ${brand.border}`,
-    borderRadius: 12,
-    padding: '1.25rem',
-    marginBottom: '1rem',
+    borderRadius: brand.radius.large,
+    padding: `${brand.spacing[20]}px`,
+    marginBottom: `${brand.spacing[16]}px`,
     boxShadow: brand.shadow,
   },
 
-  // Elevated section card (new operation layout)
   panel: {
     position: 'relative',
     background: brand.surface,
     border: `1px solid ${brand.border}`,
-    borderRadius: 14,
-    padding: '1.4rem 1.5rem',
+    borderRadius: brand.radius.large,
+    padding: `${brand.spacing[24]}px`,
     boxShadow: brand.shadow,
   },
 
-  // Small uppercase section label with leading status dot
   sectionLabel: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
-    margin: '0 0 1rem',
-    fontSize: '0.72rem',
+    gap: `${brand.spacing[8]}px`,
+    margin: `0 0 ${brand.spacing[16]}px`,
+    fontSize: brand.typography.auxiliar.fontSize,
     fontWeight: 700,
     letterSpacing: '0.14em',
     textTransform: 'uppercase',
@@ -127,12 +115,11 @@ export const layout: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
 
-  // Count badge (top-right of a panel)
   countBadge: {
     minWidth: 24,
     height: 24,
-    padding: '0 0.45rem',
-    borderRadius: 12,
+    padding: `0 ${brand.spacing[8]}px`,
+    borderRadius: brand.radius.large,
     background: brand.green50,
     border: `1px solid ${brand.green100}`,
     color: brand.green700,
@@ -143,13 +130,12 @@ export const layout: Record<string, CSSProperties> = {
     justifyContent: 'center',
   },
 
-  // Status chip / pill
   chip: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '0.4rem',
-    padding: '0.4rem 0.7rem',
-    borderRadius: 999,
+    gap: `${brand.spacing[4]}px`,
+    padding: `${brand.spacing[8]}px ${brand.spacing[12]}px`,
+    borderRadius: brand.radius.pill,
     background: brand.green50,
     border: `1px solid ${brand.border}`,
     fontSize: '0.85rem',
@@ -163,12 +149,11 @@ export const layout: Record<string, CSSProperties> = {
     textTransform: 'uppercase',
   },
 
-  // List row inside a panel
   panelRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.6rem',
-    padding: '0.6rem 0.75rem',
+    gap: `${brand.spacing[8]}px`,
+    padding: `${brand.spacing[8]}px ${brand.spacing[12]}px`,
     borderRadius: 8,
     background: brand.green50,
     border: `1px solid ${brand.border}`,
@@ -176,12 +161,11 @@ export const layout: Record<string, CSSProperties> = {
     color: brand.inkSoft,
   },
 
-  // Primary action button — verde institucional
   primaryButton: {
-    padding: '0.7rem 1.4rem',
+    padding: `${brand.spacing[12]}px ${brand.spacing[24]}px`,
     minHeight: 44,
     border: 'none',
-    borderRadius: 10,
+    borderRadius: brand.radius.medium,
     background: brand.green700,
     color: '#ffffff',
     fontWeight: 600,
@@ -189,12 +173,11 @@ export const layout: Record<string, CSSProperties> = {
     cursor: 'pointer',
   },
 
-  // Secondary / ghost button (outline)
   ghostButton: {
-    padding: '0.7rem 1.4rem',
+    padding: `${brand.spacing[12]}px ${brand.spacing[24]}px`,
     minHeight: 44,
     border: `1px solid ${brand.green600}`,
-    borderRadius: 10,
+    borderRadius: brand.radius.medium,
     background: brand.surface,
     color: brand.green700,
     fontWeight: 600,
@@ -202,12 +185,11 @@ export const layout: Record<string, CSSProperties> = {
     cursor: 'pointer',
   },
 
-  // Destructive button (outline, red accent)
   dangerButton: {
-    padding: '0.7rem 1.4rem',
+    padding: `${brand.spacing[12]}px ${brand.spacing[24]}px`,
     minHeight: 44,
     border: `1px solid ${brand.dangerBorder}`,
-    borderRadius: 10,
+    borderRadius: brand.radius.medium,
     background: brand.surface,
     color: brand.danger,
     fontWeight: 600,
@@ -215,22 +197,20 @@ export const layout: Record<string, CSSProperties> = {
     cursor: 'pointer',
   },
 
-  // Form label wrapper
   formLabel: {
     display: 'grid',
-    gap: '0.35rem',
-    marginBottom: '1rem',
+    gap: `${brand.spacing[4]}px`,
+    marginBottom: `${brand.spacing[16]}px`,
     fontSize: '0.9rem',
     fontWeight: 600,
     color: brand.inkSoft,
   },
 
-  // Form text input
   formInput: {
-    padding: '0.65rem 0.75rem',
+    padding: `${brand.spacing[12]}px`,
     minHeight: 44,
     border: `1px solid ${brand.borderStrong}`,
-    borderRadius: 10,
+    borderRadius: brand.radius.medium,
     width: '100%',
     boxSizing: 'border-box',
     fontSize: '1rem',
@@ -239,24 +219,22 @@ export const layout: Record<string, CSSProperties> = {
     background: brand.surface,
   },
 
-  // Inline error box
   error: {
-    padding: '0.75rem 0.9rem',
-    borderRadius: 10,
+    padding: `${brand.spacing[12]}px ${brand.spacing[16]}px`,
+    borderRadius: brand.radius.medium,
     color: brand.danger,
     background: brand.dangerSoft,
     border: `1px solid ${brand.dangerBorder}`,
-    marginBottom: '1rem',
+    marginBottom: `${brand.spacing[16]}px`,
     fontWeight: 500,
   },
 
-  // Confirmation modal card
   modal: {
     display: 'grid',
-    gap: '0.75rem',
+    gap: `${brand.spacing[12]}px`,
     width: 'min(420px, 100%)',
-    padding: '1.5rem',
-    borderRadius: 14,
+    padding: `${brand.spacing[24]}px`,
+    borderRadius: brand.radius.large,
     background: brand.surface,
     boxShadow: brand.shadow,
   },
