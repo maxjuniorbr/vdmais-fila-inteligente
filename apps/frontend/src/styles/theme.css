@@ -21,7 +21,7 @@
   /* Neutros */
   --gb-ink: #1c2b25;
   --gb-ink-soft: #44574e;
-  --gb-ink-muted: #6b7f75;
+  --gb-ink-muted: #5f7369;
   --gb-surface: #ffffff;
   --gb-canvas: #f4f9f6;
   --gb-border: #dbe8e1;
@@ -95,6 +95,10 @@ body {
 }
 .skip-link:focus {
   left: 0;
+}
+
+.gb-confirm-dialog::backdrop {
+  background: rgba(0, 48, 31, 0.55);
 }
 
 @media (prefers-reduced-motion: reduce) {

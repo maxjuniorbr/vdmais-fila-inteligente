@@ -50,6 +50,33 @@ function formatDuration(seconds: number): string {
   return `${Math.round(seconds / 60)} min`
 }
 
+interface PanelLayout {
+  columns: number
+  codeSize: string
+  nameSize: string
+  caixaSize: string
+}
+
+// Layout responsivo do quadro "Chamando agora" em função de quantos caixas
+// chamam ao mesmo tempo. Fica fora do componente para manter sua complexidade
+// cognitiva baixa e evitar ternários aninhados.
+function resolvePanelLayout(callCount: number): PanelLayout {
+  // Colunas: 1→1, 2→2, 3→3, 4→2x2, 5/6→3 cols.
+  let columns = 3
+  if (callCount <= 1) columns = 1
+  else if (callCount === 2 || callCount === 4) columns = 2
+
+  // Fonte da senha diminui conforme mais caixas chamam, para o card não estourar.
+  let codeSize = 'min(5vw, 9vh)'
+  if (callCount <= 1) codeSize = 'min(11vw, 17vh)'
+  else if (callCount <= 2) codeSize = 'min(7vw, 12vh)'
+
+  const nameSize = callCount <= 2 ? 'min(2.6vw, 4vh)' : 'min(1.8vw, 3vh)'
+  const caixaSize = callCount <= 2 ? 'min(2vw, 3.2vh)' : 'min(1.4vw, 2.4vh)'
+
+  return { columns, codeSize, nameSize, caixaSize }
+}
+
 // "Próximas senhas": total de linhas visíveis e quantas rotacionam abaixo da
 // primeira (que fica sempre fixa, indicando quem é a próxima a ser chamada).
 const NEXT_VISIBLE = 7
@@ -159,16 +186,6 @@ export function PanelPage() {
   }, [calling, erId])
 
   const callCount = calling.length
-  // Previsão de espera por posição: tempo médio de atendimento dividido
-  // pelos guichês ocupados — é o que permite à revendedora se planejar.
-  const busyCounters = Math.max(1, inService.length + calling.length)
-  const etaFor = (position: number): string | null => {
-    if (avgServiceSeconds === null) return null
-    const minutes = Math.max(1, Math.round((position * avgServiceSeconds) / busyCounters / 60))
-    return `~${minutes} min`
-  }
-  const lastPosition = waiting.length > 0 ? waiting[waiting.length - 1].position : 0
-  const joinEta = etaFor(lastPosition + 1)
 
   // Rodízio das "próximas senhas": a 1ª fica fixa (próxima a chamar) e as demais
   // alternam em janelas, para que toda a fila apareça ao longo do tempo.
@@ -183,11 +200,7 @@ export function PanelPage() {
       ]
     : waiting.slice(0, NEXT_VISIBLE)
   // TV-friendly column counts: 1→1, 2→2, 3→3, 4→2x2, 5/6→3 cols.
-  const columns = callCount <= 1 ? 1 : callCount === 2 || callCount === 4 ? 2 : 3
-  // Font scales down as more counters call at once so cards never overflow.
-  const codeSize = callCount <= 1 ? 'min(11vw, 17vh)' : callCount <= 2 ? 'min(7vw, 12vh)' : 'min(5vw, 9vh)'
-  const nameSize = callCount <= 2 ? 'min(2.6vw, 4vh)' : 'min(1.8vw, 3vh)'
-  const caixaSize = callCount <= 2 ? 'min(2vw, 3.2vh)' : 'min(1.4vw, 2.4vh)'
+  const { columns, codeSize, nameSize, caixaSize } = resolvePanelLayout(callCount)
 
   return (
     <main style={styles.page}>
@@ -284,7 +297,6 @@ export function PanelPage() {
             ) : (
               <div style={styles.nextList}>
                 {displayedWaiting.map((ticket, index) => {
-                  const eta = etaFor(ticket.position)
                   const isNext = index === 0
                   return (
                     <div
@@ -295,11 +307,7 @@ export function PanelPage() {
                         {ticket.code}
                       </span>
                       <span style={styles.nextMeta}>
-                        {isNext ? (
-                          <span style={styles.nextTag}>PRÓXIMA</span>
-                        ) : (
-                          eta && <span style={styles.nextEta}>{eta}</span>
-                        )}
+                        {isNext && <span style={styles.nextTag}>PRÓXIMA</span>}
                         <span style={styles.nextPos}>{ticket.position}º</span>
                       </span>
                     </div>
@@ -308,7 +316,6 @@ export function PanelPage() {
                 {needsRotation && (
                   <p style={styles.queueFooter}>
                     Rodízio das próximas · {waiting.length} na fila
-                    {joinEta ? ` · última espera ${joinEta}` : ''}
                   </p>
                 )}
               </div>
@@ -622,12 +629,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: C.accent,
     borderRadius: '999px',
     padding: '0.4vh 0.7vw',
-  },
-  nextEta: {
-    fontSize: '1.2vw',
-    fontWeight: 700,
-    color: C.inkSoft,
-    fontVariantNumeric: 'tabular-nums',
   },
   nextPos: {
     fontSize: '1.3vw',
