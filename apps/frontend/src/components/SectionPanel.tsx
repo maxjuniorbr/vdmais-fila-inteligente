@@ -1,28 +1,20 @@
 import type { CSSProperties, ReactNode } from 'react'
+import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
 import { Badge } from './Badge'
 import { StatusDot } from './StatusDot'
 
 interface SectionPanelProps {
-  /** Uppercase section label */
   label: string
-  /** Dot color for the leading status indicator */
   dotColor?: string
-  /** Optional count badge shown on the right side of the header */
   count?: number
-  /** Panel content */
   children: ReactNode
-  /** Override panel style */
   style?: CSSProperties
 }
 
-/**
- * Reusable panel with a standardized header: status dot + uppercase label + optional badge.
- * Used across Operação and Gestão for queue status sections.
- */
 export function SectionPanel({
   label,
-  dotColor = '#94a3b8',
+  dotColor = brand.borderMuted,
   count,
   children,
   style,
@@ -46,6 +38,6 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: '0.9rem',
+    marginBottom: brand.spacing[16],
   },
 }

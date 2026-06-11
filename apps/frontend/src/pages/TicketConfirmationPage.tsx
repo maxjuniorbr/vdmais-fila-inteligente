@@ -159,7 +159,6 @@ export function TicketConfirmationPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Poll current state every 10s while ticket is active
   useEffect(() => {
     if (!ticket) {
       if (pollRef.current) clearInterval(pollRef.current)
@@ -220,7 +219,6 @@ export function TicketConfirmationPage() {
       return
     }
 
-    // Create ticket on first mount
     fetch('/api/tickets', {
       method: 'POST',
       headers: {
@@ -235,7 +233,6 @@ export function TicketConfirmationPage() {
       .then(async (res) => {
         const data = await res.json()
         if (!res.ok) {
-          // If already in queue, try to fetch current ticket
           if (res.status === 409) {
             return fetchCurrentTicket(token)
           }

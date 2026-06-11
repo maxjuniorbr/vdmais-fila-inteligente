@@ -12,6 +12,7 @@ import { StaffLoginForm } from '../components/StaffLoginForm'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
+import { formatDuration } from '../utils/format'
 import { counterStateLabel, ticketStateLabel } from '../utils/labels'
 
 interface Ticket {
@@ -184,9 +185,7 @@ export function OperationPage() {
         {error && <Alert tone="error">{error}</Alert>}
 
         <div className="gb-grid-operation" style={styles.grid}>
-          {/* ── Coluna principal ─────────────────────────────── */}
           <div style={styles.mainColumn}>
-            {/* Caixa */}
             <section style={styles.panel}>
               <p style={styles.sectionLabel}>
                 <StatusDot color={counterIsActive ? brand.green500 : brand.borderStrong} />
@@ -195,7 +194,7 @@ export function OperationPage() {
 
               <Select
                 label="Caixa de atendimento"
-                style={{ borderRadius: 10 }}
+                style={{ borderRadius: brand.radius.medium }}
                 value={counterId}
                 onChange={(event) => selectCounter(event.target.value)}
                 disabled={Boolean(currentTicket)}
@@ -274,7 +273,6 @@ export function OperationPage() {
               )}
             </section>
 
-            {/* Senha atual */}
             <section style={styles.panel}>
               <p style={styles.sectionLabel}>
                 <StatusDot />
@@ -293,7 +291,7 @@ export function OperationPage() {
                     {currentTicket && (
                       <span style={styles.elapsed}>
                         {' · '}
-                        {Math.floor(elapsed / 60)}m {elapsed % 60}s
+                        {formatDuration(elapsed)}
                       </span>
                     )}
                   </p>
@@ -356,7 +354,6 @@ export function OperationPage() {
             </section>
           </div>
 
-          {/* ── Coluna lateral — status da fila ──────────────── */}
           <aside style={styles.sideColumn}>
             <SectionPanel
               label="Aguardando"
@@ -418,7 +415,6 @@ export function OperationPage() {
           </aside>
         </div>
 
-        {/* ── Chamadas recentes ──────────────────────────────── */}
         <section style={styles.panel}>
           <p style={styles.sectionLabel}>
             <StatusDot />
@@ -450,43 +446,43 @@ const styles: Record<string, React.CSSProperties> = {
   content: {
     maxWidth: 1100,
     margin: '0 auto',
-    padding: '1.5rem 1.5rem 3rem',
+    padding: `${brand.spacing[24]}px ${brand.spacing[24]}px ${brand.spacing[48]}px`,
   },
   grid: {
     // Colunas definidas pela classe .gb-grid-operation (responsiva)
-    marginBottom: '1.25rem',
+    marginBottom: `${brand.spacing[20]}px`,
   },
   mainColumn: {
     display: 'grid',
-    gap: '1.25rem',
+    gap: `${brand.spacing[20]}px`,
   },
   sideColumn: {
     display: 'grid',
-    gap: '1.25rem',
+    gap: `${brand.spacing[20]}px`,
   },
   counterActions: {
     display: 'flex',
-    gap: '0.6rem',
+    gap: `${brand.spacing[8]}px`,
     flexWrap: 'wrap',
     alignItems: 'flex-end',
-    marginTop: '0.9rem',
+    marginTop: `${brand.spacing[16]}px`,
   },
   ticketActions: {
     display: 'flex',
-    gap: '0.6rem',
+    gap: `${brand.spacing[8]}px`,
     flexWrap: 'wrap',
-    marginTop: '1rem',
+    marginTop: `${brand.spacing[16]}px`,
   },
   currentRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '1rem',
+    gap: `${brand.spacing[16]}px`,
     flexWrap: 'wrap',
   },
   currentCode: {
-    fontSize: '2.4rem',
-    fontWeight: 800,
+    fontSize: brand.typography.display.fontSize,
+    fontWeight: brand.typography.display.fontWeight,
     color: brand.green800,
     letterSpacing: '0.04em',
     lineHeight: 1,
@@ -502,20 +498,20 @@ const styles: Record<string, React.CSSProperties> = {
   currentState: {
     margin: '0.6rem 0 0',
     color: brand.inkMuted,
-    fontSize: '0.9rem',
+    fontSize: brand.typography.bodySmall.fontSize,
   },
   elapsed: {
     color: brand.inkMuted,
   },
   warning: {
     margin: '1rem 0 0',
-    padding: '0.65rem 0.85rem',
-    borderRadius: 10,
+    padding: `${brand.spacing[12]}px ${brand.spacing[16]}px`,
+    borderRadius: brand.radius.medium,
     background: brand.warningSoft,
     border: `1px solid ${brand.warningBorder}`,
     color: brand.warning,
     fontWeight: 600,
-    fontSize: '0.9rem',
+    fontSize: brand.typography.bodySmall.fontSize,
   },
   panelList: {
     display: 'grid',
@@ -530,11 +526,11 @@ const styles: Record<string, React.CSSProperties> = {
   chipRow: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '0.6rem',
+    gap: `${brand.spacing[8]}px`,
   },
   dim: {
     color: brand.inkMuted,
-    fontSize: '0.9rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     margin: 0,
   },
 }

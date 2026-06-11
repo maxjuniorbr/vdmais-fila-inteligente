@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
+import { formatDate, formatDuration, formatTime } from '../utils/format'
 
 interface Call {
   ticketId: string
@@ -47,10 +48,6 @@ const REFRESH_EVENTS = [
   'day.closed',
 ]
 
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`
-  return `${Math.round(seconds / 60)} min`
-}
 
 interface PanelLayout {
   columns: number
@@ -63,7 +60,6 @@ interface PanelLayout {
 // chamam ao mesmo tempo. Fica fora do componente para manter sua complexidade
 // cognitiva baixa e evitar ternários aninhados.
 function resolvePanelLayout(callCount: number): PanelLayout {
-  // Colunas: 1→1, 2→2, 3→3, 4→2x2, 5/6→3 cols.
   let columns = 3
   if (callCount <= 1) columns = 1
   else if (callCount === 2 || callCount === 4) columns = 2
@@ -119,13 +115,11 @@ export function PanelPage() {
     }
   }, [])
 
-  // Relógio de parede do cabeçalho (atualiza a cada segundo)
   useEffect(() => {
     const id = setInterval(() => setClock(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  // Avança o rodízio das próximas senhas (só quando há mais do que cabem)
   useEffect(() => {
     const poolSize = Math.max(0, waiting.length - 1)
     const pages = Math.max(1, Math.ceil(poolSize / NEXT_WINDOW))
@@ -175,7 +169,6 @@ export function PanelPage() {
     }
   }, [fetchPanelState, socket])
 
-  // Telemetry: record when a freshly called ticket is shown on the panel.
   useEffect(() => {
     if (!erId) return
     calling.forEach((call) => {
@@ -201,39 +194,24 @@ export function PanelPage() {
         ...rotatingPool.slice(activePage * NEXT_WINDOW, activePage * NEXT_WINDOW + NEXT_WINDOW),
       ]
     : waiting.slice(0, NEXT_VISIBLE)
-  // TV-friendly column counts: 1→1, 2→2, 3→3, 4→2x2, 5/6→3 cols.
   const { columns, codeSize, nameSize, caixaSize } = resolvePanelLayout(callCount)
 
   return (
     <main style={styles.page}>
       {/* Keyframes do efeito de "piscar" ao chamar (respeita prefers-reduced-motion via theme.css) */}
       <style>{CALL_PULSE_KEYFRAMES}</style>
-      {/* ── Cabeçalho (mesmo padrão das demais telas) ─────────── */}
       <AppHeader
         title="Painel de Atendimento"
         subtitle="Acompanhe a chamada da sua senha"
         actions={
           <span style={styles.clock}>
-            <span style={styles.clockDate}>
-              {clock.toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              })}
-            </span>
-            <span style={styles.clockTime}>
-              {clock.toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              })}
-            </span>
+            <span style={styles.clockDate}>{formatDate(clock.toISOString())}</span>
+            <span style={styles.clockTime}>{formatTime(clock.toISOString())}</span>
           </span>
         }
       />
 
       <div style={styles.body}>
-        {/* ── Área principal ──────────────────────────────────── */}
         <section style={styles.main}>
           {callCount === 0 ? (
             <div style={styles.heroEmpty}>
@@ -264,7 +242,6 @@ export function PanelPage() {
             </div>
           )}
 
-          {/* Em atendimento — faixa discreta */}
           <div style={styles.inServiceStrip}>
             <span style={styles.stripLabel}>EM ATENDIMENTO</span>
             {inService.length === 0 ? (
@@ -285,7 +262,6 @@ export function PanelPage() {
           </div>
         </section>
 
-        {/* ── Sidebar ─────────────────────────────────────────── */}
         <aside style={styles.sidebar}>
           <div style={styles.sideBlock}>
             <div style={styles.sideHead}>
@@ -353,15 +329,15 @@ const CALL_PULSE_KEYFRAMES = `
 }`
 
 const C = {
-  canvas: brand.canvas, // fundo suave esverdeado, como nas demais telas
-  surface: brand.surface, // cartões e blocos
-  surfaceAlt: brand.green50, // chips / faixas — verde bem suave
-  border: brand.border, // borda com tom da marca
+  canvas: brand.canvas,
+  surface: brand.surface,
+  surfaceAlt: brand.green50,
+  border: brand.border,
   borderStrong: brand.borderStrong,
-  ink: brand.ink, // texto principal (senha)
-  inkSoft: brand.inkSoft, // texto secundário (nome)
-  inkMuted: brand.inkMuted, // rótulos / apoio
-  accent: brand.green700, // verde primário GB — destino/realce
+  ink: brand.ink,
+  inkSoft: brand.inkSoft,
+  inkMuted: brand.inkMuted,
+  accent: brand.green700,
   accentSoft: brand.green50,
   accentBorder: brand.green100,
   shadow: brand.shadow,
@@ -380,7 +356,6 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
 
-  /* Relógio no cabeçalho (slot de ações do AppHeader) */
   clock: {
     display: 'flex',
     alignItems: 'baseline',
@@ -388,18 +363,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontVariantNumeric: 'tabular-nums',
   },
   clockDate: {
-    fontSize: '1rem',
+    fontSize: brand.typography.bodyLarge.fontSize,
     fontWeight: 600,
     color: brand.green100,
   },
   clockTime: {
-    fontSize: '1.5rem',
+    fontSize: brand.typography.heading.fontSize,
     fontWeight: 700,
     color: '#ffffff',
     letterSpacing: '0.02em',
   },
 
-  /* Split principal */
   body: {
     flex: 1,
     minHeight: 0,
@@ -409,7 +383,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '1.4vw',
   },
 
-  /* Coluna principal */
   main: {
     minHeight: 0,
     display: 'flex',
@@ -481,7 +454,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
 
-  /* Faixa "em atendimento" */
   inServiceStrip: {
     flexShrink: 0,
     display: 'flex',
@@ -531,7 +503,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: C.inkMuted,
   },
 
-  /* Sidebar */
   sidebar: {
     minHeight: 0,
     display: 'flex',
@@ -639,7 +610,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontVariantNumeric: 'tabular-nums',
   },
 
-  /* Tempos médios */
   avgBlock: {
     marginTop: 'auto',
     paddingTop: '1vh',

@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, CSSProperties } from 'react'
 import { layout } from '../styles/layout'
+import { brand } from '../styles/brand'
 
 type Variant = 'primary' | 'secondary' | 'danger'
 type Size = 'md' | 'sm'
@@ -17,13 +18,9 @@ const VARIANT_STYLE: Record<Variant, CSSProperties> = {
 
 const SIZE_STYLE: Record<Size, CSSProperties> = {
   md: {},
-  sm: { padding: '0.45rem 0.9rem', minHeight: 36, fontSize: '0.85rem', borderRadius: 8 },
+  sm: { padding: `${brand.spacing[8]}px ${brand.spacing[16]}px`, minHeight: 36, fontSize: brand.typography.bodySmall.fontSize, borderRadius: brand.radius.medium },
 }
 
-/**
- * Shared design-system button. Variants: primary (filled), secondary (outline),
- * danger (destructive outline). Use across all staff screens for consistency.
- */
 export function Button({
   variant = 'primary',
   size = 'md',
