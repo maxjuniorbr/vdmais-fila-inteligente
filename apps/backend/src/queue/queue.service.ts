@@ -152,12 +152,12 @@ export class QueueService {
 
     const [waiting, calling, inService, paused, recent, counters] = await Promise.all([
       this.prisma.ticket.findMany({
-        where: { erId, state: TicketState.WAITING },
+        where: { erId, state: TicketState.WAITING, queue: { businessDate } },
         orderBy: { queuePosition: 'asc' },
         include: { representative: { select: { fullName: true } } },
       }),
       this.prisma.ticket.findMany({
-        where: { erId, state: TicketState.CALLING },
+        where: { erId, state: TicketState.CALLING, queue: { businessDate } },
         orderBy: { calledAt: 'asc' },
         include: {
           representative: { select: { fullName: true } },
@@ -165,7 +165,7 @@ export class QueueService {
         },
       }),
       this.prisma.ticket.findMany({
-        where: { erId, state: TicketState.IN_SERVICE },
+        where: { erId, state: TicketState.IN_SERVICE, queue: { businessDate } },
         orderBy: { serviceStartedAt: 'asc' },
         include: {
           representative: { select: { fullName: true } },
@@ -173,7 +173,7 @@ export class QueueService {
         },
       }),
       this.prisma.ticket.findMany({
-        where: { erId, state: TicketState.PAUSED },
+        where: { erId, state: TicketState.PAUSED, queue: { businessDate } },
         orderBy: { pausedAt: 'asc' },
         include: { representative: { select: { fullName: true } } },
       }),

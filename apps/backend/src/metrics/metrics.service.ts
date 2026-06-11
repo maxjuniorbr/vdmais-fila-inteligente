@@ -14,7 +14,7 @@ interface DailyAuditEvent {
   operator: { id: string; name: string } | null
 }
 
-const NO_SHOW_EVENTS = new Set(['ticket_no_show', 'ticket_marked_no_show'])
+const NO_SHOW_EVENTS = new Set(['ticket_no_show', 'ticket_marked_no_show', 'ticket_auto_no_show'])
 const FINISH_EVENTS = new Set(['service_finished', 'service_force_finished'])
 
 @Injectable()
@@ -64,6 +64,7 @@ export class MetricsService {
             in: [
               'ticket_created',
               'ticket_restored',
+              'ticket_force_closed',
               'ticket_called',
               'service_started',
               'service_finished',
@@ -71,6 +72,7 @@ export class MetricsService {
               'ticket_cancelled',
               'ticket_no_show',
               'ticket_marked_no_show',
+              'ticket_auto_no_show',
               'duplicate_ticket_blocked',
               'counter_paused',
               'counter_resumed',
@@ -95,6 +97,9 @@ export class MetricsService {
     const cancelledEvents = dailyEvents.filter((event) => event.eventType === 'ticket_cancelled')
     const noShowEvents = dailyEvents.filter((event) => NO_SHOW_EVENTS.has(event.eventType))
     const restoredEvents = dailyEvents.filter((event) => event.eventType === 'ticket_restored')
+    const forceClosedEvents = dailyEvents.filter(
+      (event) => event.eventType === 'ticket_force_closed',
+    )
     const startedEvents = dailyEvents.filter((event) => event.eventType === 'service_started')
     const calledEvents = dailyEvents.filter((event) => event.eventType === 'ticket_called')
     const duplicateEvents = dailyEvents.filter(
@@ -159,6 +164,7 @@ export class MetricsService {
       totalCancelled: cancelledEvents.length,
       totalNoShow: noShowEvents.length,
       totalRestored: restoredEvents.length,
+      totalForceClosed: forceClosedEvents.length,
       duplicateAttempts: duplicateEvents.length,
       openServices,
       avgWaitSeconds: Math.round(avgWaitMs / 1000),

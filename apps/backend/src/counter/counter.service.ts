@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { CounterState, Prisma, Role } from '@prisma/client'
+import { CounterState, Prisma, Role, TicketState } from '@prisma/client'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { PanelGateway } from '../panel/panel.gateway'
 
@@ -30,6 +30,13 @@ export class CounterService {
     this._assertOperator(user)
     const counter = await this._getCounter(counterId)
     this._assertERAccess(counter.erId, user)
+    const er = await this.prisma.eR.findUnique({
+      where: { id: counter.erId },
+      select: { isDayOpen: true },
+    })
+    if (!er?.isDayOpen) {
+      throw new BadRequestException('Abra a operação do dia antes de abrir o caixa')
+    }
     if (counter.operatorId && counter.operatorId !== user.userId) {
       throw new ConflictException('O caixa está atribuído a outra operadora')
     }
@@ -162,6 +169,73 @@ export class CounterService {
     return updated
   }
 
+  /**
+   * Liberação forçada por gestora/admin: usada quando uma operadora abandona o
+   * caixa (saiu sem fechar, sessão expirou) deixando-o preso. Resolve a senha
+   * em aberto (em atendimento → finalizada; em chamada → não compareceu) e
+   * devolve o caixa ao estado disponível, sem operadora.
+   */
+  async forceReleaseCounter(counterId: string, user: AuthenticatedUser) {
+    this._assertStaffERAccess(user)
+    const counter = await this._getCounter(counterId)
+    this._assertStaffERForCounter(counter.erId, user)
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const now = new Date()
+      const openTicket = await tx.ticket.findFirst({
+        where: { counterId, state: { in: [TicketState.CALLING, TicketState.IN_SERVICE] } },
+        select: { id: true, state: true, code: true },
+      })
+
+      if (openTicket) {
+        const finishing = openTicket.state === TicketState.IN_SERVICE
+        await tx.ticket.update({
+          where: { id: openTicket.id },
+          data: finishing
+            ? { state: TicketState.FINISHED, serviceFinishedAt: now }
+            : { state: TicketState.NO_SHOW, noShowAt: now },
+        })
+        await tx.auditEvent.create({
+          data: {
+            eventType: finishing ? 'service_force_finished' : 'ticket_marked_no_show',
+            erId: counter.erId,
+            ticketId: openTicket.id,
+            operatorId: user.userId,
+            metadata: { forced: true, reason: 'counter_force_release', counterId },
+          },
+        })
+      }
+
+      const result = await tx.counter.update({
+        where: { id: counterId },
+        data: { state: CounterState.UNAVAILABLE, operatorId: null },
+      })
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'counter_force_released',
+          erId: counter.erId,
+          operatorId: user.userId,
+          metadata: { counterId, counterNumber: counter.number, hadOpenTicket: Boolean(openTicket) },
+        },
+      })
+      return { counter: result, openTicket }
+    })
+
+    if (updated.openTicket) {
+      const finishing = updated.openTicket.state === TicketState.IN_SERVICE
+      this.panelGateway.emitToER(
+        counter.erId,
+        finishing ? 'ticket.service_finished' : 'ticket.no_show',
+        { ticketId: updated.openTicket.id, code: updated.openTicket.code },
+      )
+    }
+    this.panelGateway.emitToER(counter.erId, 'counter.closed', {
+      counterId,
+      number: counter.number,
+    })
+    return updated.counter
+  }
+
   async closeCounter(counterId: string, user: AuthenticatedUser) {
     this._assertOperator(user)
     const counter = await this._getCounter(counterId)
@@ -224,6 +298,19 @@ export class CounterService {
   private _assertOperator(user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
       throw new ForbiddenException('Somente operadoras podem operar caixas')
+    }
+  }
+
+  private _assertStaffERAccess(user: AuthenticatedUser) {
+    if (user.role !== Role.MANAGER && user.role !== Role.ADMIN) {
+      throw new ForbiddenException('Somente gestoras podem liberar caixas')
+    }
+  }
+
+  private _assertStaffERForCounter(erId: string, user: AuthenticatedUser) {
+    if (user.role === Role.ADMIN) return
+    if (!user.erId || user.erId !== erId) {
+      throw new ForbiddenException('Não é possível operar um caixa de outro ER')
     }
   }
 }

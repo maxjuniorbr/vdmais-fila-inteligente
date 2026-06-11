@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { Interval } from '@nestjs/schedule'
 import { CounterState, EntryChannel, Prisma, Role, TicketState } from '@prisma/client'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { getBusinessDate } from '../common/business-date'
@@ -278,13 +279,18 @@ export class TicketService {
     }
     const ticket = await this._getTicket(ticketId)
     this._assertStaffER(ticket.erId, user)
+    if (ticket.state === TicketState.CANCELLED && ticket.serviceStartedAt) {
+      throw new BadRequestException(
+        'Senhas canceladas após o início do atendimento não podem ser restauradas',
+      )
+    }
     await this.prisma.auditEvent.create({
       data: {
         eventType: 'ticket_restoration_requested',
         erId: ticket.erId,
         ticketId,
         operatorId: user.userId,
-        metadata: { reason: reason.trim() },
+        metadata: { reason: reason.trim(), fromState: ticket.state },
       },
     })
     const businessDate = getBusinessDate()
@@ -302,6 +308,23 @@ export class TicketService {
           throw new BadRequestException('A operação do ER está encerrada hoje')
         }
 
+        // Mantém a invariante central: uma RE não pode ter duas senhas ativas
+        // no mesmo ER. Vale tanto para restaurar NO_SHOW quanto CANCELLED.
+        const existingActive = await tx.ticket.findFirst({
+          where: {
+            erId: ticket.erId,
+            representativeId: ticket.representativeId,
+            id: { not: ticketId },
+            state: { in: ACTIVE_STATES },
+          },
+          select: { code: true },
+        })
+        if (existingActive) {
+          throw new ConflictException(
+            `A representante já possui uma senha ativa: ${existingActive.code}`,
+          )
+        }
+
         const queue = await tx.queue.upsert({
           where: { erId_businessDate: { erId: ticket.erId, businessDate } },
           create: {
@@ -315,13 +338,21 @@ export class TicketService {
         })
 
         const result = await tx.ticket.updateMany({
-          where: { id: ticketId, state: TicketState.NO_SHOW },
+          where: {
+            id: ticketId,
+            OR: [
+              { state: TicketState.NO_SHOW },
+              { state: TicketState.CANCELLED, serviceStartedAt: null },
+            ],
+          },
           data: {
             state: TicketState.WAITING,
             queueId: queue.id,
             queuePosition: queue.nextSequence,
             restoreReason: reason.trim(),
             noShowAt: null,
+            cancelledAt: null,
+            cancelReason: null,
             counterId: null,
             operatorId: null,
             calledAt: null,
@@ -331,7 +362,7 @@ export class TicketService {
         })
         if (result.count !== 1) {
           throw new BadRequestException(
-            'Somente senhas marcadas como não compareceu podem ser restauradas',
+            'Somente senhas não comparecidas ou canceladas antes do atendimento podem ser restauradas',
           )
         }
 
@@ -341,7 +372,7 @@ export class TicketService {
             erId: ticket.erId,
             ticketId,
             operatorId: user.userId,
-            metadata: { reason: reason.trim() },
+            metadata: { reason: reason.trim(), fromState: ticket.state },
           },
         })
         return tx.ticket.findUniqueOrThrow({ where: { id: ticketId } })
@@ -550,9 +581,25 @@ export class TicketService {
   async getMyActiveTicket(representativeId: string, erId: string) {
     const ticket = await this.prisma.ticket.findFirst({
       where: { representativeId, erId, state: { in: ACTIVE_STATES } },
-      include: { representative: { select: { fullName: true } } },
+      include: {
+        representative: { select: { fullName: true } },
+        er: { select: { pauseTimeoutSeconds: true } },
+      },
     })
     if (!ticket) throw new NotFoundException('Nenhuma senha ativa encontrada para este ER')
+
+    // Enforce the pause timeout on read so the RE sees the cancellation
+    // promptly even before the periodic sweep runs.
+    if (this._isPauseExpired(ticket.state, ticket.pausedAt, ticket.er.pauseTimeoutSeconds)) {
+      await this._expirePause({
+        id: ticket.id,
+        code: ticket.code,
+        erId: ticket.erId,
+        representativeId: ticket.representativeId,
+      })
+      throw new NotFoundException('Nenhuma senha ativa encontrada para este ER')
+    }
+
     const currentPosition =
       ticket.state === TicketState.WAITING
         ? await this.prisma.ticket.count({
@@ -563,7 +610,92 @@ export class TicketService {
             },
           })
         : 0
-    return { ...ticket, currentPosition }
+    const { er, ...rest } = ticket
+    return { ...rest, currentPosition, pauseTimeoutSeconds: er.pauseTimeoutSeconds }
+  }
+
+  private _isPauseExpired(
+    state: TicketState,
+    pausedAt: Date | null,
+    pauseTimeoutSeconds: number,
+  ): boolean {
+    if (state !== TicketState.PAUSED || !pausedAt || pauseTimeoutSeconds <= 0) return false
+    return Date.now() >= pausedAt.getTime() + pauseTimeoutSeconds * 1000
+  }
+
+  /**
+   * Periodically cancels paused ("não estou pronta") tickets that exceeded the
+   * ER's configured pause timeout. This is the authoritative enforcement and
+   * works even when the RE has closed her queue card.
+   */
+  @Interval('expire-stale-pauses', 15000)
+  async expireStalePauses() {
+    const candidates = await this.prisma.ticket.findMany({
+      where: {
+        state: TicketState.PAUSED,
+        pausedAt: { not: null },
+        er: { pauseTimeoutSeconds: { gt: 0 } },
+      },
+      select: {
+        id: true,
+        code: true,
+        erId: true,
+        pausedAt: true,
+        representativeId: true,
+        er: { select: { pauseTimeoutSeconds: true } },
+      },
+    })
+
+    for (const ticket of candidates) {
+      if (this._isPauseExpired(TicketState.PAUSED, ticket.pausedAt, ticket.er.pauseTimeoutSeconds)) {
+        await this._expirePause(ticket)
+      }
+    }
+  }
+
+  private async _expirePause(ticket: {
+    id: string
+    code: string
+    erId: string
+    representativeId: string
+  }) {
+    const cancelled = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.ticket.updateMany({
+        where: { id: ticket.id, state: TicketState.PAUSED },
+        data: {
+          state: TicketState.CANCELLED,
+          cancelReason: 'Tempo de pausa esgotado',
+          cancelledAt: new Date(),
+        },
+      })
+      if (result.count !== 1) return false
+
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_pause_expired',
+          erId: ticket.erId,
+          ticketId: ticket.id,
+          representativeId: ticket.representativeId,
+        },
+      })
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_cancelled',
+          erId: ticket.erId,
+          ticketId: ticket.id,
+          representativeId: ticket.representativeId,
+          metadata: { reason: 'Tempo de pausa esgotado', pauseExpired: true },
+        },
+      })
+      return true
+    })
+
+    if (cancelled) {
+      this.panelGateway.emitToER(ticket.erId, 'ticket.cancelled', {
+        ticketId: ticket.id,
+        code: ticket.code,
+      })
+    }
   }
 
   async pauseTicket(ticketId: string, representativeId: string) {
@@ -594,12 +726,16 @@ export class TicketService {
       })
       return tx.ticket.findUniqueOrThrow({
         where: { id: ticketId },
-        include: { representative: { select: { fullName: true } } },
+        include: {
+          representative: { select: { fullName: true } },
+          er: { select: { pauseTimeoutSeconds: true } },
+        },
       })
     })
 
     this.panelGateway.emitToER(ticket.erId, 'ticket.paused', { ticketId, code: ticket.code })
-    return { ...updated, currentPosition: 0 }
+    const { er, ...rest } = updated
+    return { ...rest, currentPosition: 0, pauseTimeoutSeconds: er.pauseTimeoutSeconds }
   }
 
   async resumeTicket(ticketId: string, representativeId: string) {
@@ -610,18 +746,33 @@ export class TicketService {
     if (ticket.state !== TicketState.PAUSED) {
       throw new BadRequestException('Somente senhas pausadas podem ser retomadas')
     }
+    const businessDate = getBusinessDate()
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const { updated, queueId } = await this.prisma.$transaction(async (tx) => {
       // Accumulate paused duration before resuming
       const now = new Date()
       const additionalPausedSeconds = ticket.pausedAt
         ? Math.round((now.getTime() - ticket.pausedAt.getTime()) / 1000)
         : 0
 
-      // Get next position (end of the queue)
-      const queue = await tx.queue.update({
-        where: { id: ticket.queueId },
-        data: { nextSequence: { increment: 1 } },
+      const er = await tx.eR.findUnique({
+        where: { id: ticket.erId },
+        select: { dayOpenedAt: true },
+      })
+
+      // Sempre vincula à fila do dia ATUAL. Se a senha foi pausada num dia e
+      // retomada em outro (operação que cruzou a meia-noite), ela migra para a
+      // fila de hoje — caso contrário ficaria presa numa fila que o
+      // `callNext` nunca consulta.
+      const queue = await tx.queue.upsert({
+        where: { erId_businessDate: { erId: ticket.erId, businessDate } },
+        create: {
+          erId: ticket.erId,
+          businessDate,
+          openedAt: er?.dayOpenedAt ?? now,
+          nextSequence: 1,
+        },
+        update: { nextSequence: { increment: 1 } },
         select: { id: true, nextSequence: true },
       })
 
@@ -629,6 +780,7 @@ export class TicketService {
         where: { id: ticketId, state: TicketState.PAUSED },
         data: {
           state: TicketState.WAITING,
+          queueId: queue.id,
           queuePosition: queue.nextSequence,
           code: this._generateCode(queue.nextSequence),
           pausedAt: null,
@@ -645,18 +797,23 @@ export class TicketService {
           erId: ticket.erId,
           ticketId,
           representativeId,
-          metadata: { newPosition: queue.nextSequence, pausedSeconds: additionalPausedSeconds },
+          metadata: {
+            newPosition: queue.nextSequence,
+            pausedSeconds: additionalPausedSeconds,
+            ...(queue.id === ticket.queueId ? {} : { migratedFromQueueId: ticket.queueId }),
+          },
         },
       })
-      return tx.ticket.findUniqueOrThrow({
+      const fresh = await tx.ticket.findUniqueOrThrow({
         where: { id: ticketId },
         include: { representative: { select: { fullName: true } } },
       })
+      return { updated: fresh, queueId: queue.id }
     })
 
     const currentPosition = await this.prisma.ticket.count({
       where: {
-        queueId: ticket.queueId,
+        queueId,
         state: TicketState.WAITING,
         queuePosition: { lte: updated.queuePosition },
       },

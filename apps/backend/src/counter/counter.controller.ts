@@ -44,4 +44,10 @@ export class CounterController {
   close(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
     return this.counterService.closeCounter(id, req.user)
   }
+
+  @Post(':id/force-release')
+  @Roles('MANAGER')
+  forceRelease(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.counterService.forceReleaseCounter(id, req.user)
+  }
 }
