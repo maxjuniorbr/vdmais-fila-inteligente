@@ -188,6 +188,20 @@ describe('MetricsService', () => {
     expect(result.byChannel.LINK).toBe(0)
   })
 
+  it('counts auto no-shows (call timeout) as no-show', async () => {
+    mockPrisma.ticket.findMany.mockResolvedValue([
+      makeTicket({ state: TicketState.NO_SHOW, entryChannel: EntryChannel.QR_CODE }),
+    ])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      makeEvent('ticket_auto_no_show', '2026-06-10T12:05:00Z', 'tk-1', EntryChannel.QR_CODE),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.totalNoShow).toBe(1)
+    expect(result.noShowByChannel.QR_CODE).toBe(1)
+  })
+
   it('counts duplicate attempts and pause duration per counter', async () => {
     mockPrisma.counter.findMany.mockResolvedValue([{ id: 'counter-1', number: 1, state: 'ACTIVE' }])
     mockPrisma.auditEvent.findMany.mockResolvedValue([

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert } from '../components/Alert'
 import { BrandMark } from '../components/BrandMark'
@@ -13,6 +13,93 @@ interface TicketInfo {
   state: string
   erId: string
   representative?: { fullName: string }
+  pausedAt?: string | null
+  pauseTimeoutSeconds?: number
+}
+
+function formatMmSs(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds))
+  const minutes = Math.floor(safe / 60)
+  const seconds = safe % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+/**
+ * Countdown + progress bar shown while a ticket is paused. When the configured
+ * pause timeout elapses the password is auto-cancelled by the backend; this
+ * component fires `onExpire` so the card reflects it immediately.
+ */
+function PauseCountdown({
+  pausedAt,
+  pauseTimeoutSeconds,
+  onExpire,
+}: Readonly<{ pausedAt: string; pauseTimeoutSeconds: number; onExpire: () => void }>) {
+  const [now, setNow] = useState(() => Date.now())
+  const firedRef = useRef(false)
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const deadline = new Date(pausedAt).getTime() + pauseTimeoutSeconds * 1000
+  const totalMs = pauseTimeoutSeconds * 1000
+  const remainingMs = Math.max(0, deadline - now)
+  const remainingSeconds = remainingMs / 1000
+  const ratio = totalMs > 0 ? remainingMs / totalMs : 0
+  const low = remainingSeconds <= 30
+
+  useEffect(() => {
+    if (remainingMs <= 0 && !firedRef.current) {
+      firedRef.current = true
+      onExpire()
+    }
+  }, [remainingMs, onExpire])
+
+  const barColor = low ? brand.danger : brand.warning
+
+  return (
+    <div style={countdownStyles.wrapper} aria-live="polite">
+      <p style={countdownStyles.label}>Tempo restante para retomar</p>
+      <p style={{ ...countdownStyles.time, color: barColor }}>{formatMmSs(remainingSeconds)}</p>
+      <div style={countdownStyles.track}>
+        <div
+          style={{
+            ...countdownStyles.fill,
+            width: `${Math.max(0, Math.min(100, ratio * 100))}%`,
+            backgroundColor: barColor,
+          }}
+        />
+      </div>
+      <p style={countdownStyles.hint}>
+        Se o tempo acabar, sua senha será cancelada automaticamente.
+      </p>
+    </div>
+  )
+}
+
+const countdownStyles: Record<string, React.CSSProperties> = {
+  wrapper: { marginTop: '0.75rem', textAlign: 'center' },
+  label: { margin: 0, fontSize: '0.8rem', color: brand.inkMuted },
+  time: {
+    margin: '0.15rem 0 0.5rem',
+    fontSize: '1.6rem',
+    fontWeight: 700,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  track: {
+    width: '100%',
+    height: '8px',
+    borderRadius: '999px',
+    backgroundColor: brand.border,
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    borderRadius: '999px',
+    transition: 'width 1s linear, background-color 0.3s ease',
+  },
+  hint: { margin: '0.5rem 0 1.25rem', fontSize: '0.75rem', color: brand.inkMuted },
 }
 
 function TicketStatus({
@@ -91,8 +178,11 @@ export function TicketConfirmationPage() {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.status === 404) {
-          // Ticket is no longer active — service was completed or cancelled
-          setTicket((prev) => (prev ? { ...prev, state: 'FINISHED' } : prev))
+          // Ticket is no longer active. A paused ticket that vanishes was
+          // auto-cancelled (pause timeout); otherwise service completed.
+          setTicket((prev) =>
+            prev ? { ...prev, state: prev.state === 'PAUSED' ? 'CANCELLED' : 'FINISHED' } : prev,
+          )
           return
         }
         if (!res.ok) return
@@ -157,6 +247,10 @@ export function TicketConfirmationPage() {
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Erro inesperado'))
       .finally(() => setLoading(false))
   }, [erId, navigate, searchParams])
+
+  const handlePauseExpired = useCallback(() => {
+    setTicket((prev) => (prev?.state === 'PAUSED' ? { ...prev, state: 'CANCELLED' } : prev))
+  }, [])
 
   async function fetchCurrentTicket(token: string): Promise<TicketInfo> {
     const res = await fetch(`/api/tickets/my-active?erId=${erId}`, {
@@ -307,6 +401,14 @@ export function TicketConfirmationPage() {
             currentPosition={ticket.currentPosition}
           />
         </div>
+
+        {isPaused && ticket.pausedAt && (ticket.pauseTimeoutSeconds ?? 0) > 0 && (
+          <PauseCountdown
+            pausedAt={ticket.pausedAt}
+            pauseTimeoutSeconds={ticket.pauseTimeoutSeconds as number}
+            onExpire={handlePauseExpired}
+          />
+        )}
 
         {(ticket.state === 'WAITING' || isPaused) && (
           <Button

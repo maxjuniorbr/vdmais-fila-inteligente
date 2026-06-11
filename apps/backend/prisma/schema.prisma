@@ -69,6 +69,10 @@ model ER {
   dayOpenedAt DateTime?
   dayClosedAt DateTime?
 
+  // Tempo máximo (em segundos) que uma senha pode ficar pausada ("não estou
+  // pronta"). Ao estourar, a senha é cancelada automaticamente. 0 desativa.
+  pauseTimeoutSeconds Int @default(300)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

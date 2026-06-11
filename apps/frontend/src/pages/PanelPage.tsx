@@ -43,6 +43,8 @@ const REFRESH_EVENTS = [
   'ticket.cancelled',
   'ticket.paused',
   'ticket.restored',
+  'day.opened',
+  'day.closed',
 ]
 
 function formatDuration(seconds: number): string {

@@ -55,6 +55,7 @@ interface Metrics {
   totalCancelled: number
   totalNoShow: number
   totalRestored: number
+  totalForceClosed: number
   duplicateAttempts: number
   openServices: number
   avgWaitSeconds: number
@@ -124,7 +125,12 @@ function RestoreTicketAction({
   ticket,
   onSelect,
 }: Readonly<{ ticket: Ticket; onSelect: (action: PendingAction) => void }>) {
-  if (ticket.state !== 'NO_SHOW') return null
+  // Não comparecidas sempre podem ser restauradas; canceladas, apenas se nunca
+  // entraram em atendimento (alinhado à regra do backend).
+  const canRestore =
+    ticket.state === 'NO_SHOW' ||
+    (ticket.state === 'CANCELLED' && !ticket.serviceStartedAt)
+  if (!canRestore) return null
   return (
     <Button size="sm" variant="secondary" onClick={() => onSelect({ kind: 'restore', ticket })}>
       Restaurar
@@ -184,6 +190,7 @@ export function ManagerPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null)
   const [er, setER] = useState<ERState | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
+  const [pendingCounter, setPendingCounter] = useState<Counter | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const isAdmin = sessionStorage.getItem('staffRole') === 'ADMIN'
@@ -270,6 +277,7 @@ export function ManagerPage() {
     try {
       await action()
       setPendingAction(null)
+      setPendingCounter(null)
       await refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro na operação')
@@ -399,6 +407,7 @@ export function ManagerPage() {
                   ['Não compareceu', metrics.totalNoShow],
                   ['Cancelados', metrics.totalCancelled],
                   ['Restaurados', metrics.totalRestored],
+                  ['Encerradas na virada', metrics.totalForceClosed],
                   ['Duplicidades bloqueadas', metrics.duplicateAttempts],
                   ['Caixas ativos/pausados', `${metrics.activeCounters}/${metrics.pausedCounters}`],
                 ] as [string, string | number][]
@@ -447,6 +456,15 @@ export function ManagerPage() {
                 <small style={styles.counterOperator}>
                   {counter.operator?.name ?? 'Sem operadora'}
                 </small>
+                {counter.state !== 'UNAVAILABLE' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setPendingCounter(counter)}
+                  >
+                    Liberar caixa
+                  </Button>
+                )}
               </article>
             ))}
           </div>
@@ -521,6 +539,25 @@ export function ManagerPage() {
             }}
             onClose={() => {
               setPendingAction(null)
+            }}
+          />
+        )}
+
+        {pendingCounter && (
+          <ConfirmDialog
+            title="Liberar caixa"
+            description={`Caixa ${pendingCounter.number}${
+              pendingCounter.operator ? ` — ${pendingCounter.operator.name}` : ''
+            }. A senha em aberto será resolvida (finalizada ou marcada como não compareceu) e o caixa ficará disponível.`}
+            reasonRequired={false}
+            confirmLabel="Liberar caixa"
+            loading={loading}
+            onConfirm={() => {
+              const { id } = pendingCounter
+              void execute(() => api.post(`/counters/${id}/force-release`))
+            }}
+            onClose={() => {
+              setPendingCounter(null)
             }}
           />
         )}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { saveStaffSession, StaffProfile, StaffRole } from '../auth/session'
 import { brand } from '../styles/brand'
 import { Alert } from './Alert'
@@ -79,6 +80,23 @@ export function StaffLoginForm({
         <Button type="submit" disabled={loading} style={{ width: '100%' }}>
           {loading ? 'Entrando...' : 'Entrar'}
         </Button>
+        <Link to="/" className="gb-action-link" style={styles.backLink}>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M19 12H5" />
+            <path d="m12 19-7-7 7-7" />
+          </svg>
+          Voltar ao portal da equipe
+        </Link>
       </form>
     </main>
   )
@@ -119,5 +137,16 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0 0 1.25rem',
     fontSize: '1.35rem',
     color: brand.ink,
+  },
+  backLink: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.4rem',
+    marginTop: '1.25rem',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    color: brand.green700,
+    textDecoration: 'none',
   },
 }

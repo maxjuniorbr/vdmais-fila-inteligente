@@ -34,6 +34,7 @@ export class AdminService {
         name: true,
         qrCodeUrl: true,
         isDayOpen: true,
+        pauseTimeoutSeconds: true,
         createdAt: true,
         _count: { select: { counters: true, operators: true } },
       },
@@ -54,7 +55,13 @@ export class AdminService {
 
   async createER(dto: CreateERDto, user: AuthenticatedUser) {
     const er = await this.prisma.eR.create({
-      data: { name: dto.name.trim(), qrCodeUrl: dto.qrCodeUrl },
+      data: {
+        name: dto.name.trim(),
+        qrCodeUrl: dto.qrCodeUrl,
+        ...(dto.pauseTimeoutSeconds === undefined
+          ? {}
+          : { pauseTimeoutSeconds: dto.pauseTimeoutSeconds }),
+      },
     })
     await this.auditLog.log({
       eventType: 'er_created',
@@ -72,6 +79,9 @@ export class AdminService {
       data: {
         ...(dto.name === undefined ? {} : { name: dto.name.trim() }),
         ...(dto.qrCodeUrl === undefined ? {} : { qrCodeUrl: dto.qrCodeUrl }),
+        ...(dto.pauseTimeoutSeconds === undefined
+          ? {}
+          : { pauseTimeoutSeconds: dto.pauseTimeoutSeconds }),
       },
     })
     await this.auditLog.log({
