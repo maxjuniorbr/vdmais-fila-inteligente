@@ -18,6 +18,7 @@
     "sonar:up": "docker compose -f compose.sonar.yml up -d sonarqube",
     "sonar:down": "docker compose -f compose.sonar.yml down",
     "sonar:coverage": "npm run test:cov --workspace=apps/backend && npm run test:cov --workspace=apps/frontend",
+    "coverage:changed": "node scripts/check-changed-coverage.mjs",
     "sonar:scan": "docker compose -f compose.sonar.yml run --rm sonar-scanner",
     "sonar": "npm run sonar:coverage && npm run sonar:scan"
   },
