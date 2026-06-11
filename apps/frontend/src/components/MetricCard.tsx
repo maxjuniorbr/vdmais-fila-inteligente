@@ -6,10 +6,6 @@ interface MetricCardProps {
   value: string | number
 }
 
-/**
- * Single KPI card — displays a large value with a smaller label below.
- * Used in the Manager dashboard metrics grid.
- */
 export function MetricCard({ label, value }: Readonly<MetricCardProps>) {
   return (
     <article style={styles.card}>
@@ -24,20 +20,20 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     gap: '0.25rem',
     textAlign: 'center',
-    padding: '0.9rem',
+    padding: `${brand.spacing[16]}px`,
     background: brand.surface,
     border: `1px solid ${brand.border}`,
     borderTop: `3px solid ${brand.green500}`,
-    borderRadius: 10,
+    borderRadius: brand.radius.medium,
     boxShadow: brand.shadow,
   },
   value: {
-    fontSize: '1.35rem',
+    fontSize: brand.typography.heading.fontSize,
     fontWeight: 700,
     color: brand.green800,
   },
   label: {
-    fontSize: '0.78rem',
+    fontSize: brand.typography.auxiliar.fontSize,
     color: brand.inkMuted,
     letterSpacing: '0.02em',
   },

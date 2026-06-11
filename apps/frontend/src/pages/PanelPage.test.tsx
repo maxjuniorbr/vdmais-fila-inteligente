@@ -111,8 +111,8 @@ describe('PanelPage', () => {
     expect(screen.getByText('8 na fila')).toBeInTheDocument()
     expect(screen.getByText('PRÓXIMA')).toBeInTheDocument()
     expect(screen.getByText('+1')).toBeInTheDocument()
-    expect(screen.getByText('45s')).toBeInTheDocument()
-    expect(screen.getByText('2 min')).toBeInTheDocument()
+    expect(screen.getByText('0m 45s')).toBeInTheDocument()
+    expect(screen.getByText('2m 5s')).toBeInTheDocument()
     expect(screen.queryByText(/~\d+\s*min/)).not.toBeInTheDocument()
     expect(screen.queryByText(/última espera/i)).not.toBeInTheDocument()
 

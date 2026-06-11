@@ -255,39 +255,39 @@ const styles: Record<string, React.CSSProperties> = {
   content: {
     maxWidth: 720,
     margin: '0 auto',
-    padding: '1.5rem 1.5rem 3rem',
+    padding: `${brand.spacing[24]}px ${brand.spacing[24]}px ${brand.spacing[48]}px`,
   },
   form: {
     display: 'grid',
-    gap: '0.75rem',
-    margin: '0 0 1rem',
+    gap: `${brand.spacing[12]}px`,
+    margin: `0 0 ${brand.spacing[16]}px`,
   },
   result: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '1rem',
+    gap: `${brand.spacing[16]}px`,
     flexWrap: 'wrap',
-    padding: '0.75rem',
+    padding: `${brand.spacing[12]}px`,
     border: `1px solid ${brand.border}`,
     background: brand.green50,
-    borderRadius: 10,
-    marginBottom: '0.5rem',
+    borderRadius: brand.radius.medium,
+    marginBottom: `${brand.spacing[8]}px`,
   },
   resultMeta: {
     color: brand.inkMuted,
-    fontSize: '0.9rem',
+    fontSize: brand.typography.bodySmall.fontSize,
   },
   code: {
     display: 'block',
     fontSize: 'clamp(2.5rem, 12vw, 3.5rem)',
     fontWeight: 800,
     color: brand.green700,
-    margin: '0.75rem 0',
+    margin: `${brand.spacing[12]}px 0`,
     letterSpacing: '0.05em',
   },
   successTitle: {
-    margin: '0 0 0.5rem',
+    margin: `0 0 ${brand.spacing[8]}px`,
     color: brand.green800,
   },
   successName: {
@@ -296,7 +296,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   successPosition: {
-    margin: '0 0 1.25rem',
+    margin: `0 0 ${brand.spacing[20]}px`,
     color: brand.inkMuted,
   },
 }

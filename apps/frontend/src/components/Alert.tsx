@@ -49,10 +49,10 @@ export function Alert({ tone = 'error', children, style }: Readonly<AlertProps>)
 }
 
 const base: CSSProperties = {
-  padding: '0.75rem 0.9rem',
-  borderRadius: 10,
-  marginBottom: '1rem',
+  padding: `${brand.spacing[12]}px`,
+  borderRadius: brand.radius.medium,
+  marginBottom: `${brand.spacing[16]}px`,
   fontWeight: 500,
-  fontSize: '0.92rem',
+  fontSize: brand.typography.bodySmall.fontSize,
   lineHeight: 1.45,
 }
