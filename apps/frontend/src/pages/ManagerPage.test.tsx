@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
+import { seedStaffSession } from '../test/staffToken'
 import { ManagerPage } from './ManagerPage'
 
 vi.mock('../api/client', () => ({
@@ -74,11 +75,7 @@ const metrics = {
 const er = { id: 'er-1', name: 'ER Teste', isDayOpen: true }
 
 function authenticateManager() {
-  sessionStorage.setItem('token', 'mgr-token')
-  sessionStorage.setItem('staffRole', 'MANAGER')
-  sessionStorage.setItem('staffUserId', 'mgr-1')
-  sessionStorage.setItem('erId', 'er-1')
-  sessionStorage.setItem('userName', 'Gestora')
+  seedStaffSession({ id: 'mgr-1', name: 'Gestora', role: 'MANAGER', erId: 'er-1' })
 }
 
 function mockGet() {
@@ -258,7 +255,7 @@ describe('ManagerPage', () => {
   })
 
   it('lets an admin pick the ER to follow', async () => {
-    sessionStorage.setItem('staffRole', 'ADMIN')
+    seedStaffSession({ id: 'admin-1', name: 'Admin', role: 'ADMIN' })
     vi.mocked(api.get).mockImplementation((path: string) => {
       if (path === '/admin/ers') {
         return Promise.resolve([

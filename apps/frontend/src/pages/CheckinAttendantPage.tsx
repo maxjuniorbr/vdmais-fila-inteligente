@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { hasStaffSession, logoutStaffSession } from '../auth/session'
+import { hasStaffSession, logoutStaffSession, getSessionERId } from '../auth/session'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Button } from '../components/Button'
@@ -34,7 +34,7 @@ const emptyRegistration = {
 
 export function CheckinAttendantPage() {
   const [authenticated, setAuthenticated] = useState(() => hasStaffSession(['ATTENDANT']))
-  const [erId, setErId] = useState(() => sessionStorage.getItem('erId') ?? '')
+  const [erId, setErId] = useState(() => getSessionERId())
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Representative[]>([])
   const [registration, setRegistration] = useState(emptyRegistration)

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
+import { seedStaffSession } from '../test/staffToken'
 import { AdminPage } from './AdminPage'
 
 vi.mock('../api/client', () => ({
@@ -10,9 +11,7 @@ vi.mock('../api/client', () => ({
 }))
 
 function authenticate() {
-  sessionStorage.setItem('token', 'test-token')
-  sessionStorage.setItem('staffRole', 'ADMIN')
-  sessionStorage.setItem('staffUserId', 'admin-1')
+  seedStaffSession({ id: 'admin-1', name: 'Admin', role: 'ADMIN' })
 }
 
 function renderPage() {

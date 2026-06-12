@@ -2,13 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { seedStaffSession } from '../test/staffToken'
 import { CheckinAttendantPage } from './CheckinAttendantPage'
 
 function authenticate() {
-  sessionStorage.setItem('token', 'test-token')
-  sessionStorage.setItem('staffRole', 'ATTENDANT')
-  sessionStorage.setItem('staffUserId', 'att-1')
-  sessionStorage.setItem('erId', 'er-1')
+  seedStaffSession({ id: 'att-1', name: 'Atendente', role: 'ATTENDANT', erId: 'er-1' })
 }
 
 function renderPage() {

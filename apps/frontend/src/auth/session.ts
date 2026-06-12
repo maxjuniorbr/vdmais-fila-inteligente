@@ -7,35 +7,76 @@ export interface StaffProfile {
   erId?: string
 }
 
+const TOKEN_KEY = 'token'
+const NAME_KEY = 'userName'
+const COUNTER_KEY = 'counterId'
 const MANAGEMENT_ER_KEY = 'managementErId'
 
+const VALID_ROLES = new Set<StaffRole>(['OPERATOR', 'ATTENDANT', 'MANAGER', 'ADMIN'])
+
+interface TokenClaims {
+  sub?: string
+  userId?: string
+  role?: StaffRole
+  erId?: string
+  exp?: number
+}
+
+function decodeToken(token: string | null): TokenClaims | null {
+  const payload = token?.split('.')[1]
+  if (!payload) return null
+  try {
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(json) as TokenClaims
+  } catch {
+    return null
+  }
+}
+
+// Identity and authorization context are derived from the signed JWT — never
+// from separate, writable storage keys. A tampered role/erId would require a
+// validly signed token, which the client cannot forge. Expired tokens are
+// treated as no session (proactive logout, not only on the next 401).
+function activeClaims(): TokenClaims | null {
+  const claims = decodeToken(sessionStorage.getItem(TOKEN_KEY))
+  if (!claims?.role) return null
+  if (typeof claims.exp === 'number' && claims.exp * 1000 <= Date.now()) {
+    clearSession()
+    return null
+  }
+  return claims
+}
+
 export function saveStaffSession(token: string, user: StaffProfile) {
-  sessionStorage.removeItem('erId')
   sessionStorage.removeItem(MANAGEMENT_ER_KEY)
-  sessionStorage.removeItem('counterId')
-  sessionStorage.setItem('token', token)
-  sessionStorage.setItem('staffRole', user.role)
-  sessionStorage.setItem('staffUserId', user.id)
-  if (user.erId) sessionStorage.setItem('erId', user.erId)
-  sessionStorage.setItem('userName', user.name)
+  sessionStorage.removeItem(COUNTER_KEY)
+  sessionStorage.setItem(TOKEN_KEY, token)
+  sessionStorage.setItem(NAME_KEY, user.name)
 }
 
 export function hasStaffSession(allowedRoles: StaffRole[]): boolean {
-  const token = sessionStorage.getItem('token')
-  const role = sessionStorage.getItem('staffRole') as StaffRole | null
-  return Boolean(token && role && allowedRoles.includes(role))
+  const role = activeClaims()?.role
+  return Boolean(role && VALID_ROLES.has(role) && allowedRoles.includes(role))
 }
 
 export function getStaffSessionProfile(): StaffProfile | null {
-  const token = sessionStorage.getItem('token')
-  const id = sessionStorage.getItem('staffUserId')
-  const name = sessionStorage.getItem('userName')
-  const role = sessionStorage.getItem('staffRole') as StaffRole | null
-  const erId = sessionStorage.getItem('erId') ?? undefined
-  const validRoles: StaffRole[] = ['OPERATOR', 'ATTENDANT', 'MANAGER', 'ADMIN']
+  const claims = activeClaims()
+  const id = claims?.userId ?? claims?.sub
+  const role = claims?.role
+  if (!id || !role || !VALID_ROLES.has(role)) return null
+  return { id, name: getStaffName(), role, erId: claims?.erId }
+}
 
-  if (!token || !id || !name || !role || !validRoles.includes(role)) return null
-  return { id, name, role, erId }
+export function getStaffRole(): StaffRole | null {
+  return getStaffSessionProfile()?.role ?? null
+}
+
+export function getSessionERId(): string {
+  return getStaffSessionProfile()?.erId ?? ''
+}
+
+export function getStaffName(): string {
+  return sessionStorage.getItem(NAME_KEY) ?? ''
 }
 
 export function getManagementERId(): string {
@@ -51,17 +92,18 @@ export function setManagementERId(erId: string): void {
 }
 
 export function clearSession() {
-  sessionStorage.removeItem('token')
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(NAME_KEY)
+  sessionStorage.removeItem(COUNTER_KEY)
+  sessionStorage.removeItem(MANAGEMENT_ER_KEY)
+  // Drop legacy authorization keys that older builds may have left behind.
   sessionStorage.removeItem('staffRole')
   sessionStorage.removeItem('staffUserId')
   sessionStorage.removeItem('erId')
-  sessionStorage.removeItem('userName')
-  sessionStorage.removeItem('counterId')
-  sessionStorage.removeItem(MANAGEMENT_ER_KEY)
 }
 
 export async function logoutStaffSession() {
-  const token = sessionStorage.getItem('token')
+  const token = sessionStorage.getItem(TOKEN_KEY)
   try {
     if (token) {
       await fetch('/api/telemetry/staff/logout', {

@@ -14,6 +14,7 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - Tempo limite de chamada: senhas paradas em chamada além da tolerância são marcadas como não comparecimento automaticamente, liberando o caixa
 - Encerramento do dia auto-finaliza atendimentos em aberto; gestora pode liberar caixas órfãos deixados por operadoras que saíram sem fechar
 - Painel TV/display com quadro "Chamando agora" multicaixa (cartão piscante na chamada mais recente), próximas senhas com rodízio automático, atendimentos em andamento e tempos médios. O acesso é protegido por um token de exibição por ER (URL com `?token=...`), sem exigir perfil de usuário
+- Sessão da equipe baseada em JWT: a identidade/perfil/ER são derivados das claims assinadas do token; o cliente não usa chaves mutáveis separadas para autorização
 - Gestão com métricas de espera, atendimento, canais de entrada, caixas e não comparecimentos
 - Administração de ERs, caixas e contas de equipe, com ações para copiar e testar os acessos e para gerar/revogar o token do painel da TV
 - Trilha de auditoria completa de todos os eventos do ciclo de vida da senha
