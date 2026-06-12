@@ -214,6 +214,8 @@ O CI (GitHub Actions) roda a cada push e pull request para `master`:
 - **Secret scan** (`secret-scan.yml`): gitleaks varre commits em busca de segredos. Placeholders de exemplo e segredos de teste ficam na allowlist do `.gitleaks.toml`.
 - **Dependabot** (`dependabot.yml`): atualizações semanais de dependências npm e GitHub Actions. Atualizações de rotina (minor/patch) vêm agrupadas; majors vêm isolados para revisão. `prisma` e `@prisma/client` sobem em lockstep, e o major do Prisma é deliberadamente adiado (migração planejada).
 
+Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS) tanto no nginx do contêiner quanto na entrega via Vercel. Dados pessoais sensíveis (CPF e telefone) são mascarados nas respostas de cadastro assistido. Detalhes em [`docs/deployment-mvp.md`](docs/deployment-mvp.md) e [`docs/stack-mvp.md`](docs/stack-mvp.md).
+
 ---
 
 ## Estrutura do projeto

@@ -295,6 +295,15 @@ admin
 
 > Endurecimento futuro (backend): mover o token para cookie `HttpOnly`+`Secure`+`SameSite` e adotar refresh token rotativo, eliminando o token do alcance de scripts no navegador.
 
+### 7.4 Minimização de PII no check-in assistido
+
+- A busca de representantes (`GET /representatives/search`) e o cadastro assistido
+  (`POST /representatives`) devolvem **CPF e telefone sempre mascarados** (ex.:
+  `***.***.344-**`, `(**) *****-0000`). O valor completo nunca chega ao navegador do
+  atendente; os últimos dígitos bastam para conferência visual.
+- O mascaramento é centralizado no backend (`common/pii-mask.ts`), garantindo formato
+  único entre busca e cadastro. A busca continua escopada ao ER do solicitante.
+
 ---
 
 ## 8. Infraestrutura mínima
