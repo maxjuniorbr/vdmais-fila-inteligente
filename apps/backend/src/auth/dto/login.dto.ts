@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator'
+import { EntryChannel } from '@prisma/client'
+import { IsEnum, IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator'
 
 export class LoginDto {
   @IsString()
@@ -15,4 +16,13 @@ export class LoginDto {
   @IsOptional()
   @MaxLength(40)
   erId?: string
+
+  @IsEnum(EntryChannel)
+  @IsOptional()
+  entryChannel?: EntryChannel
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(2048)
+  entryToken?: string
 }

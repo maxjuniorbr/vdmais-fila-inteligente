@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsString,
   IsNotEmpty,
   IsDateString,
@@ -7,6 +8,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator'
+import { EntryChannel } from '@prisma/client'
 import { IsCpf } from '../validators/is-cpf.validator'
 import { IsNotFutureDate } from '../validators/is-not-future-date.validator'
 
@@ -42,4 +44,13 @@ export class RegisterDto {
   @IsOptional()
   @MaxLength(40)
   erId?: string
+
+  @IsEnum(EntryChannel)
+  @IsOptional()
+  entryChannel?: EntryChannel
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(2048)
+  entryToken?: string
 }

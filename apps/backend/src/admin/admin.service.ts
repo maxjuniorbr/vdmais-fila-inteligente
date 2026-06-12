@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import * as bcrypt from 'bcrypt'
-import { Prisma } from '@prisma/client'
+import { EntryChannel, Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { PanelTokenService } from '../panel/panel-token.service'
@@ -9,6 +9,7 @@ import { CreateERDto } from './dto/create-er.dto'
 import { UpdateERDto } from './dto/update-er.dto'
 import { CreateCounterDto } from './dto/create-counter.dto'
 import { CreateStaffDto } from './dto/create-staff.dto'
+import { QueueEntryTokenService } from '../auth/queue-entry-token.service'
 
 const BCRYPT_ROUNDS = 12
 
@@ -26,6 +27,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly panelTokens: PanelTokenService,
+    private readonly queueEntryTokens: QueueEntryTokenService,
   ) {}
 
   listERs() {
@@ -53,7 +55,14 @@ export class AdminService {
     })
     if (!er) throw new NotFoundException('ER não encontrado')
     const { panelTokenHash, ...rest } = er
-    return { ...rest, hasPanelToken: panelTokenHash !== null }
+    return {
+      ...rest,
+      hasPanelToken: panelTokenHash !== null,
+      entryAccess: {
+        qrCode: this.queueEntryTokens.issue(erId, EntryChannel.QR_CODE),
+        link: this.queueEntryTokens.issue(erId, EntryChannel.LINK),
+      },
+    }
   }
 
   async createER(dto: CreateERDto, user: AuthenticatedUser) {
