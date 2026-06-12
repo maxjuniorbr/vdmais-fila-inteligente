@@ -18,4 +18,11 @@ export class UpdateERDto {
   @Min(0)
   @Max(86400)
   pauseTimeoutSeconds?: number
+
+  // Tempo máximo de chamada em segundos antes do não comparecimento (0 desativa). Máx. 24h.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(86400)
+  callTimeoutSeconds?: number
 }

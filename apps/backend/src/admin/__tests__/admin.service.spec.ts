@@ -116,6 +116,16 @@ describe('AdminService', () => {
     )
   })
 
+  it('updates callTimeoutSeconds on the ER', async () => {
+    prisma.eR.update.mockResolvedValue({ id: 'er-1', name: 'ER' })
+    await service.updateER('er-1', { callTimeoutSeconds: 900 }, user)
+    expect(prisma.eR.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ callTimeoutSeconds: 900 }),
+      }),
+    )
+  })
+
   it('creates a counter and audits it', async () => {
     prisma.counter.create.mockResolvedValue({ id: 'c-1', number: 3 })
     await service.createCounter('er-1', { number: 3 }, user)

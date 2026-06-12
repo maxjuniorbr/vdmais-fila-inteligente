@@ -1,33 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { CounterState, TicketState } from '@prisma/client'
 import { PanelGateway } from '../panel/panel.gateway'
 import { PrismaService } from '../prisma/prisma.service'
 
-const DEFAULT_CALL_TIMEOUT_MINUTES = 10
-
 /**
  * Encerra automaticamente senhas que ficaram em CHAMADA por mais tempo que a
- * tolerância operacional (a RE foi chamada e não compareceu, ou a operadora
- * abandonou o caixa sem registrar o não comparecimento). Sem isso, o caixa
- * fica preso em CALLING — não dá para chamar a próxima, fechar o caixa nem
- * encerrar o dia.
+ * tolerância operacional do ER (a RE foi chamada e não compareceu, ou a
+ * operadora abandonou o caixa sem registrar o não comparecimento). Sem isso,
+ * o caixa fica preso em CALLING — não dá para chamar a próxima, fechar o
+ * caixa nem encerrar o dia. A tolerância é configurável por ER via
+ * callTimeoutSeconds; 0 desativa para aquele ER.
  */
 @Injectable()
 export class TicketTimeoutService {
   private readonly logger = new Logger(TicketTimeoutService.name)
-  private readonly timeoutMs: number
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly panelGateway: PanelGateway,
-    config: ConfigService,
-  ) {
-    const minutes = Number(config.get<string>('CALL_TIMEOUT_MINUTES'))
-    this.timeoutMs =
-      (Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_CALL_TIMEOUT_MINUTES) * 60_000
-  }
+  ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
   async handleCron(): Promise<void> {
@@ -42,20 +34,30 @@ export class TicketTimeoutService {
   }
 
   /**
-   * Marca como NO_SHOW as senhas em chamada há mais que a tolerância e libera o
-   * caixa. Cada senha é resolvida na própria transação, com guarda de estado
-   * para não competir com uma ação manual concorrente (recall/no-show/início).
+   * Marca como NO_SHOW as senhas em chamada cujo ER atingiu callTimeoutSeconds
+   * e libera o caixa. Cada senha é resolvida na própria transação para não
+   * competir com ações manuais concorrentes (recall/no-show/início).
    */
   async sweepExpiredCalls(now = new Date(), erId?: string): Promise<number> {
-    const threshold = new Date(now.getTime() - this.timeoutMs)
-    const expired = await this.prisma.ticket.findMany({
+    const tickets = await this.prisma.ticket.findMany({
       where: {
         state: TicketState.CALLING,
-        calledAt: { lt: threshold },
+        er: { callTimeoutSeconds: { gt: 0 } },
         ...(erId ? { erId } : {}),
       },
-      select: { id: true, erId: true, code: true, counterId: true },
+      select: {
+        id: true,
+        erId: true,
+        code: true,
+        counterId: true,
+        calledAt: true,
+        er: { select: { callTimeoutSeconds: true } },
+      },
     })
+
+    const expired = tickets.filter(
+      (t) => t.calledAt && now.getTime() >= t.calledAt.getTime() + t.er.callTimeoutSeconds * 1000,
+    )
 
     let closedCount = 0
     for (const ticket of expired) {
