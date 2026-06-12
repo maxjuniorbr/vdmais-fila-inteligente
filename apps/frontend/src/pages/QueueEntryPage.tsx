@@ -61,7 +61,7 @@ export function QueueEntryPage() {
 
   useEffect(() => {
     if (!erId) {
-      setError('ER não encontrado.')
+      setError('Unidade não encontrada. Verifique o QR Code ou o link utilizados.')
       setLoadingER(false)
       return
     }
@@ -75,7 +75,7 @@ export function QueueEntryPage() {
         const data = (await response.json().catch(() => ({}))) as Partial<PublicER> & {
           message?: string
         }
-        if (!response.ok) throw new Error(data.message ?? 'ER não encontrado.')
+        if (!response.ok) throw new Error(data.message ?? 'Unidade não encontrada. Verifique o QR Code ou o link utilizados.')
         return {
           ...data,
           entryChannel: data.entryChannel ?? (sourceIsLink ? 'LINK' : 'QR_CODE'),
@@ -89,7 +89,7 @@ export function QueueEntryPage() {
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return
         setER(null)
-        setError(err instanceof Error ? err.message : 'Erro ao validar o ER.')
+        setError(err instanceof Error ? err.message : 'Não foi possível carregar os dados da unidade. Tente novamente.')
       })
       .finally(() => setLoadingER(false))
 
@@ -98,11 +98,11 @@ export function QueueEntryPage() {
 
   function confirmEntry() {
     if (!erId || !er?.isDayOpen) {
-      setError('A operação deste ER está encerrada.')
+      setError('O atendimento está encerrado no momento.')
       return false
     }
     if (isLink && !erConfirmed) {
-      setError('Confirme o ER antes de continuar.')
+      setError('Confirme sua entrada antes de continuar.')
       return false
     }
 
@@ -215,7 +215,7 @@ export function QueueEntryPage() {
               ...(er.isDayOpen ? styles.statusOpen : styles.statusClosed),
             }}
           >
-            {er.isDayOpen ? 'Operação aberta' : 'Operação encerrada'}
+            {er.isDayOpen ? 'Atendimento aberto' : 'Atendimento encerrado'}
           </span>
           {isLink && er.isDayOpen && (
             <label style={styles.confirmLabel}>
@@ -225,7 +225,7 @@ export function QueueEntryPage() {
                 checked={erConfirmed}
                 onChange={(event) => setERConfirmed(event.target.checked)}
               />
-              <span>Confirmo que desejo entrar na fila deste ER</span>
+              <span>Confirmo que quero entrar na fila</span>
             </label>
           )}
         </section>
