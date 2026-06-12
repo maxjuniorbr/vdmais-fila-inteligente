@@ -76,12 +76,6 @@ export function QueueEntryPage() {
     return () => controller.abort()
   }, [erId])
 
-  useEffect(() => {
-    if (!erId || sessionStorage.getItem(`queue-entry-started:${erId}`)) return
-    sessionStorage.setItem(`queue-entry-started:${erId}`, '1')
-    void fetch(`/api/telemetry/queue-entry/${erId}`, { method: 'POST' })
-  }, [erId])
-
   function confirmEntry() {
     if (!erId || !er?.isDayOpen) {
       setError('A operação deste ER está encerrada.')
