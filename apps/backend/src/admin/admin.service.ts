@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
+import { PanelTokenService } from '../panel/panel-token.service'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { CreateERDto } from './dto/create-er.dto'
 import { UpdateERDto } from './dto/update-er.dto'
@@ -24,6 +25,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly panelTokens: PanelTokenService,
   ) {}
 
   listERs() {
@@ -50,7 +52,8 @@ export class AdminService {
       },
     })
     if (!er) throw new NotFoundException('ER não encontrado')
-    return er
+    const { panelTokenHash, ...rest } = er
+    return { ...rest, hasPanelToken: panelTokenHash !== null }
   }
 
   async createER(dto: CreateERDto, user: AuthenticatedUser) {
@@ -143,6 +146,28 @@ export class AdminService {
       }
       throw error
     }
+  }
+
+  async rotatePanelToken(erId: string, user: AuthenticatedUser) {
+    await this._assertERExists(erId)
+    const token = await this.panelTokens.rotate(erId)
+    await this.auditLog.log({
+      eventType: 'panel_token_rotated',
+      erId,
+      operatorId: user.userId,
+    })
+    return { token }
+  }
+
+  async revokePanelToken(erId: string, user: AuthenticatedUser) {
+    await this._assertERExists(erId)
+    await this.panelTokens.revoke(erId)
+    await this.auditLog.log({
+      eventType: 'panel_token_revoked',
+      erId,
+      operatorId: user.userId,
+    })
+    return { revoked: true }
   }
 
   private async _assertERExists(erId: string) {

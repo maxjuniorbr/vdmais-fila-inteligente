@@ -1,15 +1,19 @@
 import { AuditLogService } from '../../audit-log/audit-log.service'
+import { PanelAccessService } from '../panel-access.service'
 import { PanelGateway } from '../panel.gateway'
 
 const auditLog = {
   log: jest.fn().mockResolvedValue(undefined),
   logIfERExists: jest.fn().mockResolvedValue(undefined),
 }
+const access = { authorize: jest.fn() }
 
-function makeClient() {
+function makeClient(authToken?: string) {
   return {
     id: 'socket-1',
     join: jest.fn(),
+    emit: jest.fn(),
+    handshake: { auth: { token: authToken } },
     data: {} as Record<string, unknown>,
   }
 }
@@ -20,7 +24,11 @@ describe('PanelGateway', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    gateway = new PanelGateway(auditLog as unknown as AuditLogService)
+    access.authorize.mockResolvedValue(true)
+    gateway = new PanelGateway(
+      auditLog as unknown as AuditLogService,
+      access as unknown as PanelAccessService,
+    )
     emit = jest.fn()
     gateway.server = { to: jest.fn(() => ({ emit })) } as never
   })
@@ -38,9 +46,19 @@ describe('PanelGateway', () => {
     )
   })
 
-  it('joins the ER room for a valid panel client', () => {
+  it('joins an authorized panel client with its display token', async () => {
     const client = makeClient()
-    gateway.handleJoinER({ erId: 'er-1234567890', clientType: 'panel' }, client as never)
+    await gateway.handleJoinER(
+      { erId: 'er-1234567890', clientType: 'panel', token: 'display-token' },
+      client as never,
+    )
+    expect(access.authorize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        erId: 'er-1234567890',
+        clientType: 'panel',
+        panelToken: 'display-token',
+      }),
+    )
     expect(client.join).toHaveBeenCalledWith('er:er-1234567890')
     expect(client.data.panelER).toBe('er-1234567890')
     expect(auditLog.logIfERExists).toHaveBeenCalledWith(
@@ -48,16 +66,34 @@ describe('PanelGateway', () => {
     )
   })
 
-  it('accepts a plain string body without auditing a panel connection', () => {
-    const client = makeClient()
-    gateway.handleJoinER('er-1234567890', client as never)
+  it('joins an authorized staff client using the handshake token without auditing a panel connection', async () => {
+    const client = makeClient('staff-jwt')
+    await gateway.handleJoinER(
+      { erId: 'er-1234567890', clientType: 'dashboard' },
+      client as never,
+    )
+    expect(access.authorize).toHaveBeenCalledWith(
+      expect.objectContaining({ staffToken: 'staff-jwt' }),
+    )
     expect(client.join).toHaveBeenCalledWith('er:er-1234567890')
     expect(auditLog.logIfERExists).not.toHaveBeenCalled()
   })
 
-  it('ignores an invalid erId', () => {
+  it('denies and never joins when authorization fails', async () => {
+    access.authorize.mockResolvedValue(false)
     const client = makeClient()
-    gateway.handleJoinER({ erId: 'short' }, client as never)
+    await gateway.handleJoinER(
+      { erId: 'er-1234567890', clientType: 'panel', token: 'wrong' },
+      client as never,
+    )
+    expect(client.join).not.toHaveBeenCalled()
+    expect(client.emit).toHaveBeenCalledWith('joinER.denied', { erId: 'er-1234567890' })
+  })
+
+  it('ignores an invalid erId without checking authorization', async () => {
+    const client = makeClient()
+    await gateway.handleJoinER({ erId: 'short' }, client as never)
+    expect(access.authorize).not.toHaveBeenCalled()
     expect(client.join).not.toHaveBeenCalled()
   })
 

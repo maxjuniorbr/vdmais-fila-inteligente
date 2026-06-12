@@ -8,6 +8,7 @@ import {
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { AuditLogService } from '../audit-log/audit-log.service'
+import { PanelAccessService } from './panel-access.service'
 
 @WebSocketGateway({
   cors: {
@@ -16,7 +17,10 @@ import { AuditLogService } from '../audit-log/audit-log.service'
   },
 })
 export class PanelGateway implements OnGatewayDisconnect {
-  constructor(private readonly auditLog: AuditLogService) {}
+  constructor(
+    private readonly auditLog: AuditLogService,
+    private readonly access: PanelAccessService,
+  ) {}
 
   @WebSocketServer()
   server!: Server
@@ -35,13 +39,22 @@ export class PanelGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('joinER')
-  handleJoinER(@MessageBody() body: unknown, @ConnectedSocket() client: Socket) {
+  async handleJoinER(@MessageBody() body: unknown, @ConnectedSocket() client: Socket) {
     const erId = this._extractErId(body)
-    const clientType =
-      body && typeof body === 'object' && 'clientType' in body
-        ? (body as { clientType?: unknown }).clientType
-        : undefined
     if (typeof erId !== 'string' || erId.length < 10 || erId.length > 40) return
+
+    const clientType = this._readField(body, 'clientType')
+    const authorized = await this.access.authorize({
+      erId,
+      clientType,
+      panelToken: this._asString(this._readField(body, 'token')),
+      staffToken: this._asString(client.handshake?.auth?.['token']),
+    })
+    if (!authorized) {
+      client.emit('joinER.denied', { erId })
+      return
+    }
+
     client.join(`er:${erId}`)
     if (clientType === 'panel') {
       client.data.panelER = erId
@@ -57,10 +70,18 @@ export class PanelGateway implements OnGatewayDisconnect {
 
   private _extractErId(body: unknown): unknown {
     if (typeof body === 'string') return body
-    if (body && typeof body === 'object' && 'erId' in body) {
-      return (body as { erId?: unknown }).erId
+    return this._readField(body, 'erId')
+  }
+
+  private _readField(body: unknown, field: string): unknown {
+    if (body && typeof body === 'object' && field in body) {
+      return (body as Record<string, unknown>)[field]
     }
     return undefined
+  }
+
+  private _asString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value : undefined
   }
 
   handleDisconnect(client: Socket) {

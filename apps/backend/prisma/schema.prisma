@@ -73,6 +73,10 @@ model ER {
   // pronta"). Ao estourar, a senha é cancelada automaticamente. 0 desativa.
   pauseTimeoutSeconds Int @default(300)
 
+  // Hash do token de exibição do painel (TV). O token em claro é mostrado uma
+  // única vez na administração; aqui guardamos só o hash. Nulo = sem acesso.
+  panelTokenHash String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

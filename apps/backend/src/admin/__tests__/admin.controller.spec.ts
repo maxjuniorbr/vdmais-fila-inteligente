@@ -9,6 +9,8 @@ const service = {
   updateER: jest.fn(),
   createCounter: jest.fn(),
   createStaff: jest.fn(),
+  rotatePanelToken: jest.fn(),
+  revokePanelToken: jest.fn(),
 }
 const req = { user: { userId: 'admin-1', role: Role.ADMIN, erId: undefined } }
 
@@ -52,5 +54,15 @@ describe('AdminController', () => {
     const dto = { name: 'X', email: 'x@x.com', password: 'segredo123', role: Role.OPERATOR }
     controller.createStaff('er-1', dto, req)
     expect(service.createStaff).toHaveBeenCalledWith('er-1', dto, req.user)
+  })
+
+  it('delegates rotatePanelToken', () => {
+    controller.rotatePanelToken('er-1', req)
+    expect(service.rotatePanelToken).toHaveBeenCalledWith('er-1', req.user)
+  })
+
+  it('delegates revokePanelToken', () => {
+    controller.revokePanelToken('er-1', req)
+    expect(service.revokePanelToken).toHaveBeenCalledWith('er-1', req.user)
   })
 })

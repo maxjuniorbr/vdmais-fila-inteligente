@@ -43,6 +43,7 @@ interface Staff {
 interface ERDetail extends Omit<ERSummary, '_count'> {
   counters: Counter[]
   operators: Staff[]
+  hasPanelToken: boolean
 }
 
 export function AdminPage() {
@@ -331,13 +332,26 @@ function ERDetailSection({
             description="Compartilhe como alternativa ao QR Code. A RE deverá confirmar o ER."
             openLabel="Testar link"
           />
-          <CopyField
-            label="Painel de TV"
-            value={panelUrl}
-            description="Abra este endereço no navegador conectado à TV do ER."
-            openLabel="Abrir painel"
-          />
         </div>
+      </section>
+
+      <section style={styles.innerSection}>
+        <div style={styles.sectionHeader}>
+          <div>
+            <h3 style={styles.sectionTitle}>Painel de TV</h3>
+            <p style={styles.sectionDescription}>
+              O painel só abre com um token de acesso. Gere o token, configure a URL na TV e
+              revogue a qualquer momento se o endereço vazar.
+            </p>
+          </div>
+        </div>
+        <PanelAccessManager
+          erId={er.id}
+          panelUrl={panelUrl}
+          hasPanelToken={er.hasPanelToken}
+          onChanged={refresh}
+          onError={setError}
+        />
       </section>
 
       <section style={styles.innerSection}>
@@ -628,6 +642,113 @@ function CreateStaffForm({
   )
 }
 
+function PanelAccessManager({
+  erId,
+  panelUrl,
+  hasPanelToken,
+  onChanged,
+  onError,
+}: Readonly<{
+  erId: string
+  panelUrl: string
+  hasPanelToken: boolean
+  onChanged: () => Promise<void>
+  onError: (message: string | null) => void
+}>) {
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState<'rotate' | 'revoke' | null>(null)
+  const { showToast } = useToast()
+
+  async function rotate() {
+    setLoading('rotate')
+    try {
+      const { token } = await api.post<{ token: string }>(`/admin/ers/${erId}/panel-token`)
+      setGeneratedUrl(`${panelUrl}?token=${token}`)
+      onError(null)
+      await onChanged()
+      showToast('Token gerado. Copie agora: ele não será exibido novamente.', 'success')
+    } catch (err: unknown) {
+      onError(err instanceof Error ? err.message : 'Erro ao gerar token do painel')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function revoke() {
+    setLoading('revoke')
+    try {
+      await api.delete(`/admin/ers/${erId}/panel-token`)
+      setGeneratedUrl(null)
+      onError(null)
+      await onChanged()
+      showToast('Acesso do painel revogado.', 'success')
+    } catch (err: unknown) {
+      onError(err instanceof Error ? err.message : 'Erro ao revogar token do painel')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  return (
+    <div style={styles.panelManager}>
+      <div style={styles.panelStatusRow}>
+        <Badge tone={hasPanelToken ? 'success' : 'neutral'}>
+          {hasPanelToken ? 'Acesso configurado' : 'Sem acesso'}
+        </Badge>
+        <div style={styles.panelActions}>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            onClick={rotate}
+            disabled={loading !== null}
+          >
+            {resolveRotateLabel(loading === 'rotate', hasPanelToken)}
+          </Button>
+          {hasPanelToken && (
+            <Button
+              variant="danger"
+              size="sm"
+              type="button"
+              onClick={revoke}
+              disabled={loading !== null}
+            >
+              {loading === 'revoke' ? 'Revogando...' : 'Revogar acesso'}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {generatedUrl && (
+        <>
+          <Alert tone="warning">
+            Copie a URL agora. Por segurança, o token não será exibido novamente. Gerar um novo
+            token invalida a TV configurada anteriormente.
+          </Alert>
+          <CopyField
+            label="URL do painel com token"
+            value={generatedUrl}
+            description="Abra este endereço no navegador conectado à TV do ER."
+            openLabel="Abrir painel"
+          />
+        </>
+      )}
+
+      {!generatedUrl && hasPanelToken && (
+        <p style={styles.sectionDescription}>
+          Um token já está ativo. Gere um novo apenas para substituir o acesso da TV; isso
+          invalida o endereço anterior imediatamente.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function resolveRotateLabel(isLoading: boolean, hasPanelToken: boolean): string {
+  if (isLoading) return 'Gerando...'
+  return hasPanelToken ? 'Gerar novo token' : 'Gerar token de acesso'
+}
+
 const styles: Record<string, React.CSSProperties> = {
   ...layout,
   content: {
@@ -835,5 +956,22 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gap: `${brand.spacing[4]}px`,
     width: '100%',
+  },
+  panelManager: {
+    display: 'grid',
+    gap: `${brand.spacing[16]}px`,
+  },
+  panelStatusRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: `${brand.spacing[12]}px`,
+    flexWrap: 'wrap',
+  },
+  panelActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: `${brand.spacing[8]}px`,
+    flexWrap: 'wrap',
   },
 }

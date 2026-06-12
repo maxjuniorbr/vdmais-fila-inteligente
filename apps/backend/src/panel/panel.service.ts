@@ -33,7 +33,7 @@ export class PanelService {
       this.prisma.ticket.findMany({
         where: { erId, state: TicketState.WAITING },
         orderBy: { queuePosition: 'asc' },
-        select: { id: true, code: true, queuePosition: true, createdAt: true },
+        select: { code: true },
       }),
       this.prisma.ticket.findMany({
         where: {
@@ -55,21 +55,22 @@ export class PanelService {
     ])
 
     const presentCall = (ticket: (typeof callingTickets)[number]) => ({
-      ticketId: ticket.id,
       code: ticket.code,
       displayName: abbreviateName(ticket.representative.fullName),
       counterNumber: ticket.counter?.number ?? 0,
-      calledAt: ticket.calledAt,
     })
 
     const calling = callingTickets.map(presentCall)
-    // The most recently called ticket (for highlight + telemetry / back-compat).
-    const current =
-      calling.length === 0
-        ? null
-        : [...calling].sort(
-            (a, b) => (b.calledAt?.getTime() ?? 0) - (a.calledAt?.getTime() ?? 0),
-          )[0]
+    // The most recently called ticket drives the highlight. calledAt is used
+    // only here; it never leaves the server in the public payload.
+    const mostRecent = callingTickets.reduce(
+      (best, ticket, index) =>
+        (ticket.calledAt?.getTime() ?? 0) > (callingTickets[best]?.calledAt?.getTime() ?? 0)
+          ? index
+          : best,
+      0,
+    )
+    const current = calling.length === 0 ? null : calling[mostRecent]
 
     const durations = finishedToday
       .map((t) => (t.serviceFinishedAt!.getTime() - t.serviceStartedAt!.getTime()) / 1000)
@@ -95,15 +96,12 @@ export class PanelService {
       current,
       calling,
       inService: inService.map((ticket) => ({
-        ticketId: ticket.id,
         code: ticket.code,
         counterNumber: ticket.counter?.number ?? 0,
       })),
       waiting: waiting.map((ticket, index) => ({
-        ticketId: ticket.id,
         code: ticket.code,
         position: index + 1,
-        createdAt: ticket.createdAt,
       })),
       avgServiceSeconds,
       avgWaitSeconds,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
 
-export function useSocket(erId: string, clientType = 'dashboard') {
+export function useSocket(erId: string, clientType = 'dashboard', authToken?: string) {
   const [socket, setSocket] = useState<Socket | null>(null)
 
   useEffect(() => {
@@ -19,12 +19,12 @@ export function useSocket(erId: string, clientType = 'dashboard') {
       reconnectionAttempts: Infinity,
       reconnectionDelay: 2000,
     })
-    s.on('connect', () => s.emit('joinER', { erId, clientType }))
+    s.on('connect', () => s.emit('joinER', { erId, clientType, token: authToken }))
     setSocket(s)
     return () => {
       s.disconnect()
     }
-  }, [clientType, erId])
+  }, [authToken, clientType, erId])
 
   return socket
 }
