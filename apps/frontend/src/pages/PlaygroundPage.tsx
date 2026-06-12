@@ -28,6 +28,11 @@ import { layout } from '../styles/layout'
 
 type Tab = 'componentes' | 'formulario' | 'estados' | 'interacoes'
 type DataState = 'ideal' | 'carregando' | 'vazio'
+const DATA_STATE_LABEL: Record<DataState, string> = {
+  ideal: 'Ideal',
+  carregando: 'Carregando',
+  vazio: 'Vazio',
+}
 type Overlay = null | 'modal' | 'sheet' | 'drawer'
 
 const TABS: { id: Tab; label: string }[] = [
@@ -316,7 +321,7 @@ function PlaygroundInner() {
                     ...(dataState === state ? styles.segmentActive : null),
                   }}
                 >
-                  {state === 'ideal' ? 'Ideal' : state === 'carregando' ? 'Carregando' : 'Vazio'}
+                  {DATA_STATE_LABEL[state]}
                 </button>
               ))}
             </nav>

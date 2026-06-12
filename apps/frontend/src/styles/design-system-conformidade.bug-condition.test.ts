@@ -105,15 +105,17 @@ describe('Violation 1.7 — format.ts ausente', () => {
     const formatPath = resolve(__dirname, '../utils/format.ts')
     const formatJsPath = resolve(__dirname, '../utils/format.js')
 
-    fc.assert(
-      fc.property(
-        fc.date({ min: new Date('2000-01-01'), max: new Date('2099-12-31') }),
-        (_date) => {
-          const moduleExists = existsSync(formatPath) || existsSync(formatJsPath)
-          return moduleExists === true
-        },
+    expect(() =>
+      fc.assert(
+        fc.property(
+          fc.date({ min: new Date('2000-01-01'), max: new Date('2099-12-31') }),
+          (_date) => {
+            const moduleExists = existsSync(formatPath) || existsSync(formatJsPath)
+            return moduleExists === true
+          },
+        ),
       ),
-    )
+    ).not.toThrow()
   })
 })
 
@@ -133,24 +135,26 @@ describe('Violation 1.3 + 1.5 — layout.ts usa literais fora da escala', () => 
       return
     }
 
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...spacingValues),
-        ({ key, rawValue }) => {
-          const pxValue = remToPx(rawValue)
-          const isInScale = VALID_SPACING_SET.has(Math.round(pxValue))
-          if (!isInScale) {
-            const nearest = nearestScale(pxValue)
-            throw new Error(
-              `[VIOLATION] ${key} = "${rawValue}" (~${pxValue.toFixed(1)}px) ` +
-              `não pertence à escala {4,8,12,16,20,24,32,48}px. ` +
-              `Valor mais próximo da escala: ${nearest}px`,
-            )
-          }
-          return true
-        },
+    expect(() =>
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...spacingValues),
+          ({ key, rawValue }) => {
+            const pxValue = remToPx(rawValue)
+            const isInScale = VALID_SPACING_SET.has(Math.round(pxValue))
+            if (!isInScale) {
+              const nearest = nearestScale(pxValue)
+              throw new Error(
+                `[VIOLATION] ${key} = "${rawValue}" (~${pxValue.toFixed(1)}px) ` +
+                `não pertence à escala {4,8,12,16,20,24,32,48}px. ` +
+                `Valor mais próximo da escala: ${nearest}px`,
+              )
+            }
+            return true
+          },
+        ),
       ),
-    )
+    ).not.toThrow()
   })
 
   it('[BUG CONDITION] layout.ts contém valores de borderRadius fora de {4, 8, 16, 40}', () => {

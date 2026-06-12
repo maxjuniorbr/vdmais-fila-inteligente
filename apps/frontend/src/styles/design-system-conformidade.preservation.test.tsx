@@ -41,28 +41,30 @@ describe('Preservation 3.1 — Alert: role="alert" when tone="error", absent oth
    * Validates: Requirements 3.1
    */
   it('[PBT] role="alert" present when tone="error", absent for all other tones', () => {
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...ALL_TONES),
-        (tone: Tone) => {
-          const { container, unmount } = render(
-            <Alert tone={tone}>Mensagem de teste</Alert>,
-          )
+    expect(() =>
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...ALL_TONES),
+          (tone: Tone) => {
+            const { container, unmount } = render(
+              <Alert tone={tone}>Mensagem de teste</Alert>,
+            )
 
-          if (tone === 'error') {
-            const alertEl = container.querySelector('[role="alert"]')
-            const hasAlert = alertEl !== null
-            unmount()
-            return hasAlert
-          } else {
-            const alertEl = container.querySelector('[role="alert"]')
-            const hasNoAlert = alertEl === null
-            unmount()
-            return hasNoAlert
-          }
-        },
+            if (tone === 'error') {
+              const alertEl = container.querySelector('[role="alert"]')
+              const hasAlert = alertEl !== null
+              unmount()
+              return hasAlert
+            } else {
+              const alertEl = container.querySelector('[role="alert"]')
+              const hasNoAlert = alertEl === null
+              unmount()
+              return hasNoAlert
+            }
+          },
+        ),
       ),
-    )
+    ).not.toThrow()
   })
 
   it('tone="error" renders a div with role="alert"', () => {
@@ -104,47 +106,49 @@ describe('Preservation 3.2 — Button minHeight WCAG touch targets', () => {
    * Validates: Requirements 3.2
    */
   it('[PBT] md button always has minHeight >= 44, sm button always has minHeight >= 36', () => {
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...ALL_SIZES),
-        fc.constantFrom(...ALL_VARIANTS),
-        (size: Size, variant: Variant) => {
-          const { container, unmount } = render(
-            <Button size={size} variant={variant}>
-              Ação
-            </Button>,
-          )
+    expect(() =>
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...ALL_SIZES),
+          fc.constantFrom(...ALL_VARIANTS),
+          (size: Size, variant: Variant) => {
+            const { container, unmount } = render(
+              <Button size={size} variant={variant}>
+                Ação
+              </Button>,
+            )
 
-          const btn = container.querySelector('button')
-          if (!btn) {
-            unmount()
-            return false
-          }
-
-          const inlineMinHeight = btn.style.minHeight
-
-          let minHeightValue: number | null = null
-          if (inlineMinHeight) {
-            const parsed = Number.parseFloat(inlineMinHeight)
-            if (!Number.isNaN(parsed)) minHeightValue = parsed
-          }
-
-          unmount()
-
-          if (size === 'md') {
-            const variantStyles: Record<Variant, React.CSSProperties> = {
-              primary: layout.primaryButton,
-              secondary: layout.ghostButton,
-              danger: layout.dangerButton,
+            const btn = container.querySelector('button')
+            if (!btn) {
+              unmount()
+              return false
             }
-            const mdMinHeight = variantStyles[variant].minHeight
-            return typeof mdMinHeight === 'number' && mdMinHeight >= 44
-          } else {
-            return minHeightValue !== null && minHeightValue >= 36
-          }
-        },
+
+            const inlineMinHeight = btn.style.minHeight
+
+            let minHeightValue: number | null = null
+            if (inlineMinHeight) {
+              const parsed = Number.parseFloat(inlineMinHeight)
+              if (!Number.isNaN(parsed)) minHeightValue = parsed
+            }
+
+            unmount()
+
+            if (size === 'md') {
+              const variantStyles: Record<Variant, React.CSSProperties> = {
+                primary: layout.primaryButton,
+                secondary: layout.ghostButton,
+                danger: layout.dangerButton,
+              }
+              const mdMinHeight = variantStyles[variant].minHeight
+              return typeof mdMinHeight === 'number' && mdMinHeight >= 44
+            } else {
+              return minHeightValue !== null && minHeightValue >= 36
+            }
+          },
+        ),
       ),
-    )
+    ).not.toThrow()
   })
 
   it('layout.primaryButton has minHeight: 44 (WCAG 2.5.5)', () => {
@@ -228,15 +232,17 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
   it('[PBT] every existing color token keeps its hex value unchanged', () => {
     const tokenEntries = Object.entries(EXPECTED_COLOR_TOKENS) as [ColorTokenKey, string][]
 
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...tokenEntries),
-        ([tokenName, expectedHex]) => {
-          const actualHex = (brand as Record<string, unknown>)[tokenName]
-          return actualHex === expectedHex
-        },
+    expect(() =>
+      fc.assert(
+        fc.property(
+          fc.constantFrom(...tokenEntries),
+          ([tokenName, expectedHex]) => {
+            const actualHex = (brand as Record<string, unknown>)[tokenName]
+            return actualHex === expectedHex
+          },
+        ),
       ),
-    )
+    ).not.toThrow()
   })
 
   it('brand.actionable === "#264fec" (primary action color)', () => {
