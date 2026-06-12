@@ -54,7 +54,9 @@ Relacionamento e precisa ser atendida.
 **Ações disponíveis na tela da senha:**
 
 - **Pausar ("Não estou pronta"):** sai temporariamente da fila sem perder o
-  cadastro. O tempo pausado **não conta** nas métricas de espera.
+  cadastro. O tempo pausado **não conta** nas métricas de espera. A pausa tem
+  tolerância (padrão 5 min): se a RE não retomar a tempo, a senha é **cancelada**
+  automaticamente e ela precisa entrar de novo.
 - **Retomar:** volta para o **fim** da fila (recebe nova posição).
 - **Sair da fila:** cancela a própria senha. Para voltar, precisa entrar de novo.
 
@@ -89,8 +91,8 @@ Relacionamento e precisa ser atendida.
    - **Finalizar atendimento:** conclui; o caixa volta a ficar disponível para a
      próxima chamada.
 3. Se a RE **não aparece de imediato**:
-   - **Rechamar:** dispara uma **segunda chamada** da mesma senha (re-anuncia e
-     faz o cartão piscar de novo no painel), **sem mexer na fila**.
+   - **Chamar novamente:** dispara uma **segunda chamada** da mesma senha (re-anuncia
+     e faz o cartão piscar de novo no painel), **sem mexer na fila**.
    - **Não compareceu:** encerra a senha como _não compareceu_ e libera o caixa.
 
 > Se a senha ficar em chamada além da tolerância (padrão 10 min) sem ação, o
@@ -220,6 +222,9 @@ administração: a URL da TV inclui `?token=...`. Sem token válido, o painel
   cabem na tela, para que toda a fila apareça ao longo do tempo.
 - **Tempos médios:** espera e atendimento.
 - **Cabeçalho:** título e relógio com data e hora (com segundos).
+- **Operação encerrada:** com o dia fechado, a TV troca o quadro de chamadas por
+  uma tela **"Atendimento encerrado por hoje"** (cabeçalho e relógio seguem
+  visíveis), em vez de parecer uma fila vazia em operação.
 
 **Privacidade:** o painel mostra apenas a senha, o **primeiro nome + inicial** e o
 caixa de destino. Nunca expõe CPF, telefone, código completo de RE ou data de
@@ -234,7 +239,7 @@ Aguardando → Chamando → Em atendimento → Finalizado
                  │              
                  ├─→ Não compareceu  (operadora; pode restaurar → Aguardando, no fim)
                  ├─→ Não compareceu  (automático: tempo limite de chamada excedido)
-                 └─→ Rechamar        (operadora; segunda chamada, continua Chamando)
+                 └─→ Chamar novamente (operadora; segunda chamada, continua Chamando)
 
 Aguardando → Pausado → Aguardando (RE pausa/retoma; volta ao fim da fila de hoje)
 Aguardando/Pausado → Cancelado    (RE sai da fila, ou staff cancela com motivo)
