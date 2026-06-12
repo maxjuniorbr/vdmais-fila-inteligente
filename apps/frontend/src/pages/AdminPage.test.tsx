@@ -44,6 +44,7 @@ describe('AdminPage', () => {
         qrCodeUrl: null,
         isDayOpen: true,
         pauseTimeoutSeconds: 300,
+        callTimeoutSeconds: 600,
         createdAt: '2026-01-01T12:00:00.000Z',
         _count: { counters: 3, operators: 5 },
       },
@@ -84,6 +85,7 @@ const erDetail = {
   qrCodeUrl: null,
   isDayOpen: true,
   pauseTimeoutSeconds: 300,
+  callTimeoutSeconds: 600,
   createdAt: '2026-01-01T12:00:00.000Z',
   counters: [{ id: 'c1', number: 1, state: 'ACTIVE' }],
   operators: [
@@ -108,6 +110,7 @@ const erSummary = {
   qrCodeUrl: null,
   isDayOpen: true,
   pauseTimeoutSeconds: 300,
+  callTimeoutSeconds: 600,
   createdAt: '2026-01-01T12:00:00.000Z',
   _count: { counters: 1, operators: 1 },
 }
@@ -187,6 +190,7 @@ describe('AdminPage — ER management', () => {
       expect(api.patch).toHaveBeenCalledWith('/admin/ers/er-1', {
         name: 'ER Renomeado',
         pauseTimeoutSeconds: 300,
+        callTimeoutSeconds: 600,
       }),
     )
   })

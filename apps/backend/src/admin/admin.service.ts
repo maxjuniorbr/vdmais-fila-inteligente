@@ -39,6 +39,7 @@ export class AdminService {
         qrCodeUrl: true,
         isDayOpen: true,
         pauseTimeoutSeconds: true,
+        callTimeoutSeconds: true,
         createdAt: true,
         _count: { select: { counters: true, operators: true } },
       },
@@ -73,6 +74,9 @@ export class AdminService {
         ...(dto.pauseTimeoutSeconds === undefined
           ? {}
           : { pauseTimeoutSeconds: dto.pauseTimeoutSeconds }),
+        ...(dto.callTimeoutSeconds === undefined
+          ? {}
+          : { callTimeoutSeconds: dto.callTimeoutSeconds }),
       },
     })
     await this.auditLog.log({
@@ -94,6 +98,9 @@ export class AdminService {
         ...(dto.pauseTimeoutSeconds === undefined
           ? {}
           : { pauseTimeoutSeconds: dto.pauseTimeoutSeconds }),
+        ...(dto.callTimeoutSeconds === undefined
+          ? {}
+          : { callTimeoutSeconds: dto.callTimeoutSeconds }),
       },
     })
     await this.auditLog.log({

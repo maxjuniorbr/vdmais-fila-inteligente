@@ -490,7 +490,7 @@ compareceu, ou a operadora saiu sem registrar o não comparecimento, travando o
 caixa).
 
 1. O sistema verifica periodicamente as senhas em **Chamando**.
-2. Quando uma senha passa da tolerância configurável (`CALL_TIMEOUT_MINUTES`,
+2. Quando uma senha passa da tolerância configurável por ER (`callTimeoutSeconds`,
    padrão 10 minutos), ela é marcada como **Não compareceu** automaticamente.
 3. O caixa é liberado (volta para **Ativo**) e o painel é atualizado.
 4. O evento `ticket_auto_no_show` registra o encerramento; ele **conta** como

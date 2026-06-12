@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config'
 import { Logger } from '@nestjs/common'
 import { CounterState, TicketState } from '@prisma/client'
 import { PanelGateway } from '../../panel/panel.gateway'
@@ -18,13 +17,21 @@ const prisma = {
 
 const panel = { emitToER: jest.fn() }
 
-function buildService(minutes = '10') {
-  const config = { get: jest.fn().mockReturnValue(minutes) } as unknown as ConfigService
+function buildService() {
   return new TicketTimeoutService(
     prisma as unknown as PrismaService,
     panel as unknown as PanelGateway,
-    config,
   )
+}
+
+function makeTicket(
+  id: string,
+  erId: string,
+  calledAt: Date,
+  callTimeoutSeconds: number,
+  counterId: string | null = 'c1',
+) {
+  return { id, erId, code: `${id}-code`, counterId, calledAt, er: { callTimeoutSeconds } }
 }
 
 describe('TicketTimeoutService.sweepExpiredCalls', () => {
@@ -39,28 +46,34 @@ describe('TicketTimeoutService.sweepExpiredCalls', () => {
     prisma.ticket.findMany.mockResolvedValue([])
   })
 
-  it('queries CALLING tickets older than the configured timeout', async () => {
-    const service = buildService('10')
-    const now = new Date('2026-06-11T12:00:00Z')
+  it('queries CALLING tickets from ERs with a non-zero timeout', async () => {
+    const service = buildService()
 
-    await service.sweepExpiredCalls(now)
+    await service.sweepExpiredCalls(new Date('2026-06-11T12:00:00Z'))
 
     expect(prisma.ticket.findMany).toHaveBeenCalledWith({
       where: {
         state: TicketState.CALLING,
-        calledAt: { lt: new Date('2026-06-11T11:50:00Z') },
+        er: { callTimeoutSeconds: { gt: 0 } },
       },
-      select: { id: true, erId: true, code: true, counterId: true },
+      select: {
+        id: true,
+        erId: true,
+        code: true,
+        counterId: true,
+        calledAt: true,
+        er: { select: { callTimeoutSeconds: true } },
+      },
     })
   })
 
   it('marks expired calls as no-show, frees the counter and notifies the panel', async () => {
-    prisma.ticket.findMany.mockResolvedValue([
-      { id: 't1', erId: 'er-1', code: 'A001', counterId: 'c1' },
-    ])
-    const service = buildService('10')
+    const now = new Date('2026-06-11T12:00:00Z')
+    const calledAt = new Date('2026-06-11T11:49:00Z') // 11 min ago — exceeds 600 s default
+    prisma.ticket.findMany.mockResolvedValue([makeTicket('t1', 'er-1', calledAt, 600)])
+    const service = buildService()
 
-    const closed = await service.sweepExpiredCalls(new Date('2026-06-11T12:00:00Z'))
+    const closed = await service.sweepExpiredCalls(now)
 
     expect(closed).toBe(1)
     expect(tx.ticket.updateMany).toHaveBeenCalledWith({
@@ -84,38 +97,42 @@ describe('TicketTimeoutService.sweepExpiredCalls', () => {
     )
   })
 
-  it('does not notify or count when a concurrent action already changed the ticket', async () => {
-    prisma.ticket.findMany.mockResolvedValue([
-      { id: 't1', erId: 'er-1', code: 'A001', counterId: 'c1' },
-    ])
-    tx.ticket.updateMany.mockResolvedValue({ count: 0 })
-    const service = buildService('10')
+  it('respects the per-ER timeout: skips tickets that have not yet elapsed', async () => {
+    const now = new Date('2026-06-11T12:00:00Z')
+    const calledAt = new Date('2026-06-11T11:51:00Z') // 9 min ago = 540 s
 
-    const closed = await service.sweepExpiredCalls(new Date('2026-06-11T12:00:00Z'))
+    prisma.ticket.findMany.mockResolvedValue([
+      makeTicket('t1', 'er-1', calledAt, 600), // needs 10 min → not expired
+      makeTicket('t2', 'er-2', calledAt, 300), // needs  5 min → expired (9 > 5)
+    ])
+    const service = buildService()
+
+    const closed = await service.sweepExpiredCalls(now)
+
+    expect(closed).toBe(1)
+    expect(tx.ticket.updateMany).toHaveBeenCalledTimes(1)
+    expect(tx.ticket.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: 't2' }) }),
+    )
+  })
+
+  it('does not notify or count when a concurrent action already changed the ticket', async () => {
+    const now = new Date('2026-06-11T12:00:00Z')
+    const calledAt = new Date('2026-06-11T11:49:00Z')
+    prisma.ticket.findMany.mockResolvedValue([makeTicket('t1', 'er-1', calledAt, 600)])
+    tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+    const service = buildService()
+
+    const closed = await service.sweepExpiredCalls(now)
 
     expect(closed).toBe(0)
     expect(tx.counter.updateMany).not.toHaveBeenCalled()
     expect(panel.emitToER).not.toHaveBeenCalled()
   })
 
-  it('falls back to the default timeout when the env value is invalid', async () => {
-    const service = buildService('not-a-number')
-    const now = new Date('2026-06-11T12:00:00Z')
-
-    await service.sweepExpiredCalls(now)
-
-    expect(prisma.ticket.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          calledAt: { lt: new Date('2026-06-11T11:50:00Z') },
-        }),
-      }),
-    )
-  })
-
   describe('handleCron', () => {
     it('delegates to the sweep on each tick', async () => {
-      const service = buildService('10')
+      const service = buildService()
       const sweep = jest.spyOn(service, 'sweepExpiredCalls').mockResolvedValue(2)
 
       await service.handleCron()
@@ -124,7 +141,7 @@ describe('TicketTimeoutService.sweepExpiredCalls', () => {
     })
 
     it('swallows sweep failures so the scheduler keeps running', async () => {
-      const service = buildService('10')
+      const service = buildService()
       jest.spyOn(service, 'sweepExpiredCalls').mockRejectedValue(new Error('db down'))
 
       await expect(service.handleCron()).resolves.toBeUndefined()
