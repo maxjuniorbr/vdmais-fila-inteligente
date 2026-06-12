@@ -4,7 +4,7 @@ function base64url(value: object): string {
   return btoa(JSON.stringify(value))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
-    .replace(/=+$/, '')
+    .replace(/=/g, '')
 }
 
 /** Builds a decodable (unsigned) staff JWT for tests. */

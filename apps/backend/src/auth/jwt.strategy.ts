@@ -47,7 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         where: { id: user.userId },
         select: { sessionVersion: true },
       })
-      if (!operator || operator.sessionVersion !== (payload.sv ?? 0)) {
+      if (operator?.sessionVersion !== (payload.sv ?? 0)) {
         throw new UnauthorizedException('Sessão expirada. Entre novamente.')
       }
     }

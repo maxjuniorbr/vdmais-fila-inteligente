@@ -19,20 +19,32 @@ export function BottomSheet({ title, children, onClose }: Readonly<BottomSheetPr
   }, [onClose])
 
   return createPortal(
-    <div style={styles.root} role="dialog" aria-modal="true" aria-label={title}>
+    <dialog open style={styles.root} aria-modal="true" aria-label={title}>
       <button type="button" aria-label="Fechar" style={styles.backdrop} onClick={onClose} />
       <div style={styles.sheet}>
         <span style={styles.grabber} aria-hidden="true" />
         <h2 style={styles.title}>{title}</h2>
         <div>{children}</div>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   )
 }
 
 const styles: Record<string, CSSProperties> = {
-  root: { position: 'fixed', inset: 0, zIndex: 50 },
+  root: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 50,
+    width: '100%',
+    height: '100%',
+    maxWidth: '100%',
+    maxHeight: '100%',
+    margin: 0,
+    padding: 0,
+    border: 'none',
+    background: 'transparent',
+  },
   backdrop: {
     position: 'absolute',
     inset: 0,

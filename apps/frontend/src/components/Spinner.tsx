@@ -7,9 +7,8 @@ interface SpinnerProps {
 
 export function Spinner({ size = 20, label = 'Carregando' }: Readonly<SpinnerProps>) {
   return (
-    <span
+    <output
       className="gb-spinner"
-      role="status"
       aria-label={label}
       style={{ display: 'inline-block', width: size, height: size, color: brand.actionable }}
     />

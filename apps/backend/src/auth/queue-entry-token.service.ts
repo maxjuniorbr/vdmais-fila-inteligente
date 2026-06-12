@@ -10,10 +10,10 @@ const TOKEN_AUDIENCE = 'queue-entry'
 const TOKEN_ISSUER = 'vdmais-fila-inteligente'
 const QR_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60
 const LINK_TOKEN_TTL_SECONDS = 24 * 60 * 60
-const PUBLIC_ENTRY_CHANNELS: readonly EntryChannel[] = [
+const PUBLIC_ENTRY_CHANNELS: ReadonlySet<EntryChannel> = new Set([
   EntryChannel.QR_CODE,
   EntryChannel.LINK,
-]
+])
 
 type PublicEntryChannel = (typeof EntryChannel)['QR_CODE' | 'LINK']
 
@@ -75,7 +75,7 @@ export class QueueEntryTokenService {
       if (
         payload.kind !== TOKEN_KIND ||
         payload.erId !== expectedErId ||
-        !PUBLIC_ENTRY_CHANNELS.includes(payload.entryChannel) ||
+        !PUBLIC_ENTRY_CHANNELS.has(payload.entryChannel) ||
         (expectedChannel !== undefined && payload.entryChannel !== expectedChannel)
       ) {
         throw new Error('invalid queue entry token')
