@@ -110,6 +110,28 @@ describe('CheckinAttendantPage', () => {
     expect(await screen.findByText('Falha no servidor')).toBeInTheDocument()
   })
 
+  it('returns to the login form when an authenticated request gets a 401', async () => {
+    authenticate()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString()
+        if (url.includes('/representatives/search')) {
+          return new Response(JSON.stringify({ message: 'Sessão expirada' }), { status: 401 })
+        }
+        return new Response(null, { status: 201 })
+      }),
+    )
+
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF, telefone ou código RE'), 'ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+
+    expect(await screen.findByLabelText('E-mail')).toBeInTheDocument()
+    expect(sessionStorage.getItem('token')).toBeNull()
+  })
+
   it('registers a new representative and creates the ticket', async () => {
     authenticate()
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -106,7 +106,7 @@ code and are the source of truth — do not restate hex/size literals here:
 - The JWT is the single source of truth for identity and authorization. Derive `role`, `userId`, and `erId` exclusively from `getStaffSessionProfile()`, `getStaffRole()`, and `getSessionERId()`. Never read or write raw keys like `staffRole`, `staffUserId`, or `erId` in storage.
 - Route guards call `hasStaffSession(allowedRoles)`, which validates the JWT signature, role membership, and expiration in one step. Do not reimplement this check inline.
 - Staff screens hold their authenticated state via the `useStaffSession(allowedRoles)` hook, never a raw `useState(() => hasStaffSession(...))`. The hook listens for the global `SESSION_EXPIRED_EVENT` so a server-side 401 drops the screen back to the login form.
-- The API client (`api/client.ts`) calls `notifySessionExpired()` on any 401 — it clears the session and dispatches `SESSION_EXPIRED_EVENT`. Do not add ad-hoc 401 handling in pages for calls that go through the client.
+- Every authenticated staff request must use the API client (`api/client.ts`), including fire-and-forget telemetry. The client calls `notifySessionExpired()` on any 401, clearing the session and dispatching `SESSION_EXPIRED_EVENT`; never issue authenticated staff `fetch` calls directly from pages.
 - `sessionStorage` holds only the opaque JWT (`token`) and a display-only name (`userName`). State scoped to UI context (current counter, management ER) lives in `counterId`/`managementErId` — these are UI state, not security-sensitive.
 
 ## PII display
