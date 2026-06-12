@@ -1,54 +1,85 @@
 /*
- * VD+ Fila Inteligente — tema Grupo Boticário (white theme)
- * Tokens de marca, reset, acessibilidade e utilitários responsivos.
+ * VD+ Fila Inteligente — tema white (sistema de design semântico)
+ * Tokens de design, reset, acessibilidade e utilitários responsivos.
+ * Espelha apps/frontend/src/styles/brand.ts — os dois nunca devem divergir.
  */
 
 :root {
-  /* Verdes institucionais (Boticário — verde profundo Pantone 343 e apoios) */
-  --gb-green-900: #00301f;
-  --gb-green-800: #00422c;
-  --gb-green-700: #00543d; /* primário — contraste AAA com branco */
-  --gb-green-600: #056b4c;
-  --gb-green-500: #0d8a5f;
-  --gb-green-400: #2fae7d;
-  --gb-green-100: #d3ecdf;
-  --gb-green-50: #ecf7f1;
+  /* ── Background ─────────────────────────────────────────────── */
+  --gb-surface: #ffffff; /* background/primary */
+  --gb-canvas: #f5f5f5; /* background/secondary */
+  --gb-canvas-warm: #f5f1eb; /* background/tertiary */
+  --gb-overlay: rgba(0, 0, 0, 0.48); /* background/overlay */
 
-  /* Apoio dourado (acentos pontuais, par clássico do verde Boticário) */
-  --gb-gold-600: #a87b2d;
-  --gb-gold-400: #d4a843;
+  /* ── Non Interactive (texto) ───────────────────────────────── */
+  --gb-ink: #222222; /* predominant */
+  --gb-ink-soft: #444444;
+  --gb-ink-muted: #666666; /* auxiliar */
+  --gb-emphasis: #00325f;
 
-  /* Neutros */
-  --gb-ink: #1c2b25;
-  --gb-ink-soft: #44574e;
-  --gb-ink-muted: #5f7369;
-  --gb-surface: #ffffff;
-  --gb-canvas: #f4f9f6;
-  --gb-border: #dbe8e1;
-  --gb-border-strong: #c2d6cb;
+  /* ── Non Interactive / Outline (bordas e divisores) ─────────── */
+  --gb-border: #e2e2e2;
+  --gb-border-strong: #c4c4c4;
+  --gb-border-muted: #94a3b8;
+  --gb-outline: rgba(0, 0, 0, 0.15);
 
-  /* Feedback */
-  --gb-danger: #b3261e;
-  --gb-danger-soft: #fdeceb;
-  --gb-warning: #8a5a00;
-  --gb-warning-soft: #fff4dd;
-  --gb-success: #00543d;
-  --gb-success-soft: #ecf7f1;
+  /* ── Link ───────────────────────────────────────────────────── */
+  --gb-link: #264fec;
+  --gb-link-hover: #002ec9;
+  --gb-link-visited: #4c2c91;
 
-  --gb-radius: 12px;
-  --gb-shadow: 0 1px 2px rgba(0, 48, 31, 0.06), 0 4px 16px rgba(0, 48, 31, 0.05);
+  /* ── Actionable (ação primária) ─────────────────────────────── */
+  --gb-actionable: #264fec;
+  --gb-actionable-hover: #002ec9;
+  --gb-actionable-active: #001c76;
+  --gb-actionable-content: #ffffff;
+
+  /* ── Conversion (comercial / destaque) ──────────────────────── */
+  --gb-conversion: #db1e8c;
+  --gb-conversion-hover: #b2006a;
+  --gb-conversion-active: #750059;
+  --gb-conversion-content: #ffffff;
+
+  /* ── Non Primary (secundário/terciário sobre actionable) ────── */
+  --gb-non-primary-hover: rgba(38, 79, 236, 0.16);
+  --gb-non-primary-active: rgba(38, 79, 236, 0.32);
+  --gb-non-primary-content: #264fec;
+
+  /* ── Warning / Destructive ──────────────────────────────────── */
+  --gb-danger: #d32f2f;
+  --gb-danger-hover: #b71c1c;
+  --gb-danger-soft: #ffebee;
+  --gb-danger-border: #f4c7c7;
+  --gb-danger-content: #ffffff;
+
+  /* ── Status (foundations) ───────────────────────────────────── */
+  --gb-success: #1b5e20;
+  --gb-success-soft: #e8f5e9;
+  --gb-success-border: #bfe3c2;
+  --gb-warning: #f57f17;
+  --gb-warning-soft: #fffde7;
+  --gb-warning-border: #f5e2a8;
+  --gb-info: #0288d1;
+  --gb-info-soft: #e1f5fe;
+  --gb-info-border: #bce6f5;
+
+  /* ── Disabled ───────────────────────────────────────────────── */
+  --gb-disabled-bg: rgba(0, 0, 0, 0.16);
+  --gb-disabled-content: rgba(0, 0, 0, 0.48);
+
+  /* ── Keyboard Focus ─────────────────────────────────────────── */
+  --gb-keyboard-focus: #011e38;
+
+  --gb-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.05);
   --gb-font: 'IBM Plex Sans', sans-serif;
 
-  /* Tokens adicionados — espelham brand.ts */
-  --gb-border-muted: #94a3b8;
-
-  --gb-radius-small:  4px;
+  --gb-radius-small: 4px;
   --gb-radius-medium: 8px;
-  --gb-radius-large:  16px;
-  --gb-radius-pill:   40px;
+  --gb-radius-large: 16px;
+  --gb-radius-pill: 40px;
 
-  --gb-spacing-4:  4px;
-  --gb-spacing-8:  8px;
+  --gb-spacing-4: 4px;
+  --gb-spacing-8: 8px;
   --gb-spacing-12: 12px;
   --gb-spacing-16: 16px;
   --gb-spacing-20: 20px;
@@ -56,13 +87,13 @@
   --gb-spacing-32: 32px;
   --gb-spacing-48: 48px;
 
-  --gb-font-size-display:   2.4rem;
-  --gb-font-size-heading:   1.35rem;
-  --gb-font-size-title:     1.25rem;
-  --gb-font-size-subtitle:  1.05rem;
-  --gb-font-size-body-lg:   1rem;
-  --gb-font-size-body-sm:   0.9rem;
-  --gb-font-size-auxiliar:  0.72rem;
+  --gb-font-size-display: 3.25rem;
+  --gb-font-size-heading: 2.25rem;
+  --gb-font-size-title: 1.75rem;
+  --gb-font-size-subtitle: 1.25rem;
+  --gb-font-size-body-lg: 1rem;
+  --gb-font-size-body-sm: 0.875rem;
+  --gb-font-size-auxiliar: 0.75rem;
 }
 
 *,
@@ -81,13 +112,14 @@ body {
   background: var(--gb-canvas);
   color: var(--gb-ink);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ── Acessibilidade ───────────────────────────────────────────── */
 
 /* Foco visível consistente em todos os elementos interativos */
 :focus-visible {
-  outline: 3px solid var(--gb-green-500);
+  outline: 2px solid var(--gb-keyboard-focus);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -112,8 +144,8 @@ body {
   top: 0;
   z-index: 100;
   padding: 0.6rem 1rem;
-  background: var(--gb-green-700);
-  color: #fff;
+  background: var(--gb-actionable);
+  color: var(--gb-actionable-content);
   border-radius: 0 0 8px 0;
   font-weight: 600;
   text-decoration: none;
@@ -123,7 +155,7 @@ body {
 }
 
 .gb-confirm-dialog::backdrop {
-  background: rgba(0, 48, 31, 0.55);
+  background: var(--gb-overlay);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -163,8 +195,8 @@ input.gb-control:focus,
 select.gb-control:focus,
 textarea.gb-control:focus {
   outline: none;
-  border-color: var(--gb-green-500);
-  box-shadow: 0 0 0 3px rgba(13, 138, 95, 0.25);
+  border-color: var(--gb-actionable);
+  box-shadow: 0 0 0 3px var(--gb-non-primary-hover);
 }
 
 button.gb-button {
@@ -212,8 +244,8 @@ button.gb-button:not(:disabled):active {
 }
 
 .gb-home-access-card:hover {
-  border-color: var(--gb-green-400) !important;
-  box-shadow: 0 10px 28px rgba(0, 48, 31, 0.1) !important;
+  border-color: var(--gb-actionable) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1) !important;
   transform: translateY(-2px);
 }
 
@@ -361,10 +393,268 @@ button.gb-button:not(:disabled):active {
 }
 
 .gb-table tbody tr:hover {
-  background: var(--gb-green-50);
+  background: var(--gb-canvas);
 }
 
 .gb-table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Modo "card": em containers estreitos a tabela colapsa em cartões
+   rótulo:valor, evitando rolagem horizontal dentro de blocos pequenos. */
+.gb-table-shell {
+  container-type: inline-size;
+}
+
+@container (max-width: 460px) {
+  .gb-table-shell .gb-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .gb-table-shell .gb-table,
+  .gb-table-shell .gb-table tbody,
+  .gb-table-shell .gb-table tr,
+  .gb-table-shell .gb-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .gb-table-shell .gb-table tr {
+    border: 1px solid var(--gb-border);
+    border-radius: var(--gb-radius-small);
+    padding: var(--gb-spacing-8) var(--gb-spacing-12);
+    margin-bottom: var(--gb-spacing-8);
+  }
+
+  .gb-table-shell .gb-table tbody tr:hover {
+    background: transparent;
+  }
+
+  .gb-table-shell .gb-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--gb-spacing-12);
+    padding: var(--gb-spacing-4) 0;
+    border: 0;
+    text-align: right;
+  }
+
+  .gb-table-shell .gb-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--gb-ink-muted);
+    text-align: left;
+  }
+
+  .gb-table-shell .gb-table td.gb-table-empty {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .gb-table-shell .gb-table td.gb-table-empty::before {
+    content: none;
+  }
+}
+
+/* ── Skeleton (carregamento previsível) ──────────────────────── */
+
+@keyframes gbSkeletonPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.gb-skeleton {
+  background: var(--gb-disabled-bg);
+  border-radius: var(--gb-radius-medium);
+  animation: gbSkeletonPulse 1.4s ease-in-out infinite;
+}
+
+/* ── Spinner (loader genérico) ───────────────────────────────── */
+
+@keyframes gbSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gb-spinner {
+  border: 2px solid var(--gb-non-primary-hover);
+  border-top-color: var(--gb-actionable);
+  border-radius: 50%;
+  animation: gbSpin 0.8s linear infinite;
+}
+
+/* ── Sobreposições (modal / bottom sheet / drawer) ───────────── */
+
+@keyframes gbOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gbSheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes gbDrawerIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes gbToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Controles selecionáveis (checkbox / radio / switch) ─────── */
+
+.gb-checkbox,
+.gb-radio {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin: 0;
+  border: 2px solid var(--gb-border-strong);
+  background: var(--gb-surface);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.gb-checkbox {
+  border-radius: var(--gb-radius-small);
+}
+.gb-radio {
+  border-radius: 50%;
+}
+.gb-checkbox:checked,
+.gb-radio:checked {
+  background: var(--gb-actionable);
+  border-color: var(--gb-actionable);
+}
+.gb-checkbox:checked::after {
+  content: '';
+  width: 5px;
+  height: 10px;
+  border: solid var(--gb-actionable-content);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+.gb-radio:checked::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gb-actionable-content);
+}
+.gb-checkbox:disabled,
+.gb-radio:disabled {
+  cursor: not-allowed;
+  background: var(--gb-disabled-bg);
+  border-color: var(--gb-border);
+}
+
+.gb-switch {
+  appearance: none;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  margin: 0;
+  background: var(--gb-border-strong);
+  border-radius: var(--gb-radius-pill);
+  position: relative;
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+.gb-switch::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--gb-surface);
+  transition: transform 200ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.gb-switch:checked {
+  background: var(--gb-actionable);
+}
+.gb-switch:checked::before {
+  transform: translateX(20px);
+}
+.gb-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Linha rótulo + controle selecionável */
+.gb-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--gb-spacing-12);
+  cursor: pointer;
+}
+.gb-choice--block {
+  justify-content: space-between;
+}
+
+/* Item de menu de ações (ActionMenu) */
+.gb-menu-item:hover:not(:disabled),
+.gb-menu-item:focus-visible {
+  background: var(--gb-canvas);
+}
+.gb-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Botão-ícone genérico (ex.: copiar dentro de um campo) */
+.gb-icon-button:hover:not(:disabled),
+.gb-icon-button:focus-visible {
+  background: var(--gb-canvas);
+}
+
+/* Link de campo copiável (CopyField) */
+.gb-copy-link:hover {
+  text-decoration: underline;
 }

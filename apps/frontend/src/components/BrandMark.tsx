@@ -6,15 +6,21 @@ interface BrandMarkProps {
   size?: number
 }
 
+/**
+ * Marca neutra do produto (VD+ Fila Inteligente) — monograma abstrato de fila.
+ * Não representa nenhuma marca corporativa: três traços decrescentes que
+ * remetem a uma fila/atendimento.
+ */
 export function BrandMark({ onDark = false, size = 30 }: Readonly<BrandMarkProps>) {
-  const emblemBg = onDark ? 'rgba(255,255,255,0.14)' : brand.green50
-  const leafColor = onDark ? '#ffffff' : brand.green700
+  const emblemBg = onDark ? 'rgba(255,255,255,0.16)' : brand.canvas
+  const markColor = onDark ? '#ffffff' : brand.emphasis
 
   const emblem: CSSProperties = {
     width: size,
     height: size,
-    borderRadius: '32% 68% 64% 36% / 36% 36% 64% 64%',
+    borderRadius: brand.radius.medium,
     background: emblemBg,
+    border: onDark ? 'none' : `1px solid ${brand.border}`,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -25,21 +31,14 @@ export function BrandMark({ onDark = false, size = 30 }: Readonly<BrandMarkProps
     <span style={styles.wrap} aria-hidden="true">
       <span style={emblem}>
         <svg
-          width={size * 0.55}
-          height={size * 0.55}
+          width={size * 0.56}
+          height={size * 0.56}
           viewBox="0 0 24 24"
           fill="none"
         >
-          <path
-            d="M12 21c-4.5-2.8-7-6.4-7-10.2C5 6.6 8 3.5 12 3c4 .5 7 3.6 7 7.8 0 3.8-2.5 7.4-7 10.2Z"
-            fill={leafColor}
-          />
-          <path
-            d="M12 6.5v12"
-            stroke={onDark ? brand.green700 : '#ffffff'}
-            strokeWidth="1.4"
-            strokeLinecap="round"
-          />
+          <circle cx="6" cy="6" r="2.4" fill={markColor} />
+          <circle cx="12" cy="12" r="2.4" fill={markColor} opacity="0.7" />
+          <circle cx="18" cy="18" r="2.4" fill={markColor} opacity="0.4" />
         </svg>
       </span>
     </span>

@@ -10,6 +10,7 @@ import { CopyField } from '../components/CopyField'
 import { Input } from '../components/Input'
 import { Select } from '../components/Select'
 import { StaffLoginForm } from '../components/StaffLoginForm'
+import { useToast } from '../components/Toast'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
 import { formatDate } from '../utils/format'
@@ -191,6 +192,7 @@ function CreateERForm({
 }>) {
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
+  const { showToast } = useToast()
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault()
@@ -200,6 +202,7 @@ function CreateERForm({
       setName('')
       onError(null)
       await onCreated()
+      showToast('ER criado.', 'success')
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : 'Erro ao criar ER')
     } finally {
@@ -358,7 +361,7 @@ function ERDetailSection({
           </div>
 
           {er.counters.length === 0 ? (
-            <EmptyState>Nenhum caixa cadastrado.</EmptyState>
+            <EmptyNote>Nenhum caixa cadastrado.</EmptyNote>
           ) : (
             <ul style={styles.compactList}>
               {er.counters.map((counter) => (
@@ -388,7 +391,7 @@ function ERDetailSection({
           </div>
 
           {er.operators.length === 0 ? (
-            <EmptyState>Nenhuma conta cadastrada.</EmptyState>
+            <EmptyNote>Nenhuma conta cadastrada.</EmptyNote>
           ) : (
             <ul style={styles.compactList}>
               {er.operators.map((staff) => (
@@ -431,7 +434,7 @@ function SummaryItem({
   )
 }
 
-function EmptyState({ children }: Readonly<{ children: React.ReactNode }>) {
+function EmptyNote({ children }: Readonly<{ children: React.ReactNode }>) {
   return <p style={styles.emptyState}>{children}</p>
 }
 
@@ -450,6 +453,7 @@ function EditERForm({
   const parsedMinutes = Number(pauseMinutes)
   const minutesValid = Number.isFinite(parsedMinutes) && parsedMinutes >= 0 && parsedMinutes <= 1440
   const nextTimeoutSeconds = Math.round(parsedMinutes * 60)
+  const { showToast } = useToast()
   const unchanged =
     name.trim() === er.name && nextTimeoutSeconds === er.pauseTimeoutSeconds && minutesValid
 
@@ -464,6 +468,7 @@ function EditERForm({
       await api.patch(`/admin/ers/${er.id}`, { name, pauseTimeoutSeconds: nextTimeoutSeconds })
       onError(null)
       await onUpdated()
+      showToast('Alterações salvas.', 'success')
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : 'Erro ao atualizar ER')
     } finally {
@@ -512,6 +517,7 @@ function CreateCounterForm({
 }>) {
   const [number, setNumber] = useState('')
   const [loading, setLoading] = useState(false)
+  const { showToast } = useToast()
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault()
@@ -521,6 +527,7 @@ function CreateCounterForm({
       setNumber('')
       onError(null)
       await onCreated()
+      showToast('Caixa adicionado.', 'success')
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : 'Erro ao criar caixa')
     } finally {
@@ -562,6 +569,7 @@ function CreateStaffForm({
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('OPERATOR')
   const [loading, setLoading] = useState(false)
+  const { showToast } = useToast()
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault()
@@ -573,6 +581,7 @@ function CreateStaffForm({
       setPassword('')
       onError(null)
       await onCreated()
+      showToast('Conta criada.', 'success')
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : 'Erro ao criar conta')
     } finally {
@@ -629,7 +638,7 @@ const styles: Record<string, React.CSSProperties> = {
   cardTitle: {
     margin: 0,
     fontSize: brand.typography.subtitle.fontSize,
-    color: brand.green800,
+    color: brand.ink,
   },
   sectionHeader: {
     display: 'flex',
@@ -647,7 +656,7 @@ const styles: Record<string, React.CSSProperties> = {
   sectionTitle: {
     margin: 0,
     fontSize: brand.typography.bodyLarge.fontSize,
-    color: brand.green800,
+    color: brand.ink,
   },
   erCard: {
     display: 'grid',
@@ -658,8 +667,8 @@ const styles: Record<string, React.CSSProperties> = {
     background: brand.surface,
   },
   erCardSelected: {
-    borderColor: brand.green500,
-    boxShadow: '0 0 0 2px rgba(13, 138, 95, 0.12)',
+    border: `1px solid ${brand.actionable}`,
+    boxShadow: '0 0 0 2px rgba(38, 79, 236, 0.12)',
   },
   erCardHeader: {
     display: 'flex',
@@ -691,7 +700,6 @@ const styles: Record<string, React.CSSProperties> = {
     ...layout.card,
     scrollMarginTop: '6rem',
     padding: `${brand.spacing[24]}px`,
-    borderTop: `4px solid ${brand.green600}`,
   },
   managementHeader: {
     display: 'flex',
@@ -711,7 +719,7 @@ const styles: Record<string, React.CSSProperties> = {
   eyebrow: {
     display: 'block',
     marginBottom: `${brand.spacing[4]}px`,
-    color: brand.green600,
+    color: brand.emphasis,
     fontSize: brand.typography.auxiliar.fontSize,
     fontWeight: 700,
     letterSpacing: '0.12em',
@@ -719,7 +727,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   managementTitle: {
     margin: 0,
-    color: brand.green900,
+    color: brand.ink,
     fontSize: brand.typography.title.fontSize,
     lineHeight: 1.2,
   },
@@ -732,7 +740,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: `${brand.spacing[16]}px`,
     border: `1px solid ${brand.border}`,
     borderRadius: brand.radius.medium,
-    background: brand.green50,
+    background: brand.canvas,
   },
   summaryLabel: {
     color: brand.inkMuted,
@@ -742,7 +750,7 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
   },
   summaryValue: {
-    color: brand.green800,
+    color: brand.emphasis,
     fontSize: brand.typography.heading.fontSize,
     lineHeight: 1.25,
   },
@@ -755,7 +763,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: `${brand.spacing[20]}px`,
     border: `1px solid ${brand.border}`,
     borderRadius: brand.radius.large,
-    background: brand.green50,
+    background: brand.canvas,
   },
   resourceSection: {
     minWidth: 0,
@@ -820,12 +828,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   formTitle: {
     margin: `0 0 ${brand.spacing[8]}px`,
-    color: brand.green800,
+    color: brand.ink,
     fontSize: brand.typography.bodySmall.fontSize,
   },
   stackedForm: {
     display: 'grid',
     gap: `${brand.spacing[4]}px`,
-    maxWidth: 420,
+    width: '100%',
   },
 }

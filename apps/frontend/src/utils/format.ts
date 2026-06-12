@@ -13,6 +13,12 @@ export function formatTime(isoString: string): string {
   return `${hours}h${minutes}`
 }
 
+export function formatTimeWithSeconds(isoString: string): string {
+  const date    = new Date(isoString)
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${formatTime(isoString)}:${seconds}`
+}
+
 export function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60

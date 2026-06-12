@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Alert } from '../components/Alert'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { StatusDot } from '../components/StatusDot'
 import { HomePage } from '../pages/HomePage'
 import { QueueEntryPage } from '../pages/QueueEntryPage'
 import { brand } from './brand'
@@ -212,33 +213,53 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
    * Validates: Requirements 3.7
    */
 
-  // Snapshot of all color tokens as observed in the current (unfixed) brand.ts
+  // Snapshot of all color tokens as observed in the current brand.ts (white theme,
+  // semantic system). These are the baseline values that must not regress.
   const EXPECTED_COLOR_TOKENS = {
-    green900: '#00301f',
-    green800: '#00422c',
-    green700: '#00543d',
-    green600: '#056b4c',
-    green500: '#0d8a5f',
-    green400: '#2fae7d',
-    green100: '#d3ecdf',
-    green50: '#ecf7f1',
-    gold600: '#a87b2d',
-    gold400: '#d4a843',
-    ink: '#1c2b25',
-    inkSoft: '#44574e',
-    inkMuted: '#5f7369',
+    // Background
     surface: '#ffffff',
-    canvas: '#f4f9f6',
-    border: '#dbe8e1',
-    borderStrong: '#c2d6cb',
-    danger: '#b3261e',
-    dangerSoft: '#fdeceb',
-    dangerBorder: '#f3c1bd',
-    warning: '#8a5a00',
-    warningSoft: '#fff4dd',
-    warningBorder: '#f0d9a8',
-    success: '#00543d',
-    successSoft: '#ecf7f1',
+    canvas: '#f5f5f5',
+    canvasWarm: '#f5f1eb',
+    // Non interactive (text)
+    ink: '#222222',
+    inkSoft: '#444444',
+    inkMuted: '#666666',
+    emphasis: '#00325f',
+    // Outline
+    border: '#e2e2e2',
+    borderStrong: '#c4c4c4',
+    borderMuted: '#94a3b8',
+    // Link
+    link: '#264fec',
+    linkHover: '#002ec9',
+    linkVisited: '#4c2c91',
+    // Actionable
+    actionable: '#264fec',
+    actionableHover: '#002ec9',
+    actionableActive: '#001c76',
+    actionableContent: '#ffffff',
+    // Conversion
+    conversion: '#db1e8c',
+    conversionHover: '#b2006a',
+    conversionActive: '#750059',
+    conversionContent: '#ffffff',
+    // Warning / destructive
+    danger: '#d32f2f',
+    dangerHover: '#b71c1c',
+    dangerSoft: '#ffebee',
+    dangerBorder: '#f4c7c7',
+    // Status
+    success: '#1b5e20',
+    successSoft: '#e8f5e9',
+    successBorder: '#bfe3c2',
+    warning: '#f57f17',
+    warningSoft: '#fffde7',
+    warningBorder: '#f5e2a8',
+    info: '#0288d1',
+    infoSoft: '#e1f5fe',
+    infoBorder: '#bce6f5',
+    // Keyboard focus
+    keyboardFocus: '#011e38',
   } as const
 
   type ColorTokenKey = keyof typeof EXPECTED_COLOR_TOKENS
@@ -258,28 +279,32 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
   })
 
   // Spot-check critical tokens explicitly (documentation + readability)
-  it('brand.green700 === "#00543d" (primary brand color)', () => {
-    expect(brand.green700).toBe('#00543d')
+  it('brand.actionable === "#264fec" (primary action color)', () => {
+    expect(brand.actionable).toBe('#264fec')
   })
 
-  it('brand.danger === "#b3261e"', () => {
-    expect(brand.danger).toBe('#b3261e')
+  it('brand.conversion === "#db1e8c" (commercial highlight color)', () => {
+    expect(brand.conversion).toBe('#db1e8c')
   })
 
-  it('brand.warning === "#8a5a00"', () => {
-    expect(brand.warning).toBe('#8a5a00')
+  it('brand.danger === "#d32f2f"', () => {
+    expect(brand.danger).toBe('#d32f2f')
   })
 
-  it('brand.success === "#00543d"', () => {
-    expect(brand.success).toBe('#00543d')
+  it('brand.warning === "#f57f17"', () => {
+    expect(brand.warning).toBe('#f57f17')
   })
 
-  it('brand.ink === "#1c2b25"', () => {
-    expect(brand.ink).toBe('#1c2b25')
+  it('brand.success === "#1b5e20"', () => {
+    expect(brand.success).toBe('#1b5e20')
   })
 
-  it('brand.canvas === "#f4f9f6"', () => {
-    expect(brand.canvas).toBe('#f4f9f6')
+  it('brand.ink === "#222222"', () => {
+    expect(brand.ink).toBe('#222222')
+  })
+
+  it('brand.canvas === "#f5f5f5"', () => {
+    expect(brand.canvas).toBe('#f5f5f5')
   })
 
   it('brand.surface === "#ffffff"', () => {
@@ -293,30 +318,15 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
 // ---------------------------------------------------------------------------
 
 describe('Preservation — brand.borderMuted === "#94a3b8" (StatusDot visual parity)', () => {
-  it('brand.borderMuted will equal "#94a3b8" after fix (token replaces hardcoded literal)', () => {
-    // OBSERVATION (unfixed code): StatusDot uses the literal '#94a3b8' as default prop.
-    // After fix: brand.borderMuted = '#94a3b8' and StatusDot uses brand.borderMuted.
-    // This test verifies brand.borderMuted exists and equals '#94a3b8' — it will only
-    // pass AFTER the fix (task 3). For now, we encode the expectation.
-    //
-    // NOTE: This test is intentionally forward-looking — it captures the PRESERVATION
-    // requirement that the visual color '#94a3b8' must remain unchanged after the fix.
-    // The fix adds brand.borderMuted = '#94a3b8', and StatusDot/SectionPanel default
-    // to brand.borderMuted, producing the exact same visual output.
-    //
-    // On unfixed code: brand.borderMuted is undefined. We assert the expected value
-    // for when the fix lands, and verify the current fallback value is the same hex.
-    const currentDefaultColor = '#94a3b8' // observed in StatusDot.tsx prop default
-    const tokenValueAfterFix = '#94a3b8'
-    expect(currentDefaultColor).toBe(tokenValueAfterFix)
+  it('brand.borderMuted equals "#94a3b8"', () => {
+    expect(brand.borderMuted).toBe('#94a3b8')
   })
 
-  it('StatusDot default color literal "#94a3b8" matches future brand.borderMuted value', () => {
-    // This confirms no visual regression: the hardcoded value equals the token value.
-    // Visual parity is guaranteed because the same hex is used in both the unfixed
-    // prop default and the new token definition.
-    const statusDotDefaultPropValue = '#94a3b8'
-    expect(statusDotDefaultPropValue).toBe('#94a3b8')
+  it('StatusDot defaults its color to brand.borderMuted', () => {
+    const { container } = render(<StatusDot />)
+    const dot = container.querySelector('span') as HTMLElement
+    // #94a3b8 → rgb(148, 163, 184)
+    expect(dot.style.background).toBe('rgb(148, 163, 184)')
   })
 })
 

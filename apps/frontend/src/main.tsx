@@ -10,20 +10,25 @@ import { ManagerPage } from './pages/ManagerPage'
 import { PanelPage } from './pages/PanelPage'
 import { AdminPage } from './pages/AdminPage'
 import { HomePage } from './pages/HomePage'
+import { PlaygroundPage } from './pages/PlaygroundPage'
+import { ToastProvider } from './components/Toast'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/fila/:erId" element={<QueueEntryPage />} />
-        <Route path="/fila/:erId/senha" element={<TicketConfirmationPage />} />
-        <Route path="/checkin" element={<CheckinAttendantPage />} />
-        <Route path="/operacao" element={<OperationPage />} />
-        <Route path="/gestao" element={<ManagerPage />} />
-        <Route path="/painel/:erId" element={<PanelPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-      </Routes>
+      <ToastProvider>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/fila/:erId" element={<QueueEntryPage />} />
+          <Route path="/fila/:erId/senha" element={<TicketConfirmationPage />} />
+          <Route path="/checkin" element={<CheckinAttendantPage />} />
+          <Route path="/operacao" element={<OperationPage />} />
+          <Route path="/gestao" element={<ManagerPage />} />
+          <Route path="/painel/:erId" element={<PanelPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/playground" element={<PlaygroundPage />} />
+        </Routes>
+      </ToastProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )
