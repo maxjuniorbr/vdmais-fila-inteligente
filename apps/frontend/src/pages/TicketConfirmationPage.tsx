@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Alert } from '../components/Alert'
+import { getQueueEntryChannel, getQueueEntryPath } from '../auth/session'
 import { BrandMark } from '../components/BrandMark'
 import { Button } from '../components/Button'
 import { Modal } from '../components/Modal'
@@ -153,7 +154,6 @@ function TicketStatus({
 export function TicketConfirmationPage() {
   const { erId } = useParams<{ erId: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const [ticket, setTicket] = useState<TicketInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -212,12 +212,12 @@ export function TicketConfirmationPage() {
   useEffect(() => {
     const token = sessionStorage.getItem('token')
     if (!token) {
-      navigate(`/fila/${erId}`, { replace: true })
+      navigate(getQueueEntryPath(erId), { replace: true })
       return
     }
-    const isLink = searchParams.get('source') === 'link'
-    if (isLink && sessionStorage.getItem(`queue-entry:${erId}`) !== 'LINK') {
-      navigate(`/fila/${erId}?source=link`, { replace: true })
+    const entryChannel = getQueueEntryChannel(erId)
+    if (!entryChannel) {
+      navigate(getQueueEntryPath(erId), { replace: true })
       return
     }
 
@@ -229,7 +229,7 @@ export function TicketConfirmationPage() {
       },
       body: JSON.stringify({
         erId,
-        entryChannel: searchParams.get('source') === 'link' ? 'LINK' : 'QR_CODE',
+        entryChannel,
       }),
     })
       .then(async (res) => {
@@ -245,7 +245,7 @@ export function TicketConfirmationPage() {
       .then((data) => setTicket(data))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Erro inesperado'))
       .finally(() => setLoading(false))
-  }, [erId, navigate, searchParams])
+  }, [erId, navigate])
 
   const handlePauseExpired = useCallback(() => {
     setTicket((prev) => (prev?.state === 'PAUSED' ? { ...prev, state: 'CANCELLED' } : prev))
@@ -273,7 +273,7 @@ export function TicketConfirmationPage() {
         <div style={styles.card}>
           <h2 style={styles.errorTitle}>Ops!</h2>
           <p style={styles.hint}>{error}</p>
-          <Button style={{ width: '100%' }} onClick={() => navigate(`/fila/${erId}`)}>
+          <Button style={{ width: '100%' }} onClick={() => navigate(getQueueEntryPath(erId))}>
             Voltar
           </Button>
         </div>
@@ -325,9 +325,9 @@ export function TicketConfirmationPage() {
       setActionLoading(false)
       return
     }
+    const entryPath = getQueueEntryPath(erId)
     sessionStorage.removeItem('token')
-    sessionStorage.removeItem(`queue-entry:${erId}`)
-    navigate(`/fila/${erId}`)
+    navigate(entryPath)
   }
 
   const isTerminal = ['FINISHED', 'CANCELLED', 'NO_SHOW'].includes(ticket.state)
@@ -361,9 +361,9 @@ export function TicketConfirmationPage() {
           <Button
             style={{ width: '100%' }}
             onClick={() => {
+              const entryPath = getQueueEntryPath(erId)
               sessionStorage.removeItem('token')
-              sessionStorage.removeItem(`queue-entry:${erId}`)
-              navigate(`/fila/${erId}`)
+              navigate(entryPath)
             }}
           >
             Voltar ao início
