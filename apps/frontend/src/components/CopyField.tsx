@@ -6,6 +6,8 @@ interface CopyFieldProps {
   label: string
   value: string
   description?: string
+  /** Texto auxiliar exibido abaixo do campo (ex.: validade do endereço). */
+  helperText?: string
   /** Rótulo acessível do link (ação de abrir). */
   openLabel?: string
 }
@@ -57,6 +59,7 @@ export function CopyField({
   label,
   value,
   description,
+  helperText,
   openLabel = 'Abrir',
 }: Readonly<CopyFieldProps>) {
   const [copyState, setCopyState] = useState<CopyState>('idle')
@@ -110,6 +113,8 @@ export function CopyField({
           {copyState === 'copied' ? CheckIcon : CopyIcon}
         </button>
       </div>
+
+      {helperText && <p style={styles.helperText}>{helperText}</p>}
 
       <span aria-live="polite" style={styles.feedback}>
         {copyState === 'copied' && 'Endereço copiado para a área de transferência.'}
@@ -174,6 +179,12 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: `0 ${brand.radius.small}px ${brand.radius.small}px 0`,
     background: 'transparent',
     cursor: 'pointer',
+  },
+  helperText: {
+    margin: 0,
+    color: brand.inkMuted,
+    fontSize: brand.typography.auxiliar.fontSize,
+    lineHeight: 1.45,
   },
   feedback: {
     minHeight: '1.2rem',

@@ -23,6 +23,7 @@ interface ERSummary {
   qrCodeUrl: string | null
   isDayOpen: boolean
   pauseTimeoutSeconds: number
+  callTimeoutSeconds: number
   createdAt: string
   _count: { counters: number; operators: number }
 }
@@ -280,11 +281,17 @@ function ERDetailSection({
     : `${globalThis.location.origin}/fila/${er.id}?source=link`
   const panelUrl = `${globalThis.location.origin}/painel/${er.id}`
   const qrEntryDescription = er.entryAccess
-    ? `Use no QR Code do ER. Válido até ${formatDate(er.entryAccess.qrCode.expiresAt)} às ${formatTime(er.entryAccess.qrCode.expiresAt)}.`
+    ? 'Use no QR Code do ER.'
     : 'Use este endereço para gerar o QR Code exposto dentro do ER.'
+  const qrEntryValidity = er.entryAccess
+    ? `Válido até ${formatDate(er.entryAccess.qrCode.expiresAt)} às ${formatTime(er.entryAccess.qrCode.expiresAt)}.`
+    : undefined
   const linkEntryDescription = er.entryAccess
-    ? `Compartilhe como alternativa ao QR Code. Válido até ${formatDate(er.entryAccess.link.expiresAt)} às ${formatTime(er.entryAccess.link.expiresAt)}.`
+    ? 'Compartilhe como alternativa ao QR Code.'
     : 'Compartilhe como alternativa ao QR Code. A RE deverá confirmar o ER.'
+  const linkEntryValidity = er.entryAccess
+    ? `Válido até ${formatDate(er.entryAccess.link.expiresAt)} às ${formatTime(er.entryAccess.link.expiresAt)}.`
+    : undefined
 
   return (
     <section ref={sectionRef} style={styles.managementCard}>
@@ -339,12 +346,14 @@ function ERDetailSection({
             label="QR Code presencial"
             value={qrEntryUrl}
             description={qrEntryDescription}
+            helperText={qrEntryValidity}
             openLabel="Testar entrada"
           />
           <CopyField
             label="Link alternativo"
             value={siteEntryUrl}
             description={linkEntryDescription}
+            helperText={linkEntryValidity}
             openLabel="Testar link"
           />
         </div>
@@ -478,13 +487,23 @@ function EditERForm({
 }>) {
   const [name, setName] = useState(er.name)
   const [pauseMinutes, setPauseMinutes] = useState(String(Math.round(er.pauseTimeoutSeconds / 60)))
+  const [callMinutes, setCallMinutes] = useState(String(Math.round(er.callTimeoutSeconds / 60)))
   const [loading, setLoading] = useState(false)
-  const parsedMinutes = Number(pauseMinutes)
-  const minutesValid = Number.isFinite(parsedMinutes) && parsedMinutes >= 0 && parsedMinutes <= 1440
-  const nextTimeoutSeconds = Math.round(parsedMinutes * 60)
+  const parsedPauseMinutes = Number(pauseMinutes)
+  const parsedCallMinutes = Number(callMinutes)
+  const minutesValid =
+    Number.isFinite(parsedPauseMinutes) && parsedPauseMinutes >= 0 && parsedPauseMinutes <= 1440
+  const callMinutesValid =
+    Number.isFinite(parsedCallMinutes) && parsedCallMinutes >= 0 && parsedCallMinutes <= 1440
+  const nextPauseTimeoutSeconds = Math.round(parsedPauseMinutes * 60)
+  const nextCallTimeoutSeconds = Math.round(parsedCallMinutes * 60)
   const { showToast } = useToast()
   const unchanged =
-    name.trim() === er.name && nextTimeoutSeconds === er.pauseTimeoutSeconds && minutesValid
+    name.trim() === er.name &&
+    nextPauseTimeoutSeconds === er.pauseTimeoutSeconds &&
+    nextCallTimeoutSeconds === er.callTimeoutSeconds &&
+    minutesValid &&
+    callMinutesValid
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault()
@@ -492,9 +511,17 @@ function EditERForm({
       onError('Informe um tempo de pausa entre 0 e 1440 minutos')
       return
     }
+    if (!callMinutesValid) {
+      onError('Informe um tempo de chamada entre 0 e 1440 minutos')
+      return
+    }
     setLoading(true)
     try {
-      await api.patch(`/admin/ers/${er.id}`, { name, pauseTimeoutSeconds: nextTimeoutSeconds })
+      await api.patch(`/admin/ers/${er.id}`, {
+        name,
+        pauseTimeoutSeconds: nextPauseTimeoutSeconds,
+        callTimeoutSeconds: nextCallTimeoutSeconds,
+      })
       onError(null)
       await onUpdated()
       showToast('Alterações salvas.', 'success')
@@ -519,13 +546,25 @@ function EditERForm({
       <Input
         label="Tempo limite de pausa (min)"
         title="Tempo que uma senha pode ficar pausada antes de ser cancelada. Use 0 para desativar."
-        containerStyle={{ flex: '0 1 200px', marginBottom: 0 }}
+        containerStyle={{ flex: '0 1 180px', marginBottom: 0 }}
         type="number"
         min={0}
         max={1440}
         step={1}
         value={pauseMinutes}
         onChange={(event) => setPauseMinutes(event.target.value)}
+        required
+      />
+      <Input
+        label="Tempo limite de chamada (min)"
+        title="Tempo que uma senha pode ficar em chamada antes de ser marcada como não comparecimento. Use 0 para desativar."
+        containerStyle={{ flex: '0 1 180px', marginBottom: 0 }}
+        type="number"
+        min={0}
+        max={1440}
+        step={1}
+        value={callMinutes}
+        onChange={(event) => setCallMinutes(event.target.value)}
         required
       />
       <Button type="submit" disabled={loading || unchanged}>

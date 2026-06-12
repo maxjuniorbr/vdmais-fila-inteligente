@@ -29,6 +29,21 @@ describe('CopyField', () => {
     expect(screen.getByText('Painel')).toBeInTheDocument()
   })
 
+  it('renders the helper text below the field', () => {
+    render(
+      <CopyField
+        label="QR Code presencial"
+        value="https://exemplo.com/fila/er-1"
+        description="Use no QR Code do ER."
+        helperText="Válido até 12/07/2026 às 14h30."
+      />,
+    )
+    const helper = screen.getByText('Válido até 12/07/2026 às 14h30.')
+    const field = screen.getByRole('link', { name: /Abrir/ }).closest('div')
+    expect(helper).toBeInTheDocument()
+    expect(field?.compareDocumentPosition(helper)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   it('copies the value and shows confirmation feedback', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     stubClipboard(writeText)
