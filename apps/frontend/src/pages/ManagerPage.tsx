@@ -130,6 +130,7 @@ function pendingActionTitle(kind: PendingActionKind): string {
   return 'Cancelar senha'
 }
 
+
 function CancelTicketAction({
   ticket,
   onSelect,
@@ -424,7 +425,7 @@ export function ManagerPage() {
               Como administrador, selecione o ER que deseja acompanhar ou operar nesta tela.
             </p>
             <Select
-              label="Espaço do Revendedor"
+              label="Espaço de Revendedora"
               value={erId}
               onChange={(event) => {
                 const selectedERId = event.target.value
@@ -573,6 +574,7 @@ export function ManagerPage() {
         {pendingAction && (
           <ConfirmDialog
             title={pendingActionTitle(pendingAction.kind)}
+            confirmLabel={pendingActionTitle(pendingAction.kind)}
             description={`Senha ${pendingAction.ticket.code}`}
             loading={loading}
             error={error}

@@ -160,7 +160,7 @@ describe('ManagerPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Cancelar senha' }))
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByText('Cancelar senha')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Cancelar senha' })).toBeInTheDocument()
   })
 
   it('cancels a ticket with a reason through the confirm dialog', async () => {
@@ -174,7 +174,7 @@ describe('ManagerPage', () => {
     const dialog = await screen.findByRole('dialog')
     const user = userEvent.setup()
     await user.type(within(dialog).getByRole('textbox'), 'duplicada')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancelar senha|Restaurar senha|Corrigir atendimento|Finalizar atendimento/ }))
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/tickets/w1/cancel', { reason: 'duplicada' }),
@@ -192,7 +192,7 @@ describe('ManagerPage', () => {
     const dialog = await screen.findByRole('dialog')
     const user = userEvent.setup()
     await user.type(within(dialog).getByRole('textbox'), 'voltou')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancelar senha|Restaurar senha|Corrigir atendimento|Finalizar atendimento/ }))
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/tickets/r1/restore', { reason: 'voltou' }),
@@ -227,7 +227,7 @@ describe('ManagerPage', () => {
     const dialog = await screen.findByRole('dialog')
     const user = userEvent.setup()
     await user.type(within(dialog).getByRole('textbox'), 'concluído manualmente')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancelar senha|Restaurar senha|Corrigir atendimento|Finalizar atendimento/ }))
 
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/tickets/s1/correct', {
@@ -271,7 +271,7 @@ describe('ManagerPage', () => {
     renderManager()
 
     expect(await screen.findByText('ER acompanhado')).toBeInTheDocument()
-    const select = screen.getByLabelText('Espaço do Revendedor')
+    const select = screen.getByLabelText('Espaço de Revendedora')
     fireEvent.change(select, { target: { value: 'er-2' } })
     expect(select).toHaveValue('er-2')
   })

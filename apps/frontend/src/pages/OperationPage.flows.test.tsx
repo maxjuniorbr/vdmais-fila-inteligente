@@ -112,7 +112,7 @@ describe('OperationPage flows', () => {
       ],
     })
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Rechamar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Chamar novamente' }))
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/t1/recall'))
   })
 

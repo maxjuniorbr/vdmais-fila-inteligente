@@ -128,7 +128,7 @@ function AdminDashboard({ onLogout }: Readonly<{ onLogout: () => void }>) {
         <section style={styles.card}>
           <div style={styles.sectionHeader}>
             <div>
-              <h2 style={styles.cardTitle}>Espaços do Revendedor</h2>
+              <h2 style={styles.cardTitle}>Espaços de Revendedora</h2>
               <p style={styles.sectionDescription}>
                 Selecione uma unidade para acessar sua configuração operacional.
               </p>
