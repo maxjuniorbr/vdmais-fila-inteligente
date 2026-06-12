@@ -3,8 +3,6 @@ import { TelemetryController } from '../telemetry.controller'
 import { TelemetryService } from '../telemetry.service'
 
 const service = {
-  recordQueueEntryStarted: jest.fn(),
-  recordPanelCallDisplayed: jest.fn(),
   recordTicketDisplayed: jest.fn(),
   recordLogout: jest.fn(),
   recordManualCheckinStarted: jest.fn(),
@@ -17,16 +15,6 @@ describe('TelemetryController', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     controller = new TelemetryController(service as unknown as TelemetryService)
-  })
-
-  it('records a queue entry', () => {
-    controller.queueEntry('er-1')
-    expect(service.recordQueueEntryStarted).toHaveBeenCalledWith('er-1')
-  })
-
-  it('records a panel display', () => {
-    controller.panelDisplayed()
-    expect(service.recordPanelCallDisplayed).toHaveBeenCalledWith()
   })
 
   it('records a ticket display', () => {

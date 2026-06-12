@@ -5,8 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { TelemetryService } from '../telemetry.service'
 
 const prisma = {
-  eR: { findUnique: jest.fn() },
-  ticket: { findUnique: jest.fn(), findFirst: jest.fn() },
+  ticket: { findUnique: jest.fn() },
   operator: { update: jest.fn() },
 }
 const auditLog = { log: jest.fn() }
@@ -24,19 +23,6 @@ describe('TelemetryService', () => {
       prisma as unknown as PrismaService,
       auditLog as unknown as AuditLogService,
     )
-  })
-
-  describe('recordQueueEntryStarted', () => {
-    it('returns recorded for an existing ER without writing audit', async () => {
-      prisma.eR.findUnique.mockResolvedValue({ id: 'er-1' })
-      await expect(service.recordQueueEntryStarted('er-1')).resolves.toEqual({ recorded: true })
-      expect(auditLog.log).not.toHaveBeenCalled()
-    })
-
-    it('throws when the ER is unknown', async () => {
-      prisma.eR.findUnique.mockResolvedValue(null)
-      await expect(service.recordQueueEntryStarted('missing')).rejects.toThrow(NotFoundException)
-    })
   })
 
   describe('recordTicketDisplayed', () => {
@@ -67,13 +53,6 @@ describe('TelemetryService', () => {
       await expect(service.recordTicketDisplayed('t-1', representative)).rejects.toThrow(
         ForbiddenException,
       )
-    })
-  })
-
-  describe('recordPanelCallDisplayed', () => {
-    it('returns recorded without any DB or audit side effect', () => {
-      expect(service.recordPanelCallDisplayed()).toEqual({ recorded: true })
-      expect(auditLog.log).not.toHaveBeenCalled()
     })
   })
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PanelPage } from './PanelPage'
@@ -105,7 +105,7 @@ describe('PanelPage', () => {
     }))
     state.avgWaitSeconds = 45
     state.avgServiceSeconds = 125
-    const { fetchMock, unmount } = renderPanel(state)
+    const { unmount } = renderPanel(state)
 
     expect(await screen.findByText('W1')).toBeInTheDocument()
     expect(screen.getByText('8 na fila')).toBeInTheDocument()
@@ -116,12 +116,6 @@ describe('PanelPage', () => {
     expect(screen.queryByText(/~\d+\s*min/)).not.toBeInTheDocument()
     expect(screen.queryByText(/última espera/i)).not.toBeInTheDocument()
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/telemetry/panel/er-1/tickets/calling-1/displayed',
-        { method: 'POST' },
-      ),
-    )
     expect(document.documentElement.style.overflow).toBe('hidden')
 
     unmount()

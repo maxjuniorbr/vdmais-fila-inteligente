@@ -11,12 +11,6 @@ export class TelemetryService {
     private readonly auditLog: AuditLogService,
   ) {}
 
-  async recordQueueEntryStarted(erId: string) {
-    const er = await this.prisma.eR.findUnique({ where: { id: erId }, select: { id: true } })
-    if (!er) throw new NotFoundException('ER não encontrado')
-    return { recorded: true }
-  }
-
   async recordTicketDisplayed(ticketId: string, user: AuthenticatedUser) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
@@ -33,10 +27,6 @@ export class TelemetryService {
       ticketId,
       representativeId: user.userId,
     })
-    return { recorded: true }
-  }
-
-  recordPanelCallDisplayed() {
     return { recorded: true }
   }
 
