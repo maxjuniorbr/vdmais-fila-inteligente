@@ -8,6 +8,8 @@
 		}
 	],
 	"settings": {
-		"typescript.autoClosingTags": false
+		"typescript.autoClosingTags": false,
+		"claudeCode.initialPermissionMode": "acceptEdits",
+		"claudeCode.useCtrlEnterToSend": true
 	}
 }
