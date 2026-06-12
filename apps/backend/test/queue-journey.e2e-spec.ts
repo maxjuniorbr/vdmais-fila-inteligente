@@ -30,6 +30,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
   let restoredTicketId: string
   let assignedOperatorToken: string
   let adminToken: string
+  let panelToken: string
 
   const suffix = Date.now()
 
@@ -142,6 +143,12 @@ describe('Full queue journey and concurrency (e2e)', () => {
     raceOperator1Token = await login(raceOperator1.email)
     raceOperator2Token = await login(raceOperator2.email)
     adminToken = await login(admin.email)
+
+    const panelTokenResponse = await request(app.getHttpServer())
+      .post(`/admin/ers/${erId}/panel-token`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201)
+    panelToken = panelTokenResponse.body.token
 
     await request(app.getHttpServer())
       .post(`/ers/${erId}/open-day`)
@@ -430,11 +437,18 @@ describe('Full queue journey and concurrency (e2e)', () => {
     expect(metrics.body.totalNoShow).toBeGreaterThanOrEqual(1)
     expect(metrics.body.noShowByChannel.LINK).toBeGreaterThanOrEqual(1)
 
-    const panel = await request(app.getHttpServer()).get(`/panel/${erId}/state`).expect(200)
+    const panel = await request(app.getHttpServer())
+      .get(`/panel/${erId}/state`)
+      .set('x-panel-token', panelToken)
+      .expect(200)
+    const restoredCode = (
+      await prisma.ticket.findUniqueOrThrow({
+        where: { id: restoredTicketId },
+        select: { code: true },
+      })
+    ).code
     expect(panel.body.waiting).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ ticketId: restoredTicketId }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: restoredCode })]),
     )
   })
 
@@ -526,11 +540,12 @@ describe('Full queue journey and concurrency (e2e)', () => {
     // Panel state should NOT list the paused ticket in "waiting"
     const panelAfterPause = await request(app.getHttpServer())
       .get(`/panel/${erId}/state`)
+      .set('x-panel-token', panelToken)
       .expect(200)
-    const waitingIds = (panelAfterPause.body.waiting as Array<{ ticketId: string }>).map(
-      (t) => t.ticketId,
+    const waitingCodes = (panelAfterPause.body.waiting as Array<{ code: string }>).map(
+      (t) => t.code,
     )
-    expect(waitingIds).not.toContain(pauseTicketId)
+    expect(waitingCodes).not.toContain(originalCode)
 
     // Step 3: resume — ticket goes back to WAITING with a new code and end-of-queue position
     const resumed = await request(app.getHttpServer())
@@ -548,12 +563,13 @@ describe('Full queue journey and concurrency (e2e)', () => {
     // Panel waiting list should include the resumed ticket
     const panelAfterResume = await request(app.getHttpServer())
       .get(`/panel/${erId}/state`)
+      .set('x-panel-token', panelToken)
       .expect(200)
     const waitingAfter = panelAfterResume.body.waiting as Array<{
-      ticketId: string
+      code: string
       position: number
     }>
-    expect(waitingAfter.some((t) => t.ticketId === pauseTicketId)).toBe(true)
+    expect(waitingAfter.some((t) => t.code === resumed.body.code)).toBe(true)
 
     // Positions must be sequential 1..N with no gaps
     const positions = waitingAfter.map((t) => t.position).sort((a, b) => a - b)
@@ -591,13 +607,19 @@ describe('Full queue journey and concurrency (e2e)', () => {
       .send({ counterId: counter1Id })
       .expect(201)
 
-    const response = await request(app.getHttpServer()).get(`/panel/${erId}/state`).expect(200)
+    await request(app.getHttpServer()).get(`/panel/${erId}/state`).expect(401)
+
+    const response = await request(app.getHttpServer())
+      .get(`/panel/${erId}/state`)
+      .set('x-panel-token', panelToken)
+      .expect(200)
 
     const serialized = JSON.stringify(response.body)
     expect(serialized).not.toContain('cpf')
     expect(serialized).not.toContain('phone')
     expect(serialized).not.toContain('reCode')
     expect(serialized).not.toContain('representativeId')
+    expect(serialized).not.toContain('ticketId')
     const displayedCall = response.body.current ?? response.body.calling[0]
     expect(displayedCall).toBeDefined()
     expect(displayedCall.displayName).toMatch(/^[^\s]+ [A-ZÁ-Ú]\.$/i)

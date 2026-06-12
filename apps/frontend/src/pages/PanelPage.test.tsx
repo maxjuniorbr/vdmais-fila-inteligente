@@ -9,26 +9,23 @@ vi.mock('../hooks/useSocket', () => ({
 
 interface PanelFixture {
   current: null | {
-    ticketId: string
     code: string
     displayName: string
     counterNumber: number
   }
   calling: Array<{
-    ticketId: string
     code: string
     displayName: string
     counterNumber: number
   }>
-  inService: Array<{ ticketId: string; code: string; counterNumber: number }>
-  waiting: Array<{ ticketId: string; code: string; position: number; createdAt: string }>
+  inService: Array<{ code: string; counterNumber: number }>
+  waiting: Array<{ code: string; position: number }>
   avgServiceSeconds: number | null
   avgWaitSeconds: number | null
 }
 
 function fixture(callCount: number): PanelFixture {
   const calling = Array.from({ length: callCount }, (_, index) => ({
-    ticketId: `calling-${index + 1}`,
     code: `A${String(index + 1).padStart(3, '0')}`,
     displayName: `Pessoa ${index + 1}`,
     counterNumber: index + 1,
@@ -44,7 +41,7 @@ function fixture(callCount: number): PanelFixture {
   }
 }
 
-function renderPanel(state: PanelFixture) {
+function renderPanel(state: PanelFixture, entry = '/painel/er-1') {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = input instanceof Request ? input.url : input.toString()
     if (url.includes('/api/panel/er-1/state')) {
@@ -60,7 +57,7 @@ function renderPanel(state: PanelFixture) {
   return {
     fetchMock,
     ...render(
-      <MemoryRouter initialEntries={['/painel/er-1']}>
+      <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route path="/painel/:erId" element={<PanelPage />} />
         </Routes>
@@ -93,15 +90,12 @@ describe('PanelPage', () => {
   it('shows operational data without presenting an unvalidated ETA', async () => {
     const state = fixture(2)
     state.inService = Array.from({ length: 9 }, (_, index) => ({
-      ticketId: `service-${index + 1}`,
       code: `S${index + 1}`,
       counterNumber: index + 1,
     }))
     state.waiting = Array.from({ length: 8 }, (_, index) => ({
-      ticketId: `waiting-${index + 1}`,
       code: `W${index + 1}`,
       position: index + 1,
-      createdAt: '2026-06-11T10:00:00.000Z',
     }))
     state.avgWaitSeconds = 45
     state.avgServiceSeconds = 125
@@ -120,6 +114,34 @@ describe('PanelPage', () => {
 
     unmount()
     expect(document.documentElement.style.overflow).toBe('')
+  })
+
+  it('sends the display token from the URL when fetching the panel state', async () => {
+    const { fetchMock } = renderPanel(fixture(1), '/painel/er-1?token=tv-token')
+
+    await screen.findByText('A001')
+
+    const stateCall = fetchMock.mock.calls.find(([input]) => {
+      const url = input instanceof Request ? input.url : String(input)
+      return url.includes('/api/panel/er-1/state')
+    })
+    expect(stateCall?.[1]).toMatchObject({ headers: { 'x-panel-token': 'tv-token' } })
+  })
+
+  it('shows an explicit blocked screen when the panel token is missing or invalid', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <MemoryRouter initialEntries={['/painel/er-1']}>
+        <Routes>
+          <Route path="/painel/:erId" element={<PanelPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Painel sem acesso')).toBeInTheDocument()
+    expect(screen.queryByText('Aguardando próxima chamada')).not.toBeInTheDocument()
   })
 
   it('keeps the panel available when polling fails', async () => {

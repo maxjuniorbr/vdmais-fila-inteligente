@@ -6,7 +6,7 @@ import { api } from '../api/client'
 import { AdminPage } from './AdminPage'
 
 vi.mock('../api/client', () => ({
-  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }))
 
 function authenticate() {
@@ -90,6 +90,7 @@ const erDetail = {
   operators: [
     { id: 'o1', name: 'Operadora 1', email: 'op1@x.com', role: 'OPERATOR', createdAt: '2026-01-01T12:00:00.000Z' },
   ],
+  hasPanelToken: false,
 }
 
 const erSummary = {
@@ -107,6 +108,7 @@ describe('AdminPage — ER management', () => {
     vi.mocked(api.get).mockReset()
     vi.mocked(api.post).mockReset()
     vi.mocked(api.patch).mockReset()
+    vi.mocked(api.delete).mockReset()
     authenticate()
     vi.mocked(api.get).mockImplementation((path: string) =>
       Promise.resolve(path === '/admin/ers' ? [erSummary] : erDetail),
@@ -171,5 +173,34 @@ describe('AdminPage — ER management', () => {
         pauseTimeoutSeconds: 300,
       }),
     )
+  })
+
+  it('generates a panel access token and shows the URL only once', async () => {
+    vi.mocked(api.post).mockResolvedValue({ token: 'tv-secret' })
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar token de acesso' }))
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/admin/ers/er-1/panel-token'),
+    )
+    expect(await screen.findByText(/\?token=tv-secret/)).toBeInTheDocument()
+  })
+
+  it('revokes the panel access token', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      Promise.resolve(path === '/admin/ers' ? [erSummary] : { ...erDetail, hasPanelToken: true }),
+    )
+    vi.mocked(api.delete).mockResolvedValue(undefined)
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Revogar acesso' }))
+    await waitFor(() =>
+      expect(api.delete).toHaveBeenCalledWith('/admin/ers/er-1/panel-token'),
+    )
+  })
+
+  it('surfaces an error when generating the panel token fails', async () => {
+    vi.mocked(api.post).mockRejectedValue(new Error('Falha ao gerar token'))
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar token de acesso' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falha ao gerar token')
   })
 })
