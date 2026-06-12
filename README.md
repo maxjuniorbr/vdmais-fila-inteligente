@@ -13,9 +13,9 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - Restauração de senha não comparecida ou cancelada antes do atendimento, preservando a regra de uma senha ativa por RE
 - Tempo limite de chamada: senhas paradas em chamada além da tolerância são marcadas como não comparecimento automaticamente, liberando o caixa
 - Encerramento do dia auto-finaliza atendimentos em aberto; gestora pode liberar caixas órfãos deixados por operadoras que saíram sem fechar
-- Painel TV/display com quadro "Chamando agora" multicaixa (cartão piscante na chamada mais recente), próximas senhas com rodízio automático, atendimentos em andamento e tempos médios
+- Painel TV/display com quadro "Chamando agora" multicaixa (cartão piscante na chamada mais recente), próximas senhas com rodízio automático, atendimentos em andamento e tempos médios. O acesso é protegido por um token de exibição por ER (URL com `?token=...`), sem exigir perfil de usuário
 - Gestão com métricas de espera, atendimento, canais de entrada, caixas e não comparecimentos
-- Administração de ERs, caixas e contas de equipe, com ações para copiar e testar os acessos
+- Administração de ERs, caixas e contas de equipe, com ações para copiar e testar os acessos e para gerar/revogar o token do painel da TV
 - Trilha de auditoria completa de todos os eventos do ciclo de vida da senha
 
 > 📖 Para entender o passo a passo de cada perfil de usuário (RE, operadora, atendente, gestora, admin), veja o **[Guia de uso por persona](./docs/guia-personas.md)**.
@@ -216,7 +216,7 @@ vdmais-fila-inteligente/
 │   │   │   ├── ticket/    # Geração e ciclo de vida da senha
 │   │   │   ├── queue/     # Lógica de fila (call-next atômico)
 │   │   │   ├── counter/   # Caixas de atendimento
-│   │   │   ├── panel/     # WebSocket gateway (painel público)
+│   │   │   ├── panel/     # WebSocket gateway + estado do painel (token de exibição por ER)
 │   │   │   ├── metrics/   # Métricas de atendimento
 │   │   │   ├── telemetry/ # Eventos de uso e jornada
 │   │   │   ├── observability/ # Healthchecks e métricas Prometheus
