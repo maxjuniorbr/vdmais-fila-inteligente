@@ -1,13 +1,14 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcrypt'
-import { Prisma, Role } from '@prisma/client'
+import { EntryChannel, Prisma, Role } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { StaffLoginDto } from './dto/staff-login.dto'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { AuthenticatedUser } from '../common/authenticated-user'
+import { QueueEntryTokenService } from './queue-entry-token.service'
 
 const BCRYPT_ROUNDS = 12
 
@@ -17,11 +18,20 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly auditLog: AuditLogService,
+    private readonly queueEntryTokens: QueueEntryTokenService,
   ) {}
 
   async register(dto: RegisterDto) {
+    const entry = this._resolveQueueEntry(dto)
     const rep = await this.createRepresentative(dto, { erId: dto.erId })
-    return this._sign(rep.id, Role.REPRESENTATIVE)
+    return this._sign(
+      rep.id,
+      Role.REPRESENTATIVE,
+      entry?.erId,
+      undefined,
+      undefined,
+      entry?.entryChannel,
+    )
   }
 
   async createRepresentative(
@@ -94,6 +104,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    const entry = this._resolveQueueEntry(dto)
     if (dto.erId) {
       await this.auditLog.logIfERExists({
         eventType: 'representative_login_started',
@@ -129,7 +140,14 @@ export class AuthService {
       })
     }
 
-    return this._sign(rep.id, Role.REPRESENTATIVE)
+    return this._sign(
+      rep.id,
+      Role.REPRESENTATIVE,
+      entry?.erId,
+      undefined,
+      undefined,
+      entry?.entryChannel,
+    )
   }
 
   async staffLogin(dto: StaffLoginDto) {
@@ -177,10 +195,37 @@ export class AuthService {
     })
   }
 
-  private _sign(userId: string, role: Role, erId?: string, name?: string, sessionVersion?: number) {
+  private _resolveQueueEntry(dto: {
+    erId?: string
+    entryChannel?: EntryChannel
+    entryToken?: string
+  }) {
+    const hasEntryData = Boolean(dto.entryToken || dto.entryChannel)
+    if (!hasEntryData) return undefined
+    if (!dto.erId || !dto.entryChannel || !dto.entryToken) {
+      throw new UnauthorizedException('Acesso à fila inválido ou expirado')
+    }
+    return this.queueEntryTokens.verify(dto.entryToken, dto.erId, dto.entryChannel)
+  }
+
+  private _sign(
+    userId: string,
+    role: Role,
+    erId?: string,
+    name?: string,
+    sessionVersion?: number,
+    entryChannel?: EntryChannel,
+  ) {
     return {
-      access_token: this.jwt.sign({ sub: userId, userId, role, erId, sv: sessionVersion }),
-      user: { id: userId, role, erId, name },
+      access_token: this.jwt.sign({
+        sub: userId,
+        userId,
+        role,
+        erId,
+        sv: sessionVersion,
+        entryChannel,
+      }),
+      user: { id: userId, role, erId, name, entryChannel },
     }
   }
 }

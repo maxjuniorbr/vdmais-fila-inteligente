@@ -212,6 +212,26 @@ describe('TicketService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
+  it('rejects a representative token bound to another ER', async () => {
+    await expect(
+      service.create(
+        { ...representative, erId: 'er-2', entryChannel: EntryChannel.QR_CODE },
+        { erId: 'er-1', entryChannel: EntryChannel.QR_CODE },
+      ),
+    ).rejects.toThrow('O acesso à fila pertence a outro ER')
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects a representative token bound to another entry channel', async () => {
+    await expect(
+      service.create(
+        { ...representative, erId: 'er-1', entryChannel: EntryChannel.LINK },
+        { erId: 'er-1', entryChannel: EntryChannel.QR_CODE },
+      ),
+    ).rejects.toThrow('O acesso à fila pertence a outro canal')
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
   it('moves ticket and counter to IN_SERVICE in one transaction', async () => {
     prisma.ticket.findUnique.mockResolvedValue({
       ...ticketBase,

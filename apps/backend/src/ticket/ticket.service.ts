@@ -878,6 +878,12 @@ export class TicketService {
       if (dto.representativeId && dto.representativeId !== user.userId) {
         throw new ForbiddenException('Representantes só podem criar a própria senha')
       }
+      if (user.erId && user.erId !== dto.erId) {
+        throw new ForbiddenException('O acesso à fila pertence a outro ER')
+      }
+      if (user.entryChannel && user.entryChannel !== dto.entryChannel) {
+        throw new ForbiddenException('O acesso à fila pertence a outro canal')
+      }
       if (dto.entryChannel === EntryChannel.CHECKIN_ASSISTED) {
         throw new ForbiddenException('O check-in assistido requer uma atendente')
       }

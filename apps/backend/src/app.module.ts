@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { ThrottlerModule } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core'
 import { PrismaModule } from './prisma/prisma.module'
 import { AuthModule } from './auth/auth.module'
@@ -17,6 +17,7 @@ import { RepresentativesModule } from './representative/representatives.module'
 import { TelemetryModule } from './telemetry/telemetry.module'
 import { ObservabilityModule } from './observability/observability.module'
 import { AdminModule } from './admin/admin.module'
+import { ContextualThrottlerGuard } from './common/guards/contextual-throttler.guard'
 
 @Module({
   imports: [
@@ -40,7 +41,7 @@ import { AdminModule } from './admin/admin.module'
     AdminModule,
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ContextualThrottlerGuard },
   ],
 })
 export class AppModule {}
