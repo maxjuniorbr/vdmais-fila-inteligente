@@ -97,4 +97,74 @@ describe('PlaygroundPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvar endereço' }))
     expect(screen.getByText('Endereço salvo.')).toBeInTheDocument()
   })
+
+  it('runs the table row action menu items as toasts', () => {
+    render(<PlaygroundPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ações do pedido #PED-8812' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Ver detalhes' }))
+    expect(screen.getByText('Detalhes de #PED-8812.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ações do pedido #PED-8812' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cancelar pedido' }))
+    expect(screen.getByText('Pedido cancelado.')).toBeInTheDocument()
+  })
+
+  it('closes the destructive modal from its close affordance', () => {
+    render(<PlaygroundPage />)
+    fireEvent.click(screen.getByRole('button', { name: '4. Interações' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir conta' }))
+
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar' }))
+    expect(screen.queryByText('Excluir conta permanentemente?')).not.toBeInTheDocument()
+  })
+
+  it('closes the bottom sheet from the share option', () => {
+    render(<PlaygroundPage />)
+    fireEvent.click(screen.getByRole('button', { name: '4. Interações' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir opções' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compartilhar' }))
+    expect(screen.queryByText('Opções rápidas')).not.toBeInTheDocument()
+  })
+
+  it('closes the bottom sheet from the download option', () => {
+    render(<PlaygroundPage />)
+    fireEvent.click(screen.getByRole('button', { name: '4. Interações' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir opções' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Baixar comprovante' }))
+    expect(screen.queryByText('Opções rápidas')).not.toBeInTheDocument()
+  })
+
+  it('closes the bottom sheet from its backdrop affordance', () => {
+    render(<PlaygroundPage />)
+    fireEvent.click(screen.getByRole('button', { name: '4. Interações' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir opções' }))
+
+    const sheet = screen.getByRole('dialog', { name: 'Opções rápidas' })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
+    expect(screen.queryByText('Opções rápidas')).not.toBeInTheDocument()
+  })
+
+  it('navigates each drawer link, closing the drawer', () => {
+    render(<PlaygroundPage />)
+    fireEvent.click(screen.getByRole('button', { name: '4. Interações' }))
+
+    for (const link of ['Início', 'Fila', 'Minha conta']) {
+      fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }))
+      fireEvent.click(screen.getByRole('link', { name: link }))
+      expect(screen.queryByText('Minha conta')).not.toBeInTheDocument()
+    }
+  })
+
+  it('closes the drawer from its close control', () => {
+    render(<PlaygroundPage />)
+    fireEvent.click(screen.getByRole('button', { name: '4. Interações' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar menu' }))
+    expect(screen.queryByText('Minha conta')).not.toBeInTheDocument()
+  })
 })

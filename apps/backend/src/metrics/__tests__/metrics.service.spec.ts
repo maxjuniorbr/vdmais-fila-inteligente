@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { EntryChannel, Role, TicketState } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -230,5 +231,188 @@ describe('MetricsService', () => {
 
     expect(result.duplicateAttempts).toBe(1)
     expect(result.pauseSecondsByCounter['Caixa 1']).toBe(300)
+  })
+
+  it('rejects non-manager, non-admin roles', async () => {
+    await expect(
+      service.getDailyMetrics('er-1', { userId: 'rep-1', role: Role.REPRESENTATIVE, erId: 'er-1' }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('rejects a manager reading metrics from another ER', async () => {
+    await expect(
+      service.getDailyMetrics('er-2', { userId: 'mgr-1', role: Role.MANAGER, erId: 'er-1' }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('rejects a manager with no ER assigned', async () => {
+    await expect(
+      service.getDailyMetrics('er-1', { userId: 'mgr-1', role: Role.MANAGER, erId: undefined }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('allows an admin to read any ER without an erId of their own', async () => {
+    const result = await service.getDailyMetrics('er-9', {
+      userId: 'admin-1',
+      role: Role.ADMIN,
+      erId: undefined,
+    })
+
+    expect(result.totalCreated).toBe(0)
+  })
+
+  it('falls back to ticket.createdAt for the max current wait of a waiting ticket', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-10T12:10:00Z'))
+    mockPrisma.ticket.findMany.mockResolvedValue([
+      makeTicket({
+        id: 'waiting-1',
+        state: TicketState.WAITING,
+        createdAt: new Date('2026-06-10T12:00:00Z'),
+      }),
+    ])
+    // No ticket_created event, so waitingSince has no entry and the `?? createdAt` runs.
+    mockPrisma.auditEvent.findMany.mockResolvedValue([])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.maxCurrentWaitSeconds).toBe(600)
+    jest.useRealTimers()
+  })
+
+  it('ignores created events whose ticket relation is missing', async () => {
+    const orphan = { ...makeEvent('ticket_created', '2026-06-10T12:00:00Z'), ticket: null }
+    mockPrisma.auditEvent.findMany.mockResolvedValue([orphan])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.totalCreated).toBe(1)
+    expect(result.byChannel.QR_CODE).toBe(0)
+    expect(result.byChannel.LINK).toBe(0)
+  })
+
+  it('ignores cancelled and no-show events whose ticket relation is missing', async () => {
+    const cancelled = { ...makeEvent('ticket_cancelled', '2026-06-10T12:00:00Z'), ticket: null }
+    const noShow = { ...makeEvent('ticket_no_show', '2026-06-10T12:01:00Z'), ticket: null }
+    mockPrisma.auditEvent.findMany.mockResolvedValue([cancelled, noShow])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.totalCancelled).toBe(1)
+    expect(result.totalNoShow).toBe(1)
+    expect(result.cancelledByChannel.QR_CODE).toBe(0)
+    expect(result.noShowByChannel.QR_CODE).toBe(0)
+  })
+
+  it('does not accumulate wait or service samples without their starting events', async () => {
+    mockPrisma.ticket.findMany.mockResolvedValue([makeTicket()])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      // service_started without a preceding ticket_created/restored -> no wait sample
+      makeEvent('service_started', '2026-06-10T12:10:00Z'),
+      // service_finished without a preceding service_started -> no service sample
+      makeEvent('service_finished', '2026-06-10T13:00:00Z', 'tk-2'),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.avgWaitSeconds).toBe(0)
+    expect(result.avgServiceSeconds).toBe(0)
+    expect(result.totalFinished).toBe(1)
+  })
+
+  it('averages the two middle samples for an even-sized median', async () => {
+    mockPrisma.ticket.findMany.mockResolvedValue([
+      makeTicket({ id: 'tk-1' }),
+      makeTicket({ id: 'tk-2' }),
+    ])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      // tk-1: 2 min wait, 4 min service
+      makeEvent('ticket_created', '2026-06-10T12:00:00Z', 'tk-1'),
+      makeEvent('service_started', '2026-06-10T12:02:00Z', 'tk-1'),
+      makeEvent('service_finished', '2026-06-10T12:06:00Z', 'tk-1'),
+      // tk-2: 4 min wait, 6 min service
+      makeEvent('ticket_created', '2026-06-10T12:00:00Z', 'tk-2'),
+      makeEvent('service_started', '2026-06-10T12:04:00Z', 'tk-2'),
+      makeEvent('service_finished', '2026-06-10T12:10:00Z', 'tk-2'),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    // two wait samples (120s, 240s) -> median averages the pair -> 180s
+    expect(result.medianWaitSeconds).toBe(180)
+    // two service samples (240s, 360s) -> median 300s
+    expect(result.medianServiceSeconds).toBe(300)
+  })
+
+  it('labels service-by-counter with the raw id when the counter is unknown', async () => {
+    // No counters returned, so counterNames has no entry for counter-x.
+    mockPrisma.counter.findMany.mockResolvedValue([])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      makeEvent('ticket_created', '2026-06-10T12:00:00Z'),
+      makeEvent('service_started', '2026-06-10T12:02:00Z'),
+      makeEvent('service_finished', '2026-06-10T12:06:00Z', 'tk-1', EntryChannel.QR_CODE, {
+        metadata: { counterId: 'counter-x' },
+      }),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.serviceByCounter['counter-x']).toBe(1)
+    expect(result.serviceByCounter['Caixa 1']).toBeUndefined()
+  })
+
+  it('ignores non-string metadata values when grouping by counter', async () => {
+    mockPrisma.counter.findMany.mockResolvedValue([{ id: 'counter-1', number: 1, state: 'ACTIVE' }])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      makeEvent('ticket_created', '2026-06-10T12:00:00Z'),
+      makeEvent('service_started', '2026-06-10T12:02:00Z'),
+      makeEvent('service_finished', '2026-06-10T12:06:00Z', 'tk-1', EntryChannel.QR_CODE, {
+        metadata: { counterId: 42 as unknown as string },
+      }),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.serviceByCounter).toEqual({})
+  })
+
+  it('ignores pause events without a counterId in metadata', async () => {
+    mockPrisma.counter.findMany.mockResolvedValue([{ id: 'counter-1', number: 1, state: 'ACTIVE' }])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      makeEvent('counter_paused', '2026-06-10T12:10:00Z', null as unknown as string),
+      makeEvent('counter_resumed', '2026-06-10T12:15:00Z', null as unknown as string),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.pauseSecondsByCounter).toEqual({})
+  })
+
+  it('ignores a counter_resumed without a matching counter_paused', async () => {
+    mockPrisma.counter.findMany.mockResolvedValue([{ id: 'counter-1', number: 1, state: 'ACTIVE' }])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      makeEvent('counter_resumed', '2026-06-10T12:15:00Z', null as unknown as string, EntryChannel.QR_CODE, {
+        metadata: { counterId: 'counter-1' },
+      }),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.pauseSecondsByCounter).toEqual({})
+  })
+
+  it('flushes an unresolved pause up to the end of the business day', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-11T12:00:00Z'))
+    mockPrisma.counter.findMany.mockResolvedValue([{ id: 'counter-1', number: 1, state: 'PAUSED' }])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      makeEvent('counter_paused', '2026-06-10T12:10:00Z', null as unknown as string, EntryChannel.QR_CODE, {
+        metadata: { counterId: 'counter-1' },
+      }),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    // The pause stays open, so it is charged from 12:10 to the business-day end.
+    expect(result.pauseSecondsByCounter['Caixa 1']).toBeGreaterThan(0)
+    jest.useRealTimers()
   })
 })

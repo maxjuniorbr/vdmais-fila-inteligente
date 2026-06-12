@@ -77,6 +77,14 @@ describe('AdminPage', () => {
     renderPage()
     expect(await screen.findByRole('alert')).toHaveTextContent('Falha ao carregar')
   })
+
+  it('falls back to a generic message when loading ERs rejects with a non-error', async () => {
+    authenticate()
+    vi.mocked(api.get).mockRejectedValue('boom')
+
+    renderPage()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Erro ao carregar ERs')
+  })
 })
 
 const erDetail = {
@@ -222,5 +230,229 @@ describe('AdminPage — ER management', () => {
     await openManagement()
     fireEvent.click(screen.getByRole('button', { name: 'Gerar token de acesso' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Falha ao gerar token')
+  })
+
+  it('toggles the management panel closed from the card button', async () => {
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar gerenciamento' }))
+    await waitFor(() => expect(screen.queryByText('Acessos do ER')).not.toBeInTheDocument())
+  })
+
+  it('closes the management panel from the Fechar button', async () => {
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+    await waitFor(() => expect(screen.queryByText('Acessos do ER')).not.toBeInTheDocument())
+  })
+
+  it('shows empty notes when the ER has no counters or operators', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      Promise.resolve(
+        path === '/admin/ers'
+          ? [{ ...erSummary, _count: { counters: 0, operators: 0 } }]
+          : { ...erDetail, counters: [], operators: [] },
+      ),
+    )
+    await openManagement()
+    expect(screen.getByText('Nenhum caixa cadastrado.')).toBeInTheDocument()
+    expect(screen.getByText('Nenhuma conta cadastrada.')).toBeInTheDocument()
+  })
+
+  it('renders the closed-day state and entry URLs without a signed token', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      Promise.resolve(
+        path === '/admin/ers'
+          ? [{ ...erSummary, isDayOpen: false }]
+          : {
+              ...erDetail,
+              isDayOpen: false,
+              counters: [
+                { id: 'c1', number: 1, state: 'ACTIVE' },
+                { id: 'c2', number: 2, state: 'ACTIVE' },
+              ],
+              entryAccess: undefined,
+            },
+      ),
+    )
+    await openManagement()
+    expect(screen.getByText('Dia fechado')).toBeInTheDocument()
+    expect(screen.getByText('Operação fechada')).toBeInTheDocument()
+    expect(screen.getByText('caixas disponíveis')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Testar entrada (abre em nova aba)' }),
+    ).toHaveAttribute('href', expect.stringMatching(/\/fila\/er-1$/))
+    expect(screen.getByRole('link', { name: 'Testar link (abre em nova aba)' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/fila\/er-1\?source=link$/),
+    )
+  })
+
+  it('surfaces an error when loading the ER detail fails', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      path === '/admin/ers'
+        ? Promise.resolve([erSummary])
+        : Promise.reject(new Error('Falha ao carregar ER')),
+    )
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar ER' }))
+    expect(await screen.findByText('Falha ao carregar ER')).toBeInTheDocument()
+  })
+
+  it('rejects an invalid pause timeout before calling the API', async () => {
+    vi.mocked(api.patch).mockResolvedValue({})
+    await openManagement()
+    const user = userEvent.setup()
+    const editForm = screen.getByRole('button', { name: 'Salvar alteração' }).closest('form')!
+    const pauseField = within(editForm).getByLabelText('Tempo limite de pausa (min)')
+    await user.clear(pauseField)
+    await user.type(pauseField, '5000')
+    fireEvent.submit(editForm)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Informe um tempo de pausa entre 0 e 1440 minutos',
+    )
+    expect(api.patch).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid call timeout before calling the API', async () => {
+    vi.mocked(api.patch).mockResolvedValue({})
+    await openManagement()
+    const user = userEvent.setup()
+    const editForm = screen.getByRole('button', { name: 'Salvar alteração' }).closest('form')!
+    const callField = within(editForm).getByLabelText('Tempo limite de chamada (min)')
+    await user.clear(callField)
+    await user.type(callField, '5000')
+    fireEvent.submit(editForm)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Informe um tempo de chamada entre 0 e 1440 minutos',
+    )
+    expect(api.patch).not.toHaveBeenCalled()
+  })
+
+  it('surfaces an error when saving the ER fails', async () => {
+    vi.mocked(api.patch).mockRejectedValue(new Error('Falha ao salvar'))
+    await openManagement()
+    const user = userEvent.setup()
+    const editForm = screen.getByRole('button', { name: 'Salvar alteração' }).closest('form')!
+    const nameField = within(editForm).getByLabelText('Nome do ER')
+    await user.clear(nameField)
+    await user.type(nameField, 'ER Editado')
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alteração' }))
+    expect(await screen.findByText('Falha ao salvar')).toBeInTheDocument()
+  })
+
+  it('surfaces an error when creating a counter fails', async () => {
+    vi.mocked(api.post).mockRejectedValue(new Error('Falha ao criar caixa'))
+    await openManagement()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Número do caixa'), '7')
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar caixa' }))
+    expect(await screen.findByText('Falha ao criar caixa')).toBeInTheDocument()
+  })
+
+  it('creates a staff account with a chosen role', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    await openManagement()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nome'), 'Gestora X')
+    await user.type(screen.getByLabelText('E-mail'), 'gestora@x.com')
+    await user.type(screen.getByLabelText('Senha'), 'segredo123')
+    await user.selectOptions(screen.getByLabelText('Perfil'), 'MANAGER')
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/admin/ers/er-1/staff', {
+        name: 'Gestora X',
+        email: 'gestora@x.com',
+        password: 'segredo123',
+        role: 'MANAGER',
+      }),
+    )
+  })
+
+  it('surfaces an error when creating a staff account fails', async () => {
+    vi.mocked(api.post).mockRejectedValue(new Error('Falha ao criar conta'))
+    await openManagement()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nome'), 'Pessoa')
+    await user.type(screen.getByLabelText('E-mail'), 'pessoa@x.com')
+    await user.type(screen.getByLabelText('Senha'), 'segredo123')
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
+    expect(await screen.findByText('Falha ao criar conta')).toBeInTheDocument()
+  })
+
+  it('surfaces an error when revoking the panel token fails', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      Promise.resolve(path === '/admin/ers' ? [erSummary] : { ...erDetail, hasPanelToken: true }),
+    )
+    vi.mocked(api.delete).mockRejectedValue(new Error('Falha ao revogar'))
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Revogar acesso' }))
+    expect(await screen.findByText('Falha ao revogar')).toBeInTheDocument()
+  })
+})
+
+describe('AdminPage — navigation, auth and form errors', () => {
+  beforeEach(() => {
+    vi.mocked(api.get).mockReset()
+    vi.mocked(api.post).mockReset()
+  })
+
+  it('logs in through the staff form and renders the dashboard', async () => {
+    vi.mocked(api.get).mockResolvedValue([])
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            access_token: 'tok',
+            user: { id: 'admin-1', name: 'Admin', role: 'ADMIN' },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('E-mail'), 'admin@x.com')
+    await user.type(screen.getByLabelText('Senha'), 'segredo123')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByText('Cadastrar ER')).toBeInTheDocument()
+  })
+
+  it('logs out and returns to the login form', async () => {
+    authenticate()
+    vi.mocked(api.get).mockResolvedValue([])
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
+
+    renderPage()
+    await screen.findByText('Cadastrar ER')
+    fireEvent.click(screen.getByRole('button', { name: /sair/i }))
+
+    expect(await screen.findByLabelText('E-mail')).toBeInTheDocument()
+  })
+
+  it('navigates to the home and queue management routes', async () => {
+    authenticate()
+    vi.mocked(api.get).mockResolvedValue([])
+
+    renderPage()
+    await screen.findByText('Cadastrar ER')
+    expect(screen.getByRole('button', { name: 'Voltar ao início' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar ao início' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gestão da fila' }))
+  })
+
+  it('surfaces an error when creating an ER fails', async () => {
+    authenticate()
+    vi.mocked(api.get).mockResolvedValue([])
+    vi.mocked(api.post).mockRejectedValue(new Error('Falha ao criar ER'))
+
+    renderPage()
+    await screen.findByText('Nenhum ER cadastrado ainda.')
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nome do ER'), 'ER Novo')
+    fireEvent.click(screen.getByRole('button', { name: 'Criar ER' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falha ao criar ER')
   })
 })

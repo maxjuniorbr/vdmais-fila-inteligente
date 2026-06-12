@@ -116,6 +116,44 @@ describe('AuthService', () => {
       ).rejects.toThrow('Código de RE já cadastrado')
     })
 
+    it('audits an assisted check-in when an authenticated staff registers', async () => {
+      const actor = { userId: 'att-1', role: Role.ATTENDANT, erId: 'er-1' }
+      prisma.representative.findFirst.mockResolvedValue(null)
+      prisma.representative.create.mockResolvedValue({
+        id: 're-1',
+        fullName: 'Ana Souza',
+        cpf: '11122233344',
+        phone: '11999990000',
+        reCode: 'RE0001',
+      })
+
+      const result = await service.createRepresentative(registerDto, { erId: 'er-1', actor })
+
+      expect(auditLog.logIfERExists).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operatorId: 'att-1',
+          metadata: { source: 'assisted_checkin' },
+        }),
+      )
+      expect(result.id).toBe('re-1')
+    })
+
+    it('persists without auditing when no erId context is provided', async () => {
+      prisma.representative.findFirst.mockResolvedValue(null)
+      prisma.representative.create.mockResolvedValue({
+        id: 're-1',
+        fullName: 'Ana Souza',
+        cpf: '11122233344',
+        phone: '11999990000',
+        reCode: 'RE0001',
+      })
+
+      const result = await service.createRepresentative(registerDto)
+
+      expect(result.id).toBe('re-1')
+      expect(auditLog.logIfERExists).not.toHaveBeenCalled()
+    })
+
     it('translates a Prisma unique violation into a conflict', async () => {
       prisma.representative.findFirst.mockResolvedValue(null)
       prisma.representative.create.mockRejectedValue(
@@ -125,6 +163,12 @@ describe('AuthService', () => {
         }),
       )
       await expect(service.createRepresentative(registerDto)).rejects.toThrow(ConflictException)
+    })
+
+    it('rethrows non-unique persistence errors', async () => {
+      prisma.representative.findFirst.mockResolvedValue(null)
+      prisma.representative.create.mockRejectedValue(new Error('db down'))
+      await expect(service.createRepresentative(registerDto)).rejects.toThrow('db down')
     })
   })
 
@@ -284,6 +328,40 @@ describe('AuthService', () => {
       await expect(
         service.staffLogin({ email: 'no@x.com', password: 'x' }),
       ).rejects.toThrow(UnauthorizedException)
+    })
+
+    it('signs an operator without an ER and skips the login audit', async () => {
+      prisma.operator.findUnique.mockResolvedValue({
+        id: 'op-1',
+        passwordHash: 'hashed',
+        role: Role.ADMIN,
+        erId: null,
+        name: 'Admin',
+        sessionVersion: 5,
+      })
+
+      const result = await service.staffLogin({ email: 'admin@x.com', password: 'Teste@123' })
+
+      expect(result.user.erId).toBeUndefined()
+      expect(jwt.sign).toHaveBeenCalledWith(expect.objectContaining({ erId: undefined }))
+      expect(auditLog.log).not.toHaveBeenCalled()
+    })
+
+    it('rejects a wrong password for an operator without an ER and skips the audit', async () => {
+      prisma.operator.findUnique.mockResolvedValue({
+        id: 'op-1',
+        passwordHash: 'hashed',
+        role: Role.ADMIN,
+        erId: null,
+        name: 'Admin',
+        sessionVersion: 0,
+      })
+      mockedBcrypt.compare.mockResolvedValue(false as never)
+
+      await expect(
+        service.staffLogin({ email: 'admin@x.com', password: 'wrong' }),
+      ).rejects.toThrow(UnauthorizedException)
+      expect(auditLog.log).not.toHaveBeenCalled()
     })
 
     it('rejects a wrong password and audits the failure', async () => {
