@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
 import { BrandMark } from './BrandMark'
 
@@ -19,8 +20,8 @@ export function AppHeader({
 }: Readonly<AppHeaderProps>) {
   return (
     <header className="gb-topbar" style={layout.topbar}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-        <BrandMark onDark size={34} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: `${brand.spacing[12]}px`, minWidth: 0 }}>
+        <BrandMark size={34} />
         <div style={{ minWidth: 0 }}>
           <h1 style={layout.topbarTitle}>{title}</h1>
           {subtitle && <span style={layout.topbarSubtitle}>{subtitle}</span>}

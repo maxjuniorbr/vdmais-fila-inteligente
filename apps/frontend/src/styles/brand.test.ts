@@ -22,7 +22,7 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 describe('brand contrast', () => {
-  it.each([brand.surface, brand.canvas, brand.green50])(
+  it.each([brand.surface, brand.canvas, brand.canvasWarm])(
     'keeps muted text at WCAG AA contrast on %s',
     (background) => {
       expect(contrastRatio(brand.inkMuted, background)).toBeGreaterThanOrEqual(4.5)

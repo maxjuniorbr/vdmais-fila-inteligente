@@ -7,18 +7,34 @@ import {
   logoutStaffSession,
   setManagementERId,
 } from '../auth/session'
+import { ActionMenu } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
+import { Badge } from '../components/Badge'
+import { BarList } from '../components/BarList'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { MetricCard } from '../components/MetricCard'
+import { Modal } from '../components/Modal'
 import { Select } from '../components/Select'
 import { StaffLoginForm } from '../components/StaffLoginForm'
+import { Table, type Column } from '../components/Table'
+import { Tabs, type TabItem } from '../components/Tabs'
+import { useToast } from '../components/Toast'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
 import { formatDuration } from '../utils/format'
-import { counterStateLabel, entryChannelLabel, ticketStateLabel } from '../utils/labels'
+import { counterStateLabel, counterStateTone, entryChannelLabel, ticketStateLabel } from '../utils/labels'
+
+/** Cor de destaque do caixa por estado (espelha o tom do Badge). */
+const COUNTER_TONE_COLOR: Record<string, string> = {
+  success: brand.success,
+  info: brand.info,
+  warning: brand.warning,
+  danger: brand.danger,
+  neutral: brand.borderStrong,
+}
 
 interface Ticket {
   id: string
@@ -116,9 +132,16 @@ function CancelTicketAction({
   onSelect,
 }: Readonly<{ ticket: Ticket; onSelect: (action: PendingAction) => void }>) {
   return (
-    <Button size="sm" variant="danger" onClick={() => onSelect({ kind: 'cancel', ticket })}>
-      Cancelar
-    </Button>
+    <ActionMenu
+      label={`Ações da senha ${ticket.code}`}
+      items={[
+        {
+          label: 'Cancelar senha',
+          tone: 'danger',
+          onClick: () => onSelect({ kind: 'cancel', ticket }),
+        },
+      ]}
+    />
   )
 }
 
@@ -131,11 +154,15 @@ function RestoreTicketAction({
   const canRestore =
     ticket.state === 'NO_SHOW' ||
     (ticket.state === 'CANCELLED' && !ticket.serviceStartedAt)
-  if (!canRestore) return null
   return (
-    <Button size="sm" variant="secondary" onClick={() => onSelect({ kind: 'restore', ticket })}>
-      Restaurar
-    </Button>
+    <ActionMenu
+      label={`Ações da senha ${ticket.code}`}
+      items={
+        canRestore
+          ? [{ label: 'Restaurar senha', onClick: () => onSelect({ kind: 'restore', ticket }) }]
+          : []
+      }
+    />
   )
 }
 
@@ -161,16 +188,8 @@ function elapsedMinutes(from: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(from).getTime()) / 60000))
 }
 
-function formatRecord(
-  values: Record<string, number>,
-  formatter: (value: number) => string = String,
-  labelFormatter: (label: string) => string = String,
-): string {
-  return (
-    Object.entries(values)
-      .map(([label, value]) => `${labelFormatter(label)}: ${formatter(value)}`)
-      .join(' | ') || 'Sem dados'
-  )
+function elapsedSeconds(from: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(from).getTime()) / 1000))
 }
 
 export function ManagerPage() {
@@ -187,10 +206,12 @@ export function ManagerPage() {
   const [er, setER] = useState<ERState | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [pendingCounter, setPendingCounter] = useState<Counter | null>(null)
+  const [pendingDayToggle, setPendingDayToggle] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const isAdmin = sessionStorage.getItem('staffRole') === 'ADMIN'
   const socket = useSocket(authenticated ? erId : '')
+  const { showToast } = useToast()
 
   useEffect(() => {
     if (!authenticated || !isAdmin) {
@@ -267,19 +288,66 @@ export function ManagerPage() {
       elapsedMinutes(ticket.serviceStartedAt) >= LONG_SERVICE_THRESHOLD_MIN,
   )
 
-  async function execute(action: () => Promise<unknown>) {
+  const prolongedColumns: Column<Ticket>[] = [
+    { key: 'code', header: 'Senha', render: (ticket) => ticket.code },
+    { key: 're', header: 'RE', render: (ticket) => ticket.representative?.fullName ?? '-' },
+    {
+      key: 'elapsed',
+      header: 'Em atendimento',
+      render: (ticket) => (
+        <Badge tone="warning">
+          {ticket.serviceStartedAt ? formatDuration(elapsedSeconds(ticket.serviceStartedAt)) : '—'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Ações',
+      align: 'right',
+      render: (ticket) => (
+        <ActionMenu
+          label={`Ações da senha ${ticket.code}`}
+          items={[
+            {
+              label: 'Finalizar atendimento',
+              onClick: () => openTicketAction({ kind: 'correct-finish', ticket }),
+            },
+            {
+              label: 'Cancelar atendimento',
+              tone: 'danger',
+              onClick: () => openTicketAction({ kind: 'correct-cancel', ticket }),
+            },
+          ]}
+        />
+      ),
+    },
+  ]
+
+  async function execute(action: () => Promise<unknown>, successMessage?: string) {
     setLoading(true)
     setError(null)
     try {
       await action()
       setPendingAction(null)
       setPendingCounter(null)
+      setPendingDayToggle(false)
       await refresh()
+      if (successMessage) showToast(successMessage, 'success')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro na operação')
     } finally {
       setLoading(false)
     }
+  }
+
+  function openTicketAction(action: PendingAction) {
+    setError(null)
+    setPendingAction(action)
+  }
+
+  function openCounterRelease(counter: Counter) {
+    setError(null)
+    setPendingCounter(counter)
   }
 
   if (!authenticated) {
@@ -320,7 +388,10 @@ export function ManagerPage() {
                 <button
                   style={layout.topbarButton}
                   type="button"
-                  onClick={() => execute(() => api.post(`/ers/${erId}/close-day`))}
+                  onClick={() => {
+                    setError(null)
+                    setPendingDayToggle(true)
+                  }}
                   disabled={loading}
                 >
                   Encerrar operação
@@ -329,7 +400,10 @@ export function ManagerPage() {
                 <button
                   style={layout.topbarButton}
                   type="button"
-                  onClick={() => execute(() => api.post(`/ers/${erId}/open-day`))}
+                  onClick={() => {
+                    setError(null)
+                    setPendingDayToggle(true)
+                  }}
                   disabled={loading}
                 >
                   Abrir operação
@@ -411,34 +485,7 @@ export function ManagerPage() {
                 <MetricCard key={label} label={label} value={value} />
               ))}
             </section>
-            <section style={styles.card}>
-              <h2 style={styles.cardTitle}>Distribuição do dia</h2>
-              <p>Canais: {formatRecord(metrics.byChannel, String, entryChannelLabel)}</p>
-              <p>
-                Cancelamentos por canal:{' '}
-                {formatRecord(metrics.cancelledByChannel, String, entryChannelLabel)}
-              </p>
-              <p>
-                Não comparecimentos por canal:{' '}
-                {formatRecord(metrics.noShowByChannel, String, entryChannelLabel)}
-              </p>
-              <p>
-                Finalizados por hora:{' '}
-                {Object.entries(metrics.volumeByHour)
-                  .sort(([left], [right]) => Number(left) - Number(right))
-                  .map(([hour, total]) => `${hour}h: ${total}`)
-                  .join(' | ') || 'Nenhum atendimento finalizado'}
-              </p>
-              <p>Espera média por hora: {formatRecord(metrics.waitSecondsByHour, formatDuration)}</p>
-              <p>
-                Horários de pico:{' '}
-                {metrics.peakHours.map((hour) => `${hour}h`).join(', ') || 'Sem dados'}
-              </p>
-              <p>Atendimentos por caixa: {formatRecord(metrics.serviceByCounter)}</p>
-              <p>Atendimentos por operadora: {formatRecord(metrics.serviceByOperator)}</p>
-              <p>Chamadas por operadora: {formatRecord(metrics.callsByOperator)}</p>
-              <p>Pausa por caixa: {formatRecord(metrics.pauseSecondsByCounter, formatDuration)}</p>
-            </section>
+            <DayDistribution metrics={metrics} />
           </>
         )}
 
@@ -446,70 +493,79 @@ export function ManagerPage() {
           <h2 style={styles.cardTitle}>Caixas</h2>
           <div style={styles.counterGrid}>
             {overview?.counters.map((counter) => (
-              <article key={counter.id} style={styles.counter}>
-                <strong>Caixa {counter.number}</strong>
-                <span style={styles.counterState}>{counterStateLabel(counter.state)}</span>
-                <small style={styles.counterOperator}>
-                  {counter.operator?.name ?? 'Sem operadora'}
-                </small>
-                {counter.state !== 'UNAVAILABLE' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setPendingCounter(counter)}
-                  >
-                    Liberar caixa
-                  </Button>
-                )}
+              <article
+                key={counter.id}
+                style={{
+                  ...styles.counter,
+                  borderLeft: `4px solid ${COUNTER_TONE_COLOR[counterStateTone(counter.state)]}`,
+                }}
+              >
+                <div style={styles.counterTop}>
+                  <div>
+                    <span style={styles.counterEyebrow}>Caixa</span>
+                    <strong style={styles.counterNumber}>{counter.number}</strong>
+                  </div>
+                  {counter.state !== 'UNAVAILABLE' && (
+                    <span style={styles.counterMenu}>
+                      <ActionMenu
+                        label={`Ações do caixa ${counter.number}`}
+                        items={[
+                          { label: 'Liberar caixa', onClick: () => openCounterRelease(counter) },
+                        ]}
+                      />
+                    </span>
+                  )}
+                </div>
+                <Badge tone={counterStateTone(counter.state)} style={styles.counterBadge}>
+                  {counterStateLabel(counter.state)}
+                </Badge>
+                <div style={styles.counterOperatorRow}>
+                  <span style={styles.counterOperatorLabel}>Operadora</span>
+                  <span style={styles.counterOperatorName}>
+                    {counter.operator?.name ?? 'Sem operadora'}
+                  </span>
+                </div>
               </article>
             ))}
           </div>
         </section>
 
         {prolongedTickets.length > 0 && (
-          <section style={{ ...styles.card, borderLeft: `4px solid ${brand.warning}` }}>
-            <h2 style={styles.cardTitle}>Atendimentos prolongados</h2>
-            {prolongedTickets.map((ticket) => (
-              <div key={ticket.id} style={styles.row}>
-                <span>
-                  {ticket.code} - {ticket.representative?.fullName} -{' '}
-                  {ticket.serviceStartedAt ? elapsedMinutes(ticket.serviceStartedAt) : 0} min
-                </span>
-                <div style={styles.actions}>
-                  <Button
-                    size="sm"
-                    onClick={() => setPendingAction({ kind: 'correct-finish', ticket })}
-                  >
-                    Finalizar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    onClick={() => setPendingAction({ kind: 'correct-cancel', ticket })}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            ))}
+          <section style={styles.card}>
+            <div style={styles.sectionHead}>
+              <h2 style={{ ...styles.cardTitle, margin: 0 }}>Atendimentos prolongados</h2>
+              <Badge tone="warning">{prolongedTickets.length}</Badge>
+            </div>
+            <Table
+              columns={prolongedColumns}
+              rows={prolongedTickets}
+              getRowKey={(ticket) => ticket.id}
+              emptyMessage="Nenhum atendimento prolongado."
+            />
           </section>
         )}
 
         <section style={styles.card}>
-          <h2 style={styles.cardTitle}>Fila ativa</h2>
+          <div style={styles.sectionHead}>
+            <h2 style={{ ...styles.cardTitle, margin: 0 }}>Fila ativa</h2>
+            <Badge>{activeTickets.length}</Badge>
+          </div>
           <TicketTable
             tickets={activeTickets}
             ActionComponent={CancelTicketAction}
-            onSelect={setPendingAction}
+            onSelect={openTicketAction}
           />
         </section>
 
         <section style={styles.card}>
-          <h2 style={styles.cardTitle}>Chamadas recentes</h2>
+          <div style={styles.sectionHead}>
+            <h2 style={{ ...styles.cardTitle, margin: 0 }}>Chamadas recentes</h2>
+            <Badge>{overview?.recent.length ?? 0}</Badge>
+          </div>
           <TicketTable
             tickets={overview?.recent ?? []}
             ActionComponent={RestoreTicketAction}
-            onSelect={setPendingAction}
+            onSelect={openTicketAction}
           />
         </section>
 
@@ -518,18 +574,28 @@ export function ManagerPage() {
             title={pendingActionTitle(pendingAction.kind)}
             description={`Senha ${pendingAction.ticket.code}`}
             loading={loading}
+            error={error}
             onConfirm={(reason) => {
               const { ticket } = pendingAction
               if (pendingAction.kind === 'cancel') {
-                void execute(() => api.post(`/tickets/${ticket.id}/cancel`, { reason }))
+                void execute(
+                  () => api.post(`/tickets/${ticket.id}/cancel`, { reason }),
+                  'Senha cancelada.',
+                )
               } else if (pendingAction.kind === 'restore') {
-                void execute(() => api.post(`/tickets/${ticket.id}/restore`, { reason }))
+                void execute(
+                  () => api.post(`/tickets/${ticket.id}/restore`, { reason }),
+                  'Senha restaurada.',
+                )
               } else {
-                void execute(() =>
-                  api.post(`/tickets/${ticket.id}/correct`, {
-                    action: pendingAction.kind === 'correct-finish' ? 'FINISH' : 'CANCEL',
-                    reason,
-                  }),
+                const isFinish = pendingAction.kind === 'correct-finish'
+                void execute(
+                  () =>
+                    api.post(`/tickets/${ticket.id}/correct`, {
+                      action: isFinish ? 'FINISH' : 'CANCEL',
+                      reason,
+                    }),
+                  isFinish ? 'Atendimento finalizado.' : 'Atendimento cancelado.',
                 )
               }
             }}
@@ -548,14 +614,55 @@ export function ManagerPage() {
             reasonRequired={false}
             confirmLabel="Liberar caixa"
             loading={loading}
+            error={error}
             onConfirm={() => {
               const { id } = pendingCounter
-              void execute(() => api.post(`/counters/${id}/force-release`))
+              void execute(() => api.post(`/counters/${id}/force-release`), 'Caixa liberado.')
             }}
             onClose={() => {
               setPendingCounter(null)
             }}
           />
+        )}
+
+        {pendingDayToggle && er && (
+          <Modal
+            title={er.isDayOpen ? 'Encerrar operação?' : 'Abrir operação?'}
+            onClose={() => setPendingDayToggle(false)}
+            footer={
+              <>
+                <Button variant="secondary" onClick={() => setPendingDayToggle(false)} disabled={loading}>
+                  Voltar
+                </Button>
+                {er.isDayOpen ? (
+                  <Button
+                    variant="danger"
+                    disabled={loading}
+                    onClick={() => execute(() => api.post(`/ers/${erId}/close-day`), 'Operação encerrada.')}
+                  >
+                    {loading ? 'Encerrando...' : 'Encerrar operação'}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    disabled={loading}
+                    onClick={() => execute(() => api.post(`/ers/${erId}/open-day`), 'Operação aberta.')}
+                  >
+                    {loading ? 'Abrindo...' : 'Abrir operação'}
+                  </Button>
+                )}
+              </>
+            }
+          >
+            {error && (
+              <Alert tone="error" style={{ marginBottom: `${brand.spacing[12]}px` }}>
+                {error}
+              </Alert>
+            )}
+            {er.isDayOpen
+              ? 'Atendimentos em andamento serão finalizados automaticamente. Esta ação não pode ser desfeita.'
+              : 'A fila ficará disponível para entrada de senhas neste ER.'}
+          </Modal>
         )}
       </div>
     </div>
@@ -571,37 +678,171 @@ function TicketTable({
   ActionComponent: TicketActionComponent
   onSelect: (action: PendingAction) => void
 }>) {
+  const columns: Column<Ticket>[] = [
+    { key: 'code', header: 'Senha', render: (ticket) => ticket.code },
+    { key: 'state', header: 'Estado', render: (ticket) => ticketStateLabel(ticket.state) },
+    { key: 're', header: 'RE', render: (ticket) => ticket.representative?.fullName ?? '-' },
+    { key: 'wait', header: 'Espera', render: (ticket) => formatDuration(elapsedSeconds(ticket.createdAt)) },
+    { key: 'channel', header: 'Canal', render: (ticket) => entryChannelLabel(ticket.entryChannel) },
+    { key: 'counter', header: 'Caixa', render: (ticket) => ticket.counter?.number ?? '-' },
+    {
+      key: 'actions',
+      header: 'Ações',
+      align: 'right',
+      render: (ticket) => <ActionComponent ticket={ticket} onSelect={onSelect} />,
+    },
+  ]
   return (
-    <div className="gb-table-wrap">
-      <table className="gb-table">
-        <thead>
-          <tr>
-            <th>Senha</th>
-            <th>Estado</th>
-            <th>RE</th>
-            <th>Espera</th>
-            <th>Canal</th>
-            <th>Caixa</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tickets.map((ticket) => (
-            <tr key={ticket.id}>
-              <td>{ticket.code}</td>
-              <td>{ticketStateLabel(ticket.state)}</td>
-              <td>{ticket.representative?.fullName ?? '-'}</td>
-              <td>{elapsedMinutes(ticket.createdAt)} min</td>
-              <td>{entryChannelLabel(ticket.entryChannel)}</td>
-              <td>{ticket.counter?.number ?? '-'}</td>
-              <td>
-                <ActionComponent ticket={ticket} onSelect={onSelect} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table
+      columns={columns}
+      rows={tickets}
+      getRowKey={(ticket) => ticket.id}
+      emptyMessage="Nenhuma senha nesta lista."
+    />
+  )
+}
+
+function unionKeys(...records: Record<string, number>[]): string[] {
+  const keys = new Set<string>()
+  for (const record of records) {
+    for (const key of Object.keys(record)) keys.add(key)
+  }
+  return [...keys]
+}
+
+function DayDistribution({ metrics }: Readonly<{ metrics: Metrics }>) {
+  const hourItems = Object.entries(metrics.volumeByHour)
+    .map(([hour, total]) => ({ hour: Number(hour), total }))
+    .sort((left, right) => left.hour - right.hour)
+    .map(({ hour, total }) => ({
+      label: `${hour}h`,
+      value: total,
+      highlight: metrics.peakHours.includes(hour),
+    }))
+
+  const waitItems = Object.entries(metrics.waitSecondsByHour)
+    .map(([hour, seconds]) => ({ hour: Number(hour), seconds }))
+    .sort((left, right) => left.hour - right.hour)
+    .map(({ hour, seconds }) => ({
+      label: `${hour}h`,
+      value: seconds,
+      display: formatDuration(seconds),
+    }))
+
+  const channelRows = unionKeys(
+    metrics.byChannel,
+    metrics.cancelledByChannel,
+    metrics.noShowByChannel,
+  ).map((key) => ({
+    id: key,
+    channel: entryChannelLabel(key),
+    entries: metrics.byChannel[key] ?? 0,
+    cancelled: metrics.cancelledByChannel[key] ?? 0,
+    noShow: metrics.noShowByChannel[key] ?? 0,
+  }))
+  const channelColumns: Column<(typeof channelRows)[number]>[] = [
+    { key: 'channel', header: 'Canal', render: (row) => row.channel },
+    { key: 'entries', header: 'Entradas', align: 'right', render: (row) => row.entries },
+    { key: 'cancelled', header: 'Cancelados', align: 'right', render: (row) => row.cancelled },
+    { key: 'noShow', header: 'Não compareceu', align: 'right', render: (row) => row.noShow },
+  ]
+
+  const counterRows = unionKeys(metrics.serviceByCounter, metrics.pauseSecondsByCounter).map(
+    (key) => ({
+      id: key,
+      counter: `Caixa ${key}`,
+      services: metrics.serviceByCounter[key] ?? 0,
+      paused: formatDuration(metrics.pauseSecondsByCounter[key] ?? 0),
+    }),
+  )
+  const counterColumns: Column<(typeof counterRows)[number]>[] = [
+    { key: 'counter', header: 'Caixa', render: (row) => row.counter },
+    { key: 'services', header: 'Atendimentos', align: 'right', render: (row) => row.services },
+    { key: 'paused', header: 'Pausa', align: 'right', render: (row) => row.paused },
+  ]
+
+  const operatorRows = unionKeys(metrics.serviceByOperator, metrics.callsByOperator).map((key) => ({
+    id: key,
+    operator: key,
+    services: metrics.serviceByOperator[key] ?? 0,
+    calls: metrics.callsByOperator[key] ?? 0,
+  }))
+  const operatorColumns: Column<(typeof operatorRows)[number]>[] = [
+    { key: 'operator', header: 'Operadora', render: (row) => row.operator },
+    { key: 'services', header: 'Atendimentos', align: 'right', render: (row) => row.services },
+    { key: 'calls', header: 'Chamadas', align: 'right', render: (row) => row.calls },
+  ]
+
+  const tabs: TabItem[] = [
+    {
+      id: 'hora',
+      label: 'Por hora',
+      content: (
+        <div style={styles.distGrid}>
+          <div>
+            <div style={styles.distHourHead}>
+              <h3 style={styles.distTitle}>Finalizados por hora</h3>
+              {metrics.peakHours.length > 0 && (
+                <span style={styles.peakLegend}>
+                  <span style={styles.peakDot} aria-hidden="true" />
+                  Pico: {metrics.peakHours.map((hour) => `${hour}h`).join(', ')}
+                </span>
+              )}
+            </div>
+            <BarList items={hourItems} emptyMessage="Nenhum atendimento finalizado" />
+          </div>
+          <div>
+            <h3 style={{ ...styles.distTitle, marginBottom: brand.spacing[12] }}>
+              Espera média por hora
+            </h3>
+            <BarList items={waitItems} emptyMessage="Sem registros de espera" />
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'canal',
+      label: 'Por canal',
+      content: (
+        <Table
+          columns={channelColumns}
+          rows={channelRows}
+          getRowKey={(row) => row.id}
+          emptyMessage="Sem entradas registradas."
+        />
+      ),
+    },
+    {
+      id: 'caixa',
+      label: 'Por caixa',
+      content: (
+        <Table
+          columns={counterColumns}
+          rows={counterRows}
+          getRowKey={(row) => row.id}
+          emptyMessage="Sem atendimentos por caixa."
+        />
+      ),
+    },
+    {
+      id: 'operadora',
+      label: 'Por operadora',
+      content: (
+        <Table
+          columns={operatorColumns}
+          rows={operatorRows}
+          getRowKey={(row) => row.id}
+          emptyMessage="Sem atendimentos por operadora."
+        />
+      ),
+    },
+  ]
+
+  return (
+    <section style={styles.card} aria-label="Distribuição do dia">
+      <h2 style={styles.cardTitle}>Distribuição do dia</h2>
+      <Tabs tabs={tabs} ariaLabel="Distribuição do dia" />
+    </section>
   )
 }
 
@@ -618,7 +859,14 @@ const styles: Record<string, React.CSSProperties> = {
   cardTitle: {
     margin: `0 0 ${brand.spacing[12]}px`,
     fontSize: brand.typography.subtitle.fontSize,
-    color: brand.green800,
+    color: brand.ink,
+  },
+  sectionHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: `${brand.spacing[12]}px`,
+    marginBottom: `${brand.spacing[12]}px`,
   },
   adminContext: {
     margin: '-0.35rem 0 1rem',
@@ -627,33 +875,95 @@ const styles: Record<string, React.CSSProperties> = {
   },
   counterGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: `${brand.spacing[8]}px`,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+    gap: `${brand.spacing[12]}px`,
   },
   counter: {
     display: 'grid',
-    gap: `${brand.spacing[4]}px`,
-    padding: `${brand.spacing[12]}px`,
-    background: brand.green50,
+    gap: `${brand.spacing[12]}px`,
+    padding: `${brand.spacing[16]}px`,
+    background: brand.canvas,
     border: `1px solid ${brand.border}`,
     borderRadius: brand.radius.medium,
   },
-  counterState: {
+  counterTop: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: `${brand.spacing[8]}px`,
+  },
+  counterMenu: {
+    marginTop: -brand.spacing[8],
+    marginRight: -brand.spacing[8],
+  },
+  counterEyebrow: {
+    display: 'block',
     fontSize: brand.typography.auxiliar.fontSize,
     fontWeight: 700,
-    letterSpacing: '0.06em',
-    color: brand.green700,
-  },
-  counterOperator: {
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
     color: brand.inkMuted,
   },
-  row: {
+  counterNumber: {
+    fontSize: brand.typography.title.fontSize,
+    fontWeight: 700,
+    color: brand.ink,
+    lineHeight: 1.05,
+  },
+  counterBadge: {
+    justifySelf: 'start',
+  },
+  counterOperatorRow: {
+    display: 'grid',
+    gap: '2px',
+  },
+  counterOperatorLabel: {
+    fontSize: brand.typography.auxiliar.fontSize,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: brand.inkMuted,
+  },
+  counterOperatorName: {
+    fontSize: brand.typography.bodySmall.fontSize,
+    color: brand.ink,
+  },
+  distGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: `${brand.spacing[24]}px`,
+    alignItems: 'start',
+  },
+  distTitle: {
+    margin: 0,
+    fontSize: brand.typography.bodyLarge.fontSize,
+    fontWeight: 600,
+    color: brand.ink,
+  },
+  distHourHead: {
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: `${brand.spacing[16]}px`,
-    padding: `${brand.spacing[8]}px 0`,
-    borderBottom: `1px solid ${brand.warningBorder}`,
+    justifyContent: 'space-between',
+    gap: `${brand.spacing[8]}px`,
     flexWrap: 'wrap',
+    marginBottom: `${brand.spacing[12]}px`,
+  },
+  peakLegend: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: `${brand.spacing[4]}px`,
+    padding: `${brand.spacing[4]}px ${brand.spacing[8]}px`,
+    borderRadius: brand.radius.pill,
+    background: brand.canvas,
+    fontSize: brand.typography.auxiliar.fontSize,
+    color: brand.inkMuted,
+    whiteSpace: 'nowrap',
+  },
+  peakDot: {
+    display: 'inline-block',
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    background: brand.conversion,
   },
 }

@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config'
-import { getJwtSecret } from '../jwt.config'
+import { getJwtExpiresInSeconds, getJwtSecret } from '../jwt.config'
 
 function configWith(values: Record<string, string | undefined>): ConfigService {
   return {
@@ -58,5 +58,30 @@ describe('getJwtSecret', () => {
       const config = configWith({ NODE_ENV: 'production', JWT_SECRET: STRONG_SECRET })
       expect(getJwtSecret(config)).toBe(STRONG_SECRET)
     })
+  })
+})
+
+describe('getJwtExpiresInSeconds', () => {
+  it('defaults to 7 days when unset', () => {
+    expect(getJwtExpiresInSeconds(configWith({}))).toBe(7 * 86400)
+  })
+
+  it('accepts a plain number of seconds', () => {
+    expect(getJwtExpiresInSeconds(configWith({ JWT_EXPIRES_IN: '3600' }))).toBe(3600)
+  })
+
+  it.each([
+    ['15m', 15 * 60],
+    ['12h', 12 * 3600],
+    ['7d', 7 * 86400],
+    ['30s', 30],
+  ])('parses the duration %s', (value, expected) => {
+    expect(getJwtExpiresInSeconds(configWith({ JWT_EXPIRES_IN: value }))).toBe(expected)
+  })
+
+  it('rejects an invalid duration', () => {
+    expect(() => getJwtExpiresInSeconds(configWith({ JWT_EXPIRES_IN: 'soon' }))).toThrow(
+      /JWT_EXPIRES_IN/,
+    )
   })
 })

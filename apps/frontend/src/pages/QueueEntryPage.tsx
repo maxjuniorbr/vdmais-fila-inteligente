@@ -343,7 +343,7 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     margin: 0,
     fontSize: brand.typography.title.fontSize,
-    color: brand.green800,
+    color: brand.ink,
     lineHeight: 1.15,
   },
   subtitle: {
@@ -369,7 +369,7 @@ const styles: Record<string, React.CSSProperties> = {
   statusOpen: {
     background: brand.successSoft,
     color: brand.success,
-    border: `1px solid ${brand.green100}`,
+    border: `1px solid ${brand.successBorder}`,
   },
   statusClosed: {
     background: brand.dangerSoft,
@@ -387,7 +387,7 @@ const styles: Record<string, React.CSSProperties> = {
   checkbox: {
     width: 22,
     height: 22,
-    accentColor: brand.green700,
+    accentColor: brand.actionable,
     flexShrink: 0,
   },
   card: layout.card,
@@ -396,7 +396,7 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: '1fr 1fr',
     gap: brand.spacing[4],
     padding: brand.spacing[4],
-    background: brand.green50,
+    background: brand.canvas,
     borderRadius: brand.radius.large,
   },
   tab: {
@@ -411,7 +411,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   tabActive: {
-    background: brand.green700,
-    color: '#ffffff',
+    background: brand.actionable,
+    color: brand.actionableContent,
   },
 }

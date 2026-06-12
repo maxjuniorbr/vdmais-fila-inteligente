@@ -78,7 +78,7 @@ export function HomePage() {
     <div style={styles.shell}>
       <header style={styles.topbar}>
         <div style={styles.brandRow}>
-          <BrandMark onDark size={38} />
+          <BrandMark size={38} />
           <div>
             <strong style={styles.brandName}>VD+ Fila Inteligente</strong>
             <span style={styles.brandSubtitle}>Acessos internos</span>
@@ -89,7 +89,6 @@ export function HomePage() {
             variant="secondary"
             size="sm"
             type="button"
-            style={styles.logoutButton}
             onClick={() => void logout()}
           >
             Encerrar sessão
@@ -201,9 +200,9 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     gap: '1rem',
     padding: '0.9rem max(1rem, calc((100vw - 1120px) / 2))',
-    background: brand.green700,
-    borderBottom: `3px solid ${brand.gold400}`,
-    color: '#ffffff',
+    background: brand.surface,
+    borderBottom: `1px solid ${brand.border}`,
+    color: brand.ink,
   },
   brandRow: {
     display: 'flex',
@@ -218,13 +217,8 @@ const styles: Record<string, React.CSSProperties> = {
   brandSubtitle: {
     display: 'block',
     marginTop: '0.1rem',
-    color: brand.green100,
+    color: brand.inkMuted,
     fontSize: brand.typography.auxiliar.fontSize,
-  },
-  logoutButton: {
-    borderColor: 'rgba(255, 255, 255, 0.55)',
-    background: 'transparent',
-    color: '#ffffff',
   },
   content: {
     width: 'min(1120px, calc(100% - 2rem))',
@@ -238,7 +232,7 @@ const styles: Record<string, React.CSSProperties> = {
   eyebrow: {
     display: 'block',
     marginBottom: '0.5rem',
-    color: brand.green600,
+    color: brand.emphasis,
     fontSize: '0.75rem',
     fontWeight: 700,
     letterSpacing: '0.14em',
@@ -246,7 +240,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     margin: 0,
-    color: brand.green900,
+    color: brand.ink,
     fontSize: 'clamp(2rem, 5vw, 3.25rem)',
     lineHeight: 1.08,
     letterSpacing: '-0.03em',
@@ -265,13 +259,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '1rem',
     marginBottom: `${brand.spacing[20]}px`,
     padding: `${brand.spacing[16]}px ${brand.spacing[20]}px`,
-    border: `1px solid ${brand.green100}`,
+    border: `1px solid ${brand.border}`,
     borderRadius: brand.radius.large,
-    background: brand.green50,
+    background: brand.canvas,
   },
   sessionLabel: {
     display: 'block',
-    color: brand.green600,
+    color: brand.emphasis,
     fontSize: brand.typography.auxiliar.fontSize,
     fontWeight: 700,
     letterSpacing: '0.1em',
@@ -280,7 +274,7 @@ const styles: Record<string, React.CSSProperties> = {
   sessionName: {
     display: 'inline-block',
     marginTop: '0.15rem',
-    color: brand.green900,
+    color: brand.ink,
     fontSize: '1rem',
   },
   sessionRole: {
@@ -294,9 +288,9 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     minHeight: 42,
     padding: '0.6rem 1rem',
-    borderRadius: brand.radius.medium,
-    background: brand.green700,
-    color: '#ffffff',
+    borderRadius: brand.radius.pill,
+    background: brand.actionable,
+    color: brand.actionableContent,
     fontSize: '0.88rem',
     fontWeight: 700,
     textDecoration: 'none',
@@ -309,9 +303,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
   },
   secondarySessionLink: {
-    border: `1px solid ${brand.green600}`,
+    border: `2px solid ${brand.actionable}`,
     background: brand.surface,
-    color: brand.green700,
+    color: brand.actionable,
   },
   accessCard: {
     display: 'grid',
@@ -320,7 +314,6 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 235,
     padding: `${brand.spacing[20]}px`,
     border: `1px solid ${brand.border}`,
-    borderTop: `3px solid ${brand.green400}`,
     borderRadius: brand.radius.large,
     background: brand.surface,
     boxShadow: brand.shadow,
@@ -328,9 +321,8 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: 'none',
   },
   accessCardCurrent: {
-    borderColor: brand.green500,
-    borderTopColor: brand.green700,
-    boxShadow: '0 0 0 2px rgba(13, 138, 95, 0.12)',
+    border: `1px solid ${brand.actionable}`,
+    boxShadow: '0 0 0 2px rgba(38, 79, 236, 0.12)',
   },
   cardTop: {
     display: 'flex',
@@ -339,7 +331,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '0.5rem',
   },
   roleTag: {
-    color: brand.green600,
+    color: brand.inkMuted,
     fontSize: '0.7rem',
     fontWeight: 700,
     letterSpacing: '0.1em',
@@ -348,14 +340,14 @@ const styles: Record<string, React.CSSProperties> = {
   currentTag: {
     padding: '0.2rem 0.45rem',
     borderRadius: 999,
-    background: brand.green50,
-    color: brand.green700,
+    background: brand.successSoft,
+    color: brand.success,
     fontSize: '0.68rem',
     fontWeight: 700,
   },
   cardTitle: {
     margin: 0,
-    color: brand.green900,
+    color: brand.ink,
     fontSize: brand.typography.title.fontSize,
   },
   cardDescription: {
@@ -365,7 +357,7 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.55,
   },
   cardAction: {
-    color: brand.green700,
+    color: brand.actionable,
     fontSize: brand.typography.bodySmall.fontSize,
     fontWeight: 700,
   },
@@ -395,9 +387,9 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     minHeight: 38,
     padding: '0.45rem 0.85rem',
-    border: `1px solid ${brand.green600}`,
-    borderRadius: brand.radius.medium,
-    color: brand.green700,
+    border: `2px solid ${brand.actionable}`,
+    borderRadius: brand.radius.pill,
+    color: brand.actionable,
     fontSize: '0.82rem',
     fontWeight: 700,
     textDecoration: 'none',

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { layout } from '../styles/layout'
 import { brand } from '../styles/brand'
+import { Alert } from './Alert'
 import { Button } from './Button'
 
 const FOCUSABLE_SELECTOR = [
@@ -19,6 +20,7 @@ interface ConfirmDialogProps {
   reasonPlaceholder?: string
   reasonRequired?: boolean
   loading?: boolean
+  error?: string | null
   confirmLabel?: string
   cancelLabel?: string
   onConfirm: (reason: string) => void
@@ -31,6 +33,7 @@ export function ConfirmDialog({
   reasonPlaceholder = 'Motivo obrigatório',
   reasonRequired = true,
   loading = false,
+  error,
   confirmLabel = 'Confirmar',
   cancelLabel = 'Fechar',
   onConfirm,
@@ -114,6 +117,7 @@ export function ConfirmDialog({
           onChange={(event) => setReason(event.target.value)}
           style={styles.textarea}
         />
+        {error && <Alert tone="error">{error}</Alert>}
         <div style={layout.actions}>
           <Button onClick={() => onConfirm(reason.trim())} disabled={loading || !canConfirm}>
             {confirmLabel}
@@ -130,28 +134,28 @@ export function ConfirmDialog({
 const styles: Record<string, React.CSSProperties> = {
   title: {
     margin: 0,
-    fontSize: '1.1rem',
+    fontSize: brand.typography.subtitle.fontSize,
     fontWeight: 700,
-    color: brand.green800,
+    color: brand.ink,
   },
   description: {
     margin: 0,
-    fontSize: '0.9rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     color: brand.inkSoft,
   },
   label: {
-    fontSize: '0.9rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     fontWeight: 600,
     color: brand.inkSoft,
   },
   textarea: {
     width: '100%',
-    padding: '0.6rem',
+    padding: `${brand.spacing[12]}px`,
     border: `1px solid ${brand.borderStrong}`,
-    borderRadius: 10,
+    borderRadius: brand.radius.medium,
     resize: 'vertical',
     fontFamily: 'inherit',
-    fontSize: '0.9rem',
+    fontSize: brand.typography.bodyLarge.fontSize,
     boxSizing: 'border-box',
     color: brand.ink,
   },
