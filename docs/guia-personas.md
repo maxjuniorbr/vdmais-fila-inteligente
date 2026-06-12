@@ -32,10 +32,9 @@ Relacionamento e precisa ser atendida.
 
 **Como entra na fila (3 canais):**
 
-1. **QR Code (preferencial):** escaneia o QR Code exposto no ER → abre
-   `/fila/:erId`.
-2. **Link alternativo:** acessa `/fila/:erId?source=link` → confirma o ER antes
-   de continuar.
+1. **QR Code (preferencial):** escaneia o QR Code assinado exposto no ER.
+2. **Link alternativo:** acessa o link assinado e confirma o ER antes de
+   continuar.
 3. **Check-in assistido:** quando está sem celular/internet, um atendente a
    coloca na fila (ver persona Atendente).
 
@@ -61,6 +60,9 @@ Relacionamento e precisa ser atendida.
 
 > Se a RE fechar a página e voltar pelo mesmo acesso, o sistema **recupera a
 > senha ativa** após o login.
+
+> Se o acesso estiver inválido ou expirado, a RE deve ler o QR Code atualizado
+> ou pedir um novo link à equipe. Não há CAPTCHA.
 
 ---
 
@@ -186,12 +188,17 @@ pode administrar vários.
    - cadastra os **caixas** físicos;
    - cria as contas de **gestora**, **operadoras** e (se usar) **atendente**;
    - copia/testa os acessos do ER:
-     - **QR Code presencial** — o endereço para gerar o QR Code no balcão;
-     - **Link alternativo** — com `?source=link`, exige confirmar o ER;
+     - **QR Code presencial** — URL assinada válida por 30 dias;
+     - **Link alternativo** — URL assinada válida por 24 horas e com confirmação
+       do ER;
      - **Painel de TV** — gera o **token de acesso** e copia a URL com o token
        para abrir na TV do salão. O token pode ser revogado ou regerado a
        qualquer momento se o endereço vazar.
 4. Entrega os acessos à equipe e o ER está pronto para operar.
+
+> A validade aparece ao lado de cada acesso. Quando expirar, copie a nova URL e
+> regenere o QR Code ou redistribua o link. QR Codes antigos sem `#entry=` não
+> funcionam nesta versão.
 
 ---
 

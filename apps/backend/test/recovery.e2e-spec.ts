@@ -1,7 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Test, TestingModule } from '@nestjs/testing'
-import { CounterState, Role, TicketState } from '@prisma/client'
+import { CounterState, EntryChannel, Role, TicketState } from '@prisma/client'
 import * as bcrypt from 'bcrypt'
 import request from 'supertest'
 import { AppModule } from '../src/app.module'
@@ -64,7 +64,7 @@ describe('Operational recovery scenarios (e2e)', () => {
     }
   }
 
-  async function createRepresentative() {
+  async function createRepresentative(erId: string) {
     repCounter += 1
     const rep = await prisma.representative.create({
       data: {
@@ -76,7 +76,16 @@ describe('Operational recovery scenarios (e2e)', () => {
         passwordHash: await bcrypt.hash('senha123', 10),
       },
     })
-    return { id: rep.id, token: jwt.sign({ sub: rep.id, userId: rep.id, role: Role.REPRESENTATIVE }) }
+    return {
+      id: rep.id,
+      token: jwt.sign({
+        sub: rep.id,
+        userId: rep.id,
+        role: Role.REPRESENTATIVE,
+        erId,
+        entryChannel: EntryChannel.QR_CODE,
+      }),
+    }
   }
 
   beforeAll(async () => {
@@ -123,7 +132,7 @@ describe('Operational recovery scenarios (e2e)', () => {
 
   it('sanitizes leftover tickets and counters from a previous unclosed day when opening', async () => {
     const { erId, counterId, operatorId, managerToken } = await provisionER('ER Virada')
-    const rep = await createRepresentative()
+    const rep = await createRepresentative(erId)
 
     // Simula um dia anterior que não foi encerrado: fila de ontem com senha
     // ainda aguardando, ER marcado como aberto e caixa preso a uma operadora.
@@ -173,7 +182,7 @@ describe('Operational recovery scenarios (e2e)', () => {
 
   it('lets a manager force-release an orphan counter, resolving the called ticket', async () => {
     const { erId, counterId, operatorToken, managerToken } = await provisionER('ER Orfao')
-    const rep = await createRepresentative()
+    const rep = await createRepresentative(erId)
 
     await request(app.getHttpServer())
       .post(`/ers/${erId}/open-day`)
@@ -223,7 +232,7 @@ describe('Operational recovery scenarios (e2e)', () => {
 
   it('auto-finishes an in-service ticket when the day is closed', async () => {
     const { erId, counterId, operatorToken, managerToken } = await provisionER('ER Encerra')
-    const rep = await createRepresentative()
+    const rep = await createRepresentative(erId)
 
     await request(app.getHttpServer())
       .post(`/ers/${erId}/open-day`)
@@ -267,7 +276,7 @@ describe('Operational recovery scenarios (e2e)', () => {
 
   it('auto-expires a ticket stuck in CALLING beyond the tolerance window', async () => {
     const { erId, counterId, operatorToken, managerToken } = await provisionER('ER Timeout')
-    const rep = await createRepresentative()
+    const rep = await createRepresentative(erId)
 
     await request(app.getHttpServer())
       .post(`/ers/${erId}/open-day`)
