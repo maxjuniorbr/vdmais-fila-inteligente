@@ -65,9 +65,14 @@ describe('api client', () => {
         }),
       ),
     )
+    const onExpired = vi.fn()
+    globalThis.addEventListener('staff-session-expired', onExpired)
 
     await expect(api.get('/private')).rejects.toThrow('Sessão expirada')
     expect(sessionStorage.getItem('token')).toBeNull()
+    expect(onExpired).toHaveBeenCalledTimes(1)
+
+    globalThis.removeEventListener('staff-session-expired', onExpired)
   })
 
   it('uses the HTTP status text when an error body is not JSON', async () => {
