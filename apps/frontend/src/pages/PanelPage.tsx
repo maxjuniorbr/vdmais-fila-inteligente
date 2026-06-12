@@ -1,29 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { formatDate, formatDuration, formatTimeWithSeconds } from '../utils/format'
 
 interface Call {
-  ticketId: string
   code: string
   displayName: string
   counterNumber: number
-  calledAt?: string
 }
 
 interface InService {
-  ticketId: string
   code: string
   counterNumber: number
 }
 
 interface WaitingTicket {
-  ticketId: string
   code: string
   position: number
-  createdAt: string
 }
 
 interface PanelState {
@@ -83,13 +78,16 @@ const NEXT_ROTATE_MS = 5000
 
 export function PanelPage() {
   const { erId } = useParams<{ erId: string }>()
-  const socket = useSocket(erId ?? '', 'panel')
+  const [searchParams] = useSearchParams()
+  const panelToken = searchParams.get('token') ?? ''
+  const socket = useSocket(erId ?? '', 'panel', panelToken)
   const [current, setCurrent] = useState<Call | null>(null)
   const [calling, setCalling] = useState<Call[]>([])
   const [inService, setInService] = useState<InService[]>([])
   const [waiting, setWaiting] = useState<WaitingTicket[]>([])
   const [avgServiceSeconds, setAvgServiceSeconds] = useState<number | null>(null)
   const [avgWaitSeconds, setAvgWaitSeconds] = useState<number | null>(null)
+  const [accessDenied, setAccessDenied] = useState(false)
   const [clock, setClock] = useState(() => new Date())
   const [nextPage, setNextPage] = useState(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -133,9 +131,16 @@ export function PanelPage() {
   const fetchPanelState = useCallback(async () => {
     if (!erId) return
     try {
-      const response = await fetch(`/api/panel/${erId}/state`)
+      const response = await fetch(`/api/panel/${erId}/state`, {
+        headers: panelToken ? { 'x-panel-token': panelToken } : undefined,
+      })
+      if (response.status === 401) {
+        setAccessDenied(true)
+        return
+      }
       if (!response.ok) return
       const state = (await response.json()) as PanelState
+      setAccessDenied(false)
       setCurrent(state.current)
       setCalling(state.calling ?? [])
       setInService(state.inService)
@@ -145,7 +150,7 @@ export function PanelPage() {
     } catch {
       // Polling retries automatically; the TV must remain on screen.
     }
-  }, [erId])
+  }, [erId, panelToken])
 
   useEffect(() => {
     fetchPanelState()
@@ -184,6 +189,20 @@ export function PanelPage() {
     : waiting.slice(0, NEXT_VISIBLE)
   const { columns, codeSize, nameSize, caixaSize } = resolvePanelLayout(callCount)
 
+  if (accessDenied) {
+    return (
+      <main style={styles.page}>
+        <div style={styles.blockedScreen}>
+          <span style={styles.blockedTitle}>Painel sem acesso</span>
+          <span style={styles.blockedText}>
+            Gere o token do painel na administração do ER e abra a TV com a URL que inclui o
+            token.
+          </span>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main style={styles.page}>
       {/* Keyframes do efeito de "piscar" ao chamar (respeita prefers-reduced-motion via theme.css) */}
@@ -208,10 +227,10 @@ export function PanelPage() {
           ) : (
             <div style={{ ...styles.callGrid, gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
               {calling.map((call) => {
-                const isCurrent = current?.ticketId === call.ticketId
+                const isCurrent = current?.code === call.code
                 return (
                   <article
-                    key={call.ticketId}
+                    key={call.code}
                     style={{
                       ...styles.callCard,
                       ...(isCurrent ? styles.callCardActive : null),
@@ -237,7 +256,7 @@ export function PanelPage() {
             ) : (
               <div style={styles.stripChips}>
                 {inService.slice(0, 8).map((ticket) => (
-                  <span key={ticket.ticketId} style={styles.serviceChip}>
+                  <span key={ticket.code} style={styles.serviceChip}>
                     <strong>{ticket.code}</strong>
                     <span style={styles.serviceChipCaixa}>CX {ticket.counterNumber}</span>
                   </span>
@@ -266,7 +285,7 @@ export function PanelPage() {
                   const isNext = index === 0
                   return (
                     <div
-                      key={ticket.ticketId}
+                      key={ticket.code}
                       style={{ ...styles.nextRow, ...(isNext ? styles.nextRowFirst : null) }}
                     >
                       <span style={{ ...styles.nextCode, ...(isNext ? styles.nextCodeFirst : null) }}>
@@ -342,6 +361,28 @@ const styles: Record<string, React.CSSProperties> = {
     color: C.ink,
     fontFamily: brand.font,
     overflow: 'hidden',
+  },
+
+  blockedScreen: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '1.5vh',
+    padding: '6vh 8vw',
+    textAlign: 'center',
+  },
+  blockedTitle: {
+    fontSize: 'min(6vw, 9vh)',
+    fontWeight: 900,
+    color: C.ink,
+  },
+  blockedText: {
+    fontSize: 'min(2.2vw, 3.4vh)',
+    fontWeight: 600,
+    color: C.inkMuted,
+    maxWidth: '40ch',
   },
 
   clock: {

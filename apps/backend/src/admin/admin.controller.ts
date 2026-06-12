@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common'
 import { AdminService } from './admin.service'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -55,5 +55,15 @@ export class AdminController {
     @Request() req: { user: AuthenticatedUser },
   ) {
     return this.adminService.createStaff(erId, dto, req.user)
+  }
+
+  @Post('ers/:erId/panel-token')
+  rotatePanelToken(@Param('erId') erId: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.adminService.rotatePanelToken(erId, req.user)
+  }
+
+  @Delete('ers/:erId/panel-token')
+  revokePanelToken(@Param('erId') erId: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.adminService.revokePanelToken(erId, req.user)
   }
 }

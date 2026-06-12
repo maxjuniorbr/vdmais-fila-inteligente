@@ -40,7 +40,7 @@ describe('useSocket', () => {
     const socket = makeSocket()
     ioMock.mockReturnValue(socket)
 
-    const { result, unmount } = renderHook(() => useSocket('er-1', 'panel'))
+    const { result, unmount } = renderHook(() => useSocket('er-1', 'panel', 'display-token'))
 
     expect(ioMock).toHaveBeenCalledTimes(1)
     const [, options] = ioMock.mock.calls[0]
@@ -51,7 +51,11 @@ describe('useSocket', () => {
     const connectHandler = socket.on.mock.calls.find(([event]) => event === 'connect')?.[1]
     expect(connectHandler).toBeTypeOf('function')
     connectHandler()
-    expect(socket.emit).toHaveBeenCalledWith('joinER', { erId: 'er-1', clientType: 'panel' })
+    expect(socket.emit).toHaveBeenCalledWith('joinER', {
+      erId: 'er-1',
+      clientType: 'panel',
+      token: 'display-token',
+    })
 
     unmount()
     expect(socket.disconnect).toHaveBeenCalledTimes(1)

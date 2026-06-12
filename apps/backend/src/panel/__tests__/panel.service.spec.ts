@@ -54,7 +54,11 @@ describe('PanelService', () => {
       expect.objectContaining({ code: 'A001', counterNumber: 1, displayName: 'Ana P.' }),
       expect.objectContaining({ code: 'A002', counterNumber: 2, displayName: 'Carla M.' }),
     ])
-    expect(result.current).toEqual(expect.objectContaining({ ticketId: 'ticket-2' }))
+    expect(result.current).toEqual(
+      expect.objectContaining({ code: 'A002', counterNumber: 2, displayName: 'Carla M.' }),
+    )
+    expect(result.calling[0]).not.toHaveProperty('ticketId')
+    expect(result.calling[0]).not.toHaveProperty('calledAt')
   })
 
   it('throws when the ER does not exist', async () => {
@@ -104,5 +108,7 @@ describe('PanelService', () => {
       expect.objectContaining({ code: 'B001', counterNumber: 3 }),
     ])
     expect(result.waiting).toEqual([expect.objectContaining({ code: 'C001', position: 1 })])
+    expect(result.inService[0]).not.toHaveProperty('ticketId')
+    expect(result.waiting[0]).not.toHaveProperty('createdAt')
   })
 })

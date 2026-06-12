@@ -3,6 +3,7 @@ import { Prisma, Role } from '@prisma/client'
 import * as bcrypt from 'bcrypt'
 import { AuditLogService } from '../../audit-log/audit-log.service'
 import { PrismaService } from '../../prisma/prisma.service'
+import { PanelTokenService } from '../../panel/panel-token.service'
 import { AdminService } from '../admin.service'
 
 jest.mock('bcrypt')
@@ -14,6 +15,7 @@ const prisma = {
   operator: { create: jest.fn() },
 }
 const auditLog = { log: jest.fn() }
+const panelTokens = { rotate: jest.fn(), revoke: jest.fn() }
 const user = { userId: 'admin-1', role: Role.ADMIN, erId: undefined }
 
 const uniqueViolation = new Prisma.PrismaClientKnownRequestError('dup', {
@@ -29,6 +31,7 @@ describe('AdminService', () => {
     service = new AdminService(
       prisma as unknown as PrismaService,
       auditLog as unknown as AuditLogService,
+      panelTokens as unknown as PanelTokenService,
     )
     mockedBcrypt.hash.mockResolvedValue('hashed' as never)
     prisma.eR.findUnique.mockResolvedValue({ id: 'er-1' })
@@ -39,10 +42,28 @@ describe('AdminService', () => {
     await expect(service.listERs()).resolves.toEqual([{ id: 'er-1' }])
   })
 
-  it('returns an ER with relations', async () => {
-    prisma.eR.findUnique.mockResolvedValue({ id: 'er-1', counters: [], operators: [] })
+  it('returns an ER with relations and hides the panel token hash', async () => {
+    prisma.eR.findUnique.mockResolvedValue({
+      id: 'er-1',
+      panelTokenHash: 'secret-hash',
+      counters: [],
+      operators: [],
+    })
     const result = await service.getER('er-1')
     expect(result.id).toBe('er-1')
+    expect(result).not.toHaveProperty('panelTokenHash')
+    expect(result.hasPanelToken).toBe(true)
+  })
+
+  it('reports hasPanelToken false when no token is set', async () => {
+    prisma.eR.findUnique.mockResolvedValue({
+      id: 'er-1',
+      panelTokenHash: null,
+      counters: [],
+      operators: [],
+    })
+    const result = await service.getER('er-1')
+    expect(result.hasPanelToken).toBe(false)
   })
 
   it('throws when the ER does not exist', async () => {
@@ -122,5 +143,31 @@ describe('AdminService', () => {
     await expect(service.createCounter('missing', { number: 1 }, user)).rejects.toThrow(
       NotFoundException,
     )
+  })
+
+  it('rotates a panel token and audits it', async () => {
+    panelTokens.rotate.mockResolvedValue('fresh-token')
+    const result = await service.rotatePanelToken('er-1', user)
+    expect(panelTokens.rotate).toHaveBeenCalledWith('er-1')
+    expect(result).toEqual({ token: 'fresh-token' })
+    expect(auditLog.log).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'panel_token_rotated', erId: 'er-1' }),
+    )
+  })
+
+  it('revokes a panel token and audits it', async () => {
+    panelTokens.revoke.mockResolvedValue(undefined)
+    const result = await service.revokePanelToken('er-1', user)
+    expect(panelTokens.revoke).toHaveBeenCalledWith('er-1')
+    expect(result).toEqual({ revoked: true })
+    expect(auditLog.log).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'panel_token_revoked', erId: 'er-1' }),
+    )
+  })
+
+  it('does not rotate a panel token for a missing ER', async () => {
+    prisma.eR.findUnique.mockResolvedValue(null)
+    await expect(service.rotatePanelToken('missing', user)).rejects.toThrow(NotFoundException)
+    expect(panelTokens.rotate).not.toHaveBeenCalled()
   })
 })
