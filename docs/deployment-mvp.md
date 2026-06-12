@@ -40,6 +40,25 @@ HTTPS.
 > Regras operacionais de migrations (paridade, pipeline e segurança) vivem no AI
 > steering `.kiro/steering/database-migrations.md`.
 
+## Segurança de borda
+
+O frontend é servido com cabeçalhos de hardening aplicados na borda (definidos em
+`apps/frontend/nginx.conf` para o container e em `apps/frontend/vercel.json` para a
+Vercel; os dois devem permanecer equivalentes):
+
+- `Content-Security-Policy` restritiva: `default-src 'self'`, `object-src 'none'`,
+  `frame-ancestors 'none'`, scripts só de origem própria. Fontes do Google liberadas em
+  `style-src`/`font-src`. O `connect-src` libera o backend (REST + WebSocket): mesma
+  origem no Nginx (proxy interno) e o domínio do backend na Vercel (o WebSocket não passa
+  pelo rewrite).
+- `X-Frame-Options: DENY` e `frame-ancestors 'none'` contra clickjacking.
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  `Permissions-Policy` desativando câmera/microfone/geolocalização.
+- `Strict-Transport-Security` (HSTS) com um ano e `includeSubDomains`.
+
+> Ao adicionar um novo destino de rede (ex.: domínio de backend ou CDN), atualize o
+> `connect-src` nos dois arquivos, senão o navegador bloqueia a chamada em produção.
+
 ## Observabilidade
 
 - Logs HTTP são emitidos em JSON para stdout, sem corpo, credenciais ou dados da RE.
