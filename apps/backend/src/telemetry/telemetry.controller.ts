@@ -34,7 +34,7 @@ export class TelemetryController {
 
   @Post('staff/logout')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OPERATOR', 'ATTENDANT', 'MANAGER')
+  @Roles('ADMIN', 'OPERATOR', 'ATTENDANT', 'MANAGER')
   logout(@Request() req: { user: AuthenticatedUser }) {
     return this.telemetryService.recordLogout(req.user)
   }

@@ -7,6 +7,7 @@ import { TelemetryService } from '../telemetry.service'
 const prisma = {
   eR: { findUnique: jest.fn() },
   ticket: { findUnique: jest.fn(), findFirst: jest.fn() },
+  operator: { update: jest.fn() },
 }
 const auditLog = { log: jest.fn() }
 
@@ -88,15 +89,33 @@ describe('TelemetryService', () => {
   })
 
   describe('recordLogout', () => {
-    it('records the staff logout', async () => {
+    it('records the staff logout and revokes the session', async () => {
+      prisma.operator.update.mockResolvedValue({})
       await expect(service.recordLogout(operator)).resolves.toEqual({ recorded: true })
+      expect(prisma.operator.update).toHaveBeenCalledWith({
+        where: { id: 'op-1' },
+        data: { sessionVersion: { increment: 1 } },
+      })
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'operator_logged_out' }),
       )
     })
 
+    it('revokes an admin session even without an ER bound', async () => {
+      prisma.operator.update.mockResolvedValue({})
+      await expect(
+        service.recordLogout({ userId: 'adm-1', role: Role.ADMIN, erId: undefined }),
+      ).resolves.toEqual({ recorded: true })
+      expect(prisma.operator.update).toHaveBeenCalledWith({
+        where: { id: 'adm-1' },
+        data: { sessionVersion: { increment: 1 } },
+      })
+      expect(auditLog.log).not.toHaveBeenCalled()
+    })
+
     it('forbids a representative logout', async () => {
       await expect(service.recordLogout(representative)).rejects.toThrow(ForbiddenException)
+      expect(prisma.operator.update).not.toHaveBeenCalled()
     })
   })
 

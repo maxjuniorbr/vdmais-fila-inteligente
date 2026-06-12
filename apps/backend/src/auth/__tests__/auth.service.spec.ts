@@ -74,21 +74,34 @@ describe('AuthService', () => {
 
     it('rejects a duplicated CPF', async () => {
       prisma.representative.findFirst.mockResolvedValue({ cpf: '11122233344' })
-      await expect(service.createRepresentative(registerDto)).rejects.toThrow('CPF já cadastrado')
+      await expect(service.createRepresentative(registerDto)).rejects.toThrow(
+        'Não foi possível concluir o cadastro com os dados informados',
+      )
     })
 
-    it('rejects a duplicated phone', async () => {
+    it('hides which identifier exists on public self-registration', async () => {
       prisma.representative.findFirst.mockResolvedValue({ cpf: 'x', phone: '11999990000' })
       await expect(service.createRepresentative(registerDto)).rejects.toThrow(
-        'Telefone já cadastrado',
+        'Não foi possível concluir o cadastro com os dados informados',
       )
     })
 
-    it('rejects a duplicated RE code', async () => {
+    it('keeps the specific message on the assisted (staff) flow', async () => {
+      const actor = { userId: 'att-1', role: Role.ATTENDANT, erId: 'er-1' }
+      prisma.representative.findFirst.mockResolvedValue({ cpf: '11122233344' })
+      await expect(
+        service.createRepresentative(registerDto, { erId: 'er-1', actor }),
+      ).rejects.toThrow('CPF já cadastrado')
+
+      prisma.representative.findFirst.mockResolvedValue({ cpf: 'x', phone: '11999990000' })
+      await expect(
+        service.createRepresentative(registerDto, { erId: 'er-1', actor }),
+      ).rejects.toThrow('Telefone já cadastrado')
+
       prisma.representative.findFirst.mockResolvedValue({ cpf: 'x', phone: 'y', reCode: 'RE0001' })
-      await expect(service.createRepresentative(registerDto)).rejects.toThrow(
-        'Código de RE já cadastrado',
-      )
+      await expect(
+        service.createRepresentative(registerDto, { erId: 'er-1', actor }),
+      ).rejects.toThrow('Código de RE já cadastrado')
     })
 
     it('translates a Prisma unique violation into a conflict', async () => {
@@ -166,10 +179,12 @@ describe('AuthService', () => {
         role: Role.OPERATOR,
         erId: 'er-1',
         name: 'Operadora',
+        sessionVersion: 3,
       })
 
       const result = await service.staffLogin({ email: 'OP@x.com', password: 'Teste@123' })
       expect(result.user.name).toBe('Operadora')
+      expect(jwt.sign).toHaveBeenCalledWith(expect.objectContaining({ sv: 3 }))
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'operator_logged_in' }),
       )
@@ -189,6 +204,7 @@ describe('AuthService', () => {
         role: Role.OPERATOR,
         erId: 'er-1',
         name: 'Operadora',
+        sessionVersion: 0,
       })
       mockedBcrypt.compare.mockResolvedValue(false as never)
       await expect(

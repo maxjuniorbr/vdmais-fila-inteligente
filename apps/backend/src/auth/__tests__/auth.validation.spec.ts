@@ -92,7 +92,7 @@ describe('AuthService uniqueness', () => {
     })
 
     await expect(service.register(validRegistration)).rejects.toThrow(
-      new ConflictException('CPF já cadastrado'),
+      new ConflictException('Não foi possível concluir o cadastro com os dados informados'),
     )
     expect(prisma.representative.create).not.toHaveBeenCalled()
   })
@@ -105,7 +105,6 @@ describe('AuthService uniqueness', () => {
         phone: validRegistration.phone,
         reCode: 'OTHER',
       },
-      'Telefone já cadastrado',
     ],
     [
       'RE code',
@@ -114,10 +113,11 @@ describe('AuthService uniqueness', () => {
         phone: '11999999999',
         reCode: validRegistration.reCode,
       },
-      'Código de RE já cadastrado',
     ],
-  ])('rejects a duplicate %s', async (_field, existing, message) => {
+  ])('hides which identifier (%s) already exists on public registration', async (_field, existing) => {
     prisma.representative.findFirst.mockResolvedValue(existing)
-    await expect(service.register(validRegistration)).rejects.toThrow(message)
+    await expect(service.register(validRegistration)).rejects.toThrow(
+      'Não foi possível concluir o cadastro com os dados informados',
+    )
   })
 })
