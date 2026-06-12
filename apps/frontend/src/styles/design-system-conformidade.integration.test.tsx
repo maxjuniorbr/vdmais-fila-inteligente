@@ -17,6 +17,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
+import { seedStaffSession } from '../test/staffToken'
 import { OperationPage } from '../pages/OperationPage'
 import { PanelPage } from '../pages/PanelPage'
 import { ManagerPage } from '../pages/ManagerPage'
@@ -56,11 +57,7 @@ function readSource(relativePath: string): string {
 
 describe('Integration 2.7 — OperationPage: elapsed timer uses formatDuration', () => {
   beforeEach(() => {
-    sessionStorage.setItem('token', 'test-token')
-    sessionStorage.setItem('staffRole', 'OPERATOR')
-    sessionStorage.setItem('staffUserId', 'operator-1')
-    sessionStorage.setItem('erId', 'er-1')
-    sessionStorage.setItem('userName', 'Operadora Teste')
+    seedStaffSession({ id: 'operator-1', name: 'Operadora Teste', role: 'OPERATOR', erId: 'er-1' })
 
     vi.mocked(api.get).mockResolvedValue({
       waiting: [],
@@ -251,11 +248,7 @@ describe('Smoke tests 3.1, 3.2 — Main pages render without runtime errors', ()
   })
 
   it('OperationPage renders without runtime errors (authenticated state)', async () => {
-    sessionStorage.setItem('token', 'test-token')
-    sessionStorage.setItem('staffRole', 'OPERATOR')
-    sessionStorage.setItem('staffUserId', 'operator-1')
-    sessionStorage.setItem('erId', 'er-1')
-    sessionStorage.setItem('userName', 'Operadora Smoke')
+    seedStaffSession({ id: 'operator-1', name: 'Operadora Smoke', role: 'OPERATOR', erId: 'er-1' })
 
     vi.mocked(api.get).mockResolvedValue({
       waiting: [],
@@ -270,11 +263,7 @@ describe('Smoke tests 3.1, 3.2 — Main pages render without runtime errors', ()
   })
 
   it('ManagerPage renders without runtime errors (authenticated state)', async () => {
-    sessionStorage.setItem('token', 'test-token')
-    sessionStorage.setItem('staffRole', 'MANAGER')
-    sessionStorage.setItem('staffUserId', 'manager-1')
-    sessionStorage.setItem('erId', 'er-1')
-    sessionStorage.setItem('userName', 'Gestora Smoke')
+    seedStaffSession({ id: 'manager-1', name: 'Gestora Smoke', role: 'MANAGER', erId: 'er-1' })
 
     vi.mocked(api.get).mockResolvedValue({
       waiting: [],

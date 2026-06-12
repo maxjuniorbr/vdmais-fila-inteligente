@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
-import { saveStaffSession } from '../auth/session'
+import { seedStaffSession } from '../test/staffToken'
 import { HomePage } from './HomePage'
 
 function renderHome() {
@@ -24,7 +24,7 @@ describe('HomePage', () => {
   })
 
   it('shows the recognized session for an authenticated user', () => {
-    saveStaffSession('tok', { id: 'm1', name: 'Gestora Teste', role: 'MANAGER', erId: 'er-1' })
+    seedStaffSession({ id: 'm1', name: 'Gestora Teste', role: 'MANAGER', erId: 'er-1' })
     renderHome()
     expect(screen.getByText('Sessão reconhecida')).toBeInTheDocument()
     expect(screen.getByText('Gestora Teste')).toBeInTheDocument()
@@ -37,7 +37,7 @@ describe('HomePage', () => {
 
   it('ends the session and returns to the anonymous view', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
-    saveStaffSession('tok', { id: 'm1', name: 'Gestora Teste', role: 'MANAGER', erId: 'er-1' })
+    seedStaffSession({ id: 'm1', name: 'Gestora Teste', role: 'MANAGER', erId: 'er-1' })
     renderHome()
     fireEvent.click(screen.getByRole('button', { name: 'Encerrar sessão' }))
     await waitFor(() =>

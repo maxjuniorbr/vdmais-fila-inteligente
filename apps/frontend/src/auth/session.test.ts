@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { makeStaffToken } from '../test/staffToken'
 import {
   clearSession,
   getManagementERId,
@@ -7,6 +8,7 @@ import {
   logoutStaffSession,
   saveStaffSession,
   setManagementERId,
+  type StaffRole,
 } from './session'
 
 const profile = {
@@ -16,12 +18,23 @@ const profile = {
   erId: 'er-1',
 }
 
+type ProfileOverrides = Partial<{ id: string; name: string; role: StaffRole; erId?: string }>
+
+function login(overrides: ProfileOverrides = {}, expiresInSeconds?: number) {
+  const merged = { ...profile, ...overrides }
+  saveStaffSession(
+    makeStaffToken({ id: merged.id, role: merged.role, erId: merged.erId, expiresInSeconds }),
+    merged,
+  )
+  return merged
+}
+
 describe('staff session', () => {
-  it('replaces stale staff context when saving a session', () => {
+  it('derives identity from the token and replaces stale staff context', () => {
     sessionStorage.setItem('managementErId', 'old-er')
     sessionStorage.setItem('counterId', 'old-counter')
 
-    saveStaffSession('token-1', profile)
+    login()
 
     expect(getStaffSessionProfile()).toEqual(profile)
     expect(hasStaffSession(['OPERATOR'])).toBe(true)
@@ -30,8 +43,16 @@ describe('staff session', () => {
     expect(sessionStorage.getItem('counterId')).toBeNull()
   })
 
+  it('does not trust a tampered role key in storage', () => {
+    login()
+    sessionStorage.setItem('staffRole', 'ADMIN')
+
+    expect(getStaffSessionProfile()?.role).toBe('OPERATOR')
+    expect(hasStaffSession(['ADMIN'])).toBe(false)
+  })
+
   it('supports staff profiles without an assigned ER', () => {
-    saveStaffSession('token-1', { ...profile, role: 'ADMIN', erId: undefined })
+    login({ role: 'ADMIN', erId: undefined })
 
     expect(getStaffSessionProfile()).toEqual({
       id: 'staff-1',
@@ -39,22 +60,23 @@ describe('staff session', () => {
       role: 'ADMIN',
       erId: undefined,
     })
-    expect(sessionStorage.getItem('erId')).toBeNull()
   })
 
-  it.each(['token', 'staffUserId', 'userName', 'staffRole'])(
-    'rejects incomplete or invalid sessions when %s is missing',
-    (key) => {
-      saveStaffSession('token-1', profile)
-      if (key === 'staffRole') {
-        sessionStorage.setItem(key, 'INVALID')
-      } else {
-        sessionStorage.removeItem(key)
-      }
+  it('rejects a session without a token', () => {
+    expect(getStaffSessionProfile()).toBeNull()
+    expect(hasStaffSession(['OPERATOR'])).toBe(false)
+  })
 
-      expect(getStaffSessionProfile()).toBeNull()
-    },
-  )
+  it('rejects a token without a valid role', () => {
+    sessionStorage.setItem('token', makeStaffToken({ role: 'INVALID' as never }))
+    expect(getStaffSessionProfile()).toBeNull()
+  })
+
+  it('rejects and clears an expired token', () => {
+    login({}, -10)
+    expect(getStaffSessionProfile()).toBeNull()
+    expect(sessionStorage.getItem('token')).toBeNull()
+  })
 
   it('sets and clears the selected management ER', () => {
     setManagementERId('er-2')
@@ -65,7 +87,7 @@ describe('staff session', () => {
   })
 
   it('clears every session-scoped staff value', () => {
-    saveStaffSession('token-1', profile)
+    login()
     sessionStorage.setItem('counterId', 'counter-1')
     setManagementERId('er-2')
 
@@ -75,7 +97,8 @@ describe('staff session', () => {
   })
 
   it('records logout telemetry before clearing the session', async () => {
-    saveStaffSession('token-1', profile)
+    const merged = login()
+    const token = sessionStorage.getItem('token')
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -83,13 +106,14 @@ describe('staff session', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('/api/telemetry/staff/logout', {
       method: 'POST',
-      headers: { Authorization: 'Bearer token-1' },
+      headers: { Authorization: `Bearer ${token}` },
     })
+    expect(merged.role).toBe('OPERATOR')
     expect(sessionStorage.length).toBe(0)
   })
 
   it('clears the session even when logout telemetry fails', async () => {
-    saveStaffSession('token-1', profile)
+    login()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network unavailable')))
 
     await expect(logoutStaffSession()).rejects.toThrow('network unavailable')
@@ -105,4 +129,3 @@ describe('staff session', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
-
