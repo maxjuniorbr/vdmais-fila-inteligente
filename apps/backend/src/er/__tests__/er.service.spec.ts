@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common'
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { CounterState, Role, TicketState } from '@prisma/client'
 import { PanelGateway } from '../../panel/panel.gateway'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -84,6 +84,96 @@ describe('ERService', () => {
     expect(tx.auditEvent.createMany).toHaveBeenCalledWith({
       data: [expect.objectContaining({ eventType: 'service_force_finished', ticketId: 'svc-1' })],
     })
+  })
+
+  it('blocks day closing when the day is already closed', async () => {
+    tx.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: false })
+
+    await expect(service.closeDay('er-1', manager)).rejects.toThrow(ConflictException)
+
+    expect(tx.ticket.count).not.toHaveBeenCalled()
+    expect(tx.eR.update).not.toHaveBeenCalled()
+  })
+
+  it('fails to close the day when the ER no longer exists', async () => {
+    tx.eR.findUnique.mockResolvedValue(null)
+
+    await expect(service.closeDay('er-1', manager)).rejects.toThrow(NotFoundException)
+
+    expect(tx.eR.update).not.toHaveBeenCalled()
+  })
+
+  it('finishes in-service tickets without touching counters when none are assigned', async () => {
+    tx.ticket.count.mockResolvedValue(0)
+    tx.ticket.findMany.mockResolvedValue([{ id: 'svc-1', counterId: null }])
+    tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+
+    await service.closeDay('er-1', manager)
+
+    expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['svc-1'] } },
+      data: { state: TicketState.FINISHED, serviceFinishedAt: expect.any(Date) },
+    })
+    expect(tx.counter.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('fails to open the day when the ER no longer exists', async () => {
+    tx.eR.findUnique.mockResolvedValue(null)
+
+    await expect(service.openDay('er-1', manager)).rejects.toThrow(NotFoundException)
+
+    expect(tx.eR.update).not.toHaveBeenCalled()
+  })
+
+  it('finds an ER by id for staff access', async () => {
+    prisma.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: true })
+
+    await expect(service.getForStaff('er-1', manager)).resolves.toEqual({
+      id: 'er-1',
+      isDayOpen: true,
+    })
+    expect(prisma.eR.findUnique).toHaveBeenCalledWith({ where: { id: 'er-1' } })
+  })
+
+  it('throws when an ER is not found by id', async () => {
+    prisma.eR.findUnique.mockResolvedValue(null)
+
+    await expect(service.findById('er-1')).rejects.toThrow(NotFoundException)
+  })
+
+  it('throws when a public ER is not found', async () => {
+    prisma.eR.findUnique.mockResolvedValue(null)
+
+    await expect(service.getPublic('er-1')).rejects.toThrow(NotFoundException)
+  })
+
+  it('allows an admin to manage any ER', async () => {
+    const admin = { userId: 'admin-1', role: Role.ADMIN, erId: undefined }
+    prisma.eR.findUnique.mockResolvedValue({ id: 'er-2', isDayOpen: true })
+
+    await expect(service.getForStaff('er-2', admin)).resolves.toEqual({
+      id: 'er-2',
+      isDayOpen: true,
+    })
+  })
+
+  it('forbids a manager from managing a different ER', async () => {
+    const otherManager = { userId: 'manager-2', role: Role.MANAGER, erId: 'er-9' }
+
+    expect(() => service.getForStaff('er-1', otherManager)).toThrow(ForbiddenException)
+    expect(prisma.eR.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('forbids a manager without an assigned ER', async () => {
+    const unassignedManager = { userId: 'manager-3', role: Role.MANAGER, erId: undefined }
+
+    expect(() => service.getForStaff('er-1', unassignedManager)).toThrow(ForbiddenException)
+  })
+
+  it('forbids a non-manager non-admin role from managing an ER', async () => {
+    const operator = { userId: 'op-1', role: Role.OPERATOR, erId: 'er-1' }
+
+    expect(() => service.getForStaff('er-1', operator)).toThrow(ForbiddenException)
   })
 
   it('returns only public ER identification and operation status', async () => {
