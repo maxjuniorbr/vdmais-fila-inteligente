@@ -37,8 +37,8 @@ deploy no ambiente corporativo deve promover essas mesmas imagens, sem reconstru
 ambiente de container único. Em produção corporativa, prefira banco gerenciado e ingress
 HTTPS.
 
-> Regras operacionais de migrations (paridade, pipeline e segurança) vivem no AI
-> steering `.kiro/steering/database-migrations.md`.
+> Regras operacionais de migrations (paridade, pipeline e segurança) vivem em
+> [`.github/instructions/database-migrations.instructions.md`](../.github/instructions/database-migrations.instructions.md).
 
 ## Canais GitHub e Vercel
 
