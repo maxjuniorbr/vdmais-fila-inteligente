@@ -6,9 +6,7 @@ interface CopyFieldProps {
   label: string
   value: string
   description?: string
-  /** Texto auxiliar exibido abaixo do campo (ex.: validade do endereço). */
   helperText?: string
-  /** Rótulo acessível do link (ação de abrir). */
   openLabel?: string
 }
 

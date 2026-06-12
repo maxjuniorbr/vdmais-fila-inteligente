@@ -24,25 +24,14 @@ import { QueueEntryPage } from '../pages/QueueEntryPage'
 import { brand } from './brand'
 import { layout } from './layout'
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** All tone values the Alert component accepts */
 const ALL_TONES = ['error', 'warning', 'success', 'info'] as const
 type Tone = (typeof ALL_TONES)[number]
 
-/** All size values the Button component accepts */
 const ALL_SIZES = ['md', 'sm'] as const
 type Size = (typeof ALL_SIZES)[number]
 
-/** All variant values the Button component accepts */
 const ALL_VARIANTS = ['primary', 'secondary', 'danger'] as const
 type Variant = (typeof ALL_VARIANTS)[number]
-
-// ---------------------------------------------------------------------------
-// Preservation 3.1 — Alert ARIA roles and semantic feedback categories
-// ---------------------------------------------------------------------------
 
 describe('Preservation 3.1 — Alert: role="alert" when tone="error", absent otherwise', () => {
   /**
@@ -107,10 +96,6 @@ describe('Preservation 3.1 — Alert: role="alert" when tone="error", absent oth
   })
 })
 
-// ---------------------------------------------------------------------------
-// Preservation 3.2 — Button touch targets (WCAG 2.5.5)
-// ---------------------------------------------------------------------------
-
 describe('Preservation 3.2 — Button minHeight WCAG touch targets', () => {
   /**
    * PBT: For any combination of Button size and variant, minHeight >= 44 in "md"
@@ -136,10 +121,8 @@ describe('Preservation 3.2 — Button minHeight WCAG touch targets', () => {
             return false
           }
 
-          // Read minHeight from inline style computed from layout + SIZE_STYLE
           const inlineMinHeight = btn.style.minHeight
 
-          // Parse the numeric value from inline style (e.g., "44px" or just number styles)
           let minHeightValue: number | null = null
           if (inlineMinHeight) {
             const parsed = Number.parseFloat(inlineMinHeight)
@@ -149,9 +132,6 @@ describe('Preservation 3.2 — Button minHeight WCAG touch targets', () => {
           unmount()
 
           if (size === 'md') {
-            // md size uses layout.primaryButton / ghostButton / dangerButton — all have minHeight: 44
-            // minHeight may come from the layout object, not inline style directly
-            // We verify it is present in the layout token
             const variantStyles: Record<Variant, React.CSSProperties> = {
               primary: layout.primaryButton,
               secondary: layout.ghostButton,
@@ -160,7 +140,6 @@ describe('Preservation 3.2 — Button minHeight WCAG touch targets', () => {
             const mdMinHeight = variantStyles[variant].minHeight
             return typeof mdMinHeight === 'number' && mdMinHeight >= 44
           } else {
-            // sm explicitly sets minHeight: 36
             return minHeightValue !== null && minHeightValue >= 36
           }
         },
@@ -183,24 +162,17 @@ describe('Preservation 3.2 — Button minHeight WCAG touch targets', () => {
   it('Button size="sm" renders with minHeight >= 36', () => {
     const { container } = render(<Button size="sm">Ação sm</Button>)
     const btn = container.querySelector('button')
-    // The sm size style sets minHeight: 36 inline
     const inlineStyle = btn?.style.minHeight
     expect(Number.parseFloat(inlineStyle ?? '0')).toBeGreaterThanOrEqual(36)
   })
 
   it('Button size="md" renders without overriding minHeight (uses layout token >= 44)', () => {
-    // The md SIZE_STYLE is empty: {}, so minHeight comes from layout tokens
     const { container } = render(<Button size="md" variant="primary">Ação md</Button>)
     const btn = container.querySelector('button')
     expect(btn).not.toBeNull()
-    // minHeight from layout.primaryButton = 44 — verify token value
     expect(layout.primaryButton.minHeight).toBeGreaterThanOrEqual(44)
   })
 })
-
-// ---------------------------------------------------------------------------
-// Preservation 3.7 — Existing color tokens remain unchanged
-// ---------------------------------------------------------------------------
 
 describe('Preservation 3.7 — Existing brand color tokens unchanged after fix', () => {
   /**
@@ -213,42 +185,32 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
    * Validates: Requirements 3.7
    */
 
-  // Snapshot of all color tokens as observed in the current brand.ts (white theme,
-  // semantic system). These are the baseline values that must not regress.
   const EXPECTED_COLOR_TOKENS = {
-    // Background
     surface: '#ffffff',
     canvas: '#f5f5f5',
     canvasWarm: '#f5f1eb',
-    // Non interactive (text)
     ink: '#222222',
     inkSoft: '#444444',
     inkMuted: '#666666',
     emphasis: '#00325f',
-    // Outline
     border: '#e2e2e2',
     borderStrong: '#c4c4c4',
     borderMuted: '#94a3b8',
-    // Link
     link: '#264fec',
     linkHover: '#002ec9',
     linkVisited: '#4c2c91',
-    // Actionable
     actionable: '#264fec',
     actionableHover: '#002ec9',
     actionableActive: '#001c76',
     actionableContent: '#ffffff',
-    // Conversion
     conversion: '#db1e8c',
     conversionHover: '#b2006a',
     conversionActive: '#750059',
     conversionContent: '#ffffff',
-    // Warning / destructive
     danger: '#d32f2f',
     dangerHover: '#b71c1c',
     dangerSoft: '#ffebee',
     dangerBorder: '#f4c7c7',
-    // Status
     success: '#1b5e20',
     successSoft: '#e8f5e9',
     successBorder: '#bfe3c2',
@@ -258,7 +220,6 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
     info: '#0288d1',
     infoSoft: '#e1f5fe',
     infoBorder: '#bce6f5',
-    // Keyboard focus
     keyboardFocus: '#011e38',
   } as const
 
@@ -278,7 +239,6 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
     )
   })
 
-  // Spot-check critical tokens explicitly (documentation + readability)
   it('brand.actionable === "#264fec" (primary action color)', () => {
     expect(brand.actionable).toBe('#264fec')
   })
@@ -312,11 +272,6 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
   })
 })
 
-// ---------------------------------------------------------------------------
-// Preservation 3.7 (specific) — brand.borderMuted === '#94a3b8'
-// Visual parity: StatusDot default color remains the same via token after fix
-// ---------------------------------------------------------------------------
-
 describe('Preservation — brand.borderMuted === "#94a3b8" (StatusDot visual parity)', () => {
   it('brand.borderMuted equals "#94a3b8"', () => {
     expect(brand.borderMuted).toBe('#94a3b8')
@@ -330,29 +285,19 @@ describe('Preservation — brand.borderMuted === "#94a3b8" (StatusDot visual par
   })
 })
 
-// ---------------------------------------------------------------------------
-// Preservation 3.3 — ConfirmDialog: focus on confirmation button at open
-// ---------------------------------------------------------------------------
-
 describe('Preservation 3.3 — ConfirmDialog accessibility on open', () => {
   it('ConfirmDialog focuses the textarea when opened (focus trap active)', () => {
     render(
       <ConfirmDialog title="Cancelar operação" onConfirm={vi.fn()} onClose={vi.fn()} />,
     )
 
-    // ConfirmDialog uses createPortal and renders a <dialog> element
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveAttribute('open')
 
-    // The first focusable element (textarea for reason) receives focus on mount
     const reason = screen.getByLabelText('Motivo obrigatório')
     expect(reason).toHaveFocus()
   })
 })
-
-// ---------------------------------------------------------------------------
-// Preservation 3.4 — QueueEntryPage: keyboard navigation on TabBar
-// ---------------------------------------------------------------------------
 
 describe('Preservation 3.4 — QueueEntryPage TabBar keyboard navigation', () => {
   beforeEach(() => {
@@ -416,12 +361,10 @@ describe('Preservation 3.4 — QueueEntryPage TabBar keyboard navigation', () =>
     const loginTab = screen.getByRole('tab', { name: 'Já tenho cadastro' })
     const registerTab = screen.getByRole('tab', { name: 'Criar cadastro' })
 
-    // First navigate to register tab
     loginTab.focus()
     fireEvent.keyDown(loginTab, { key: 'ArrowRight' })
     expect(registerTab).toHaveFocus()
 
-    // Home should return to login tab
     fireEvent.keyDown(registerTab, { key: 'Home' })
     expect(loginTab).toHaveFocus()
     expect(loginTab).toHaveAttribute('aria-selected', 'true')
@@ -455,10 +398,6 @@ describe('Preservation 3.4 — QueueEntryPage TabBar keyboard navigation', () =>
   })
 })
 
-// ---------------------------------------------------------------------------
-// Preservation 3.5 — Microcopy of CTAs (infinitive + noun pattern)
-// ---------------------------------------------------------------------------
-
 describe('Preservation 3.5 — Microcopy dos CTAs preservado', () => {
   it('QueueEntryPage renders "Entrar na fila" CTA text', async () => {
     vi.stubGlobal(
@@ -487,10 +426,6 @@ describe('Preservation 3.5 — Microcopy dos CTAs preservado', () => {
     expect(screen.getByRole('button', { name: 'Entrar na fila' })).toBeInTheDocument()
   })
 })
-
-// ---------------------------------------------------------------------------
-// Preservation 3.6 — Integration smoke test: no runtime errors on render
-// ---------------------------------------------------------------------------
 
 describe('Preservation 3.6 — Smoke test: main components render without runtime errors', () => {
   it('Alert renders without errors for all tones', () => {

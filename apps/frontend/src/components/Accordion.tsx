@@ -10,11 +10,9 @@ interface AccordionItem {
 
 interface AccordionProps {
   items: AccordionItem[]
-  /** Permite mais de um item aberto ao mesmo tempo. Padrão: false. */
   allowMultiple?: boolean
 }
 
-/** Lista expansível (H6 — reconhecer em vez de lembrar). */
 export function Accordion({ items, allowMultiple = false }: Readonly<AccordionProps>) {
   const [open, setOpen] = useState<Set<string>>(new Set())
 

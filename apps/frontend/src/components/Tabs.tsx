@@ -10,16 +10,10 @@ export interface TabItem {
 
 interface TabsProps {
   tabs: TabItem[]
-  /** Aba inicial. Padrão: primeira. */
   initialId?: string
-  /** Rótulo acessível da lista de abas. */
   ariaLabel: string
 }
 
-/**
- * Abas para alternar conteúdo na mesma tela (padrão WAI-ARIA Tabs).
- * Teclado: ←/→ navegam, Home/End vão para a primeira/última; roving tabindex.
- */
 export function Tabs({ tabs, initialId, ariaLabel }: Readonly<TabsProps>) {
   const [active, setActive] = useState(initialId ?? tabs[0]?.id)
   const baseId = useId()

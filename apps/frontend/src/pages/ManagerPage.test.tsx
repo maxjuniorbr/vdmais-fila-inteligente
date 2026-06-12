@@ -10,7 +10,6 @@ vi.mock('../api/client', () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }))
 
-// A controllable socket double so tests can drive the realtime refresh path.
 type SocketHandler = (...args: unknown[]) => void
 let socketDouble: {
   on: ReturnType<typeof vi.fn>
@@ -134,16 +133,13 @@ describe('ManagerPage', () => {
     expect(await screen.findByText('Caixas')).toBeInTheDocument()
     expect(screen.getByText('Fila ativa')).toBeInTheDocument()
     expect(screen.getByText('Chamadas recentes')).toBeInTheDocument()
-    // counter state badge
     expect(screen.getByText('Ativo')).toBeInTheDocument()
-    // active queue ticket row
     expect(screen.getByText('A001')).toBeInTheDocument()
   })
 
   it('shows prolonged services for a long-running attendance', async () => {
     renderManager()
     expect(await screen.findByText('Atendimentos prolongados')).toBeInTheDocument()
-    // Bia aparece na fila ativa e em atendimentos prolongados.
     expect(screen.getAllByText('Bia Lima').length).toBeGreaterThan(0)
   })
 
@@ -152,7 +148,6 @@ describe('ManagerPage', () => {
     await screen.findByText('Distribuição do dia')
     fireEvent.click(screen.getByRole('tab', { name: 'Por canal' }))
     expect(screen.getByRole('tab', { name: 'Por canal' })).toHaveAttribute('aria-selected', 'true')
-    // Channel table header
     expect(screen.getByText('Entradas')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Por caixa' }))
@@ -408,7 +403,6 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('ER acompanhado')
 
-    // Both navigation buttons render; clicking them runs the navigate handlers.
     fireEvent.click(screen.getByRole('button', { name: 'Voltar ao início' }))
     fireEvent.click(screen.getByRole('button', { name: 'Administração' }))
   })
@@ -601,7 +595,6 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Chamadas recentes')
 
-    // NO_SHOW and a clean CANCELLED expose a restore menu.
     expect(screen.getByRole('button', { name: /Ações da senha A003/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Ações da senha A004/ })).toBeInTheDocument()
 

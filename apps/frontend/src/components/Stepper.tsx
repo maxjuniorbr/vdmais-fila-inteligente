@@ -4,11 +4,9 @@ import { brand } from '../styles/brand'
 
 interface StepperProps {
   steps: string[]
-  /** Índice (base 0) da etapa atual. Etapas anteriores ficam concluídas. */
   current: number
 }
 
-/** Indicador de progresso por etapas (H1 — visibilidade do status). */
 export function Stepper({ steps, current }: Readonly<StepperProps>) {
   return (
     <ol style={styles.list} aria-label="Progresso">

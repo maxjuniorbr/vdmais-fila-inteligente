@@ -6,15 +6,10 @@ import { brand } from '../styles/brand'
 interface ModalProps {
   title: string
   children: ReactNode
-  /** Rodapé com ações (ex.: botões). */
   footer?: ReactNode
   onClose: () => void
 }
 
-/**
- * Diálogo modal genérico para decisões críticas (H3 — saídas claras:
- * botão fechar, Esc e clique no backdrop). Usa <dialog> nativo.
- */
 export function Modal({ title, children, footer, onClose }: Readonly<ModalProps>) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)

@@ -23,7 +23,6 @@ import { ContextualThrottlerGuard } from './common/guards/contextual-throttler.g
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
-    // Operational endpoints need room for polling and WebSocket fallbacks.
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 300 }]),
     PrismaModule,
     AuthModule,

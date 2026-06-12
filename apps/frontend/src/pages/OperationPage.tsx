@@ -501,7 +501,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: `${brand.spacing[24]}px ${brand.spacing[24]}px ${brand.spacing[48]}px`,
   },
   grid: {
-    // Colunas definidas pela classe .gb-grid-operation (responsiva)
     marginBottom: `${brand.spacing[20]}px`,
   },
   mainColumn: {

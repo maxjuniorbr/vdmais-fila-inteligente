@@ -30,7 +30,6 @@ import { layout } from '../styles/layout'
 import { formatDuration } from '../utils/format'
 import { counterStateLabel, counterStateTone, entryChannelLabel, ticketStateLabel } from '../utils/labels'
 
-/** Cor de destaque do caixa por estado (espelha o tom do Badge). */
 const COUNTER_TONE_COLOR: Record<string, string> = {
   success: brand.success,
   info: brand.info,

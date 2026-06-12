@@ -2,11 +2,9 @@ import type { InputHTMLAttributes } from 'react'
 import { brand } from '../styles/brand'
 
 interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  /** Rótulo sempre visível (nunca usar placeholder como rótulo). */
   label: string
 }
 
-/** Toggle de efeito imediato (H6 — estado selecionado claramente diferenciado). */
 export function Switch({ label, className, ...rest }: Readonly<SwitchProps>) {
   const cls = ['gb-switch', className].filter(Boolean).join(' ')
   return (

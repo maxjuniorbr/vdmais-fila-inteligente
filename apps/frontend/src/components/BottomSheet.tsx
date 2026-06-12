@@ -9,7 +9,6 @@ interface BottomSheetProps {
   onClose: () => void
 }
 
-/** Folha ancorada na base — ideal para menus de opções no mobile (H3). */
 export function BottomSheet({ title, children, onClose }: Readonly<BottomSheetProps>) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {

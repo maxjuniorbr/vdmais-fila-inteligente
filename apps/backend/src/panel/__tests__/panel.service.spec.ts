@@ -97,7 +97,6 @@ describe('PanelService', () => {
           },
         ])
       }
-      // calledToday branch (no state filter)
       return Promise.resolve([
         {
           createdAt: new Date('2026-06-10T11:00:00Z'),

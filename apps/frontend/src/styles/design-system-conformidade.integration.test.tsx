@@ -26,10 +26,6 @@ import { QueueEntryPage } from '../pages/QueueEntryPage'
 import { Alert } from '../components/Alert'
 import { Button } from '../components/Button'
 
-// ---------------------------------------------------------------------------
-// Shared mocks
-// ---------------------------------------------------------------------------
-
 vi.mock('../api/client', () => ({
   api: {
     get: vi.fn(),
@@ -41,19 +37,11 @@ vi.mock('../hooks/useSocket', () => ({
   useSocket: () => null,
 }))
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const SRC_DIR = resolve(__dirname, '..')
 
 function readSource(relativePath: string): string {
   return readFileSync(resolve(SRC_DIR, relativePath), 'utf-8')
 }
-
-// ---------------------------------------------------------------------------
-// 1. OperationPage: elapsed timer uses formatDuration (no inline expression)
-// ---------------------------------------------------------------------------
 
 describe('Integration 2.7 — OperationPage: elapsed timer uses formatDuration', () => {
   beforeEach(() => {
@@ -79,8 +67,6 @@ describe('Integration 2.7 — OperationPage: elapsed timer uses formatDuration',
   it('OperationPage source does not contain inline elapsed expression', () => {
     const source = readSource('pages/OperationPage.tsx')
 
-    // The old inline expression: `{Math.floor(elapsed / 60)}m {elapsed % 60}s`
-    // After fix, this must be replaced with {formatDuration(elapsed)}
     expect(source).not.toContain('Math.floor(elapsed / 60)}m')
     expect(source).not.toContain('elapsed % 60}s')
   })
@@ -93,20 +79,14 @@ describe('Integration 2.7 — OperationPage: elapsed timer uses formatDuration',
 
   it('OperationPage renders without runtime errors with mocked data', async () => {
     expect(() => render(<OperationPage />)).not.toThrow()
-    // Verify the component mounted successfully
     expect(await screen.findByLabelText('Caixa de atendimento')).toBeInTheDocument()
   })
 })
-
-// ---------------------------------------------------------------------------
-// 2. ManagerPage: no local formatSeconds function
-// ---------------------------------------------------------------------------
 
 describe('Integration 2.7 — ManagerPage: no local formatSeconds function', () => {
   it('ManagerPage source does not define a local formatSeconds function', () => {
     const source = readSource('pages/ManagerPage.tsx')
 
-    // The old local function: `function formatSeconds(...)` or `const formatSeconds =`
     expect(source).not.toMatch(/function\s+formatSeconds\s*\(/)
     expect(source).not.toMatch(/const\s+formatSeconds\s*=/)
   })
@@ -118,16 +98,10 @@ describe('Integration 2.7 — ManagerPage: no local formatSeconds function', () 
   })
 })
 
-// ---------------------------------------------------------------------------
-// 3. PanelPage: no local formatDuration function
-// ---------------------------------------------------------------------------
-
 describe('Integration 2.7 — PanelPage: no local formatDuration function', () => {
   it('PanelPage source does not define a local formatDuration function', () => {
     const source = readSource('pages/PanelPage.tsx')
 
-    // After fix: formatDuration is imported from utils/format, not defined locally
-    // A local definition would match: `function formatDuration(` or `const formatDuration =`
     expect(source).not.toMatch(/function\s+formatDuration\s*\(/)
     expect(source).not.toMatch(/const\s+formatDuration\s*=/)
   })
@@ -139,13 +113,8 @@ describe('Integration 2.7 — PanelPage: no local formatDuration function', () =
   })
 })
 
-// ---------------------------------------------------------------------------
-// 4. index.html: contains <link> for IBM Plex Sans
-// ---------------------------------------------------------------------------
-
 describe('Integration 2.6 — index.html: IBM Plex Sans font link present', () => {
   it('index.html contains a <link> tag loading IBM Plex Sans', () => {
-    // __dirname = apps/frontend/src/styles → ../../ = apps/frontend
     const indexHtmlPath = resolve(__dirname, '../../index.html')
     const html = readFileSync(indexHtmlPath, 'utf-8')
 
@@ -162,10 +131,6 @@ describe('Integration 2.6 — index.html: IBM Plex Sans font link present', () =
     expect(html).toContain('fonts.gstatic.com')
   })
 })
-
-// ---------------------------------------------------------------------------
-// 5. Smoke tests: main pages/components render without runtime errors
-// ---------------------------------------------------------------------------
 
 describe('Smoke tests 3.1, 3.2 — Main pages render without runtime errors', () => {
   it('Alert renders without errors for all tones', () => {

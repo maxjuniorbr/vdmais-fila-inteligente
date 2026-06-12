@@ -8,7 +8,6 @@ import { OperationPage } from './OperationPage'
 
 vi.mock('../api/client', () => ({ api: { get: vi.fn(), post: vi.fn() } }))
 
-// A controllable fake socket so we can exercise the event-subscription effect.
 const handlers = new Map<string, Set<(...args: unknown[]) => void>>()
 const fakeSocket = {
   on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
@@ -57,12 +56,10 @@ describe('OperationPage coverage', () => {
     render(<OperationPage />)
 
     await screen.findByLabelText('Caixa de atendimento')
-    // The effect registered listeners for every queue event.
     expect(fakeSocket.on).toHaveBeenCalledWith('ticket.created', expect.any(Function))
     expect(handlers.get('ticket.created')?.size).toBeGreaterThan(0)
 
     const callsBefore = vi.mocked(api.get).mock.calls.length
-    // Emitting a known event triggers refreshOverview again.
     handlers.get('ticket.called')?.forEach((cb) => cb())
     await waitFor(() =>
       expect(vi.mocked(api.get).mock.calls.length).toBeGreaterThan(callsBefore),
@@ -106,13 +103,11 @@ describe('OperationPage coverage', () => {
       </MemoryRouter>,
     )
 
-    // The staff login form is shown because there is no valid session.
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('E-mail'), 'op@example.com')
     await user.type(screen.getByLabelText('Senha'), 'senha123')
     fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
 
-    // The onAuthenticated callback flips the page into the operation panel.
     expect(await screen.findByText('Painel da Operadora')).toBeInTheDocument()
   })
 
@@ -144,7 +139,6 @@ describe('OperationPage coverage', () => {
     await screen.findByText('Painel da Operadora')
     fireEvent.click(screen.getByRole('button', { name: /sair|logout/i }))
 
-    // logoutStaffSession clears the token and the screen drops to the login form.
     await waitFor(() => expect(sessionStorage.getItem('token')).toBeNull())
   })
 
@@ -163,7 +157,6 @@ describe('OperationPage coverage', () => {
     })
     render(<OperationPage />)
 
-    // The elapsed counter renders a non-zero duration derived from serviceStartedAt.
     await screen.findAllByText('A002')
     await waitFor(() => {
       expect(screen.getByText(/·\s*\d+m \d+s/)).toBeInTheDocument()
@@ -180,7 +173,6 @@ describe('OperationPage coverage', () => {
     render(<OperationPage />)
 
     await screen.findByText('A003')
-    // Duration falls back to 0 because there is no calledAt/serviceStartedAt.
     expect(screen.getByText(/0s/)).toBeInTheDocument()
   })
 
@@ -194,7 +186,6 @@ describe('OperationPage coverage', () => {
     render(<OperationPage />)
 
     await screen.findByText('A010')
-    // Three em-dash fallbacks: waiting, paused and in-service rows lacking a name.
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3)
   })
 
