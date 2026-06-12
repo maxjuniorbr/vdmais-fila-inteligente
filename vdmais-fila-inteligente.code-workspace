@@ -9,7 +9,10 @@
 	],
 	"settings": {
 		"typescript.autoClosingTags": false,
-		"claudeCode.initialPermissionMode": "acceptEdits",
-		"claudeCode.useCtrlEnterToSend": true
+		"claudeCode.initialPermissionMode": "bypassPermissions",
+		"claudeCode.useCtrlEnterToSend": true,
+		"claudeCode.environmentVariables": [
+			
+		]
 	}
 }
