@@ -6,14 +6,41 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     groups:
-      dev-dependencies:
-        dependency-type: "development"
+      # Prisma CLI and client must move together (same major/minor), otherwise
+      # `prisma generate` fails on a version mismatch. Routine patches only.
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/*"
+        update-types:
+          - "minor"
+          - "patch"
       production-dependencies:
         dependency-type: "production"
         update-types:
           - "minor"
           - "patch"
+        exclude-patterns:
+          - "@prisma/*"
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "prisma"
+    ignore:
+      # Prisma 7 is a major with breaking changes (generator output, removed
+      # flags, ESM). Upgrade deliberately in a dedicated PR, not via Dependabot.
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
