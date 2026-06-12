@@ -92,7 +92,6 @@ export function PanelPage() {
   const [avgWaitSeconds, setAvgWaitSeconds] = useState<number | null>(null)
   const [clock, setClock] = useState(() => new Date())
   const [nextPage, setNextPage] = useState(0)
-  const displayedCalls = useRef(new Set<string>())
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Lock body scroll while panel is mounted (TV mode)
@@ -168,17 +167,6 @@ export function PanelPage() {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [fetchPanelState, socket])
-
-  useEffect(() => {
-    if (!erId) return
-    calling.forEach((call) => {
-      if (displayedCalls.current.has(call.ticketId)) return
-      displayedCalls.current.add(call.ticketId)
-      void fetch(`/api/telemetry/panel/${erId}/tickets/${call.ticketId}/displayed`, {
-        method: 'POST',
-      })
-    })
-  }, [calling, erId])
 
   const callCount = calling.length
 

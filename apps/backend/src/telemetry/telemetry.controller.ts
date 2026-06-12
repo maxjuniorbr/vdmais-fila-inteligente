@@ -1,5 +1,4 @@
 import { Controller, Param, Post, Request, UseGuards } from '@nestjs/common'
-import { Throttle } from '@nestjs/throttler'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -9,18 +8,6 @@ import { TelemetryService } from './telemetry.service'
 @Controller('telemetry')
 export class TelemetryController {
   constructor(private readonly telemetryService: TelemetryService) {}
-
-  @Post('queue-entry/:erId')
-  @Throttle({ default: { ttl: 60000, limit: 30 } })
-  queueEntry(@Param('erId') erId: string) {
-    return this.telemetryService.recordQueueEntryStarted(erId)
-  }
-
-  @Post('panel/:erId/tickets/:ticketId/displayed')
-  @Throttle({ default: { ttl: 60000, limit: 120 } })
-  panelDisplayed() {
-    return this.telemetryService.recordPanelCallDisplayed()
-  }
 
   @Post('tickets/:ticketId/displayed')
   @UseGuards(JwtAuthGuard, RolesGuard)

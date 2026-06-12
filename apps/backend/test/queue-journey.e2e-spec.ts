@@ -176,8 +176,6 @@ describe('Full queue journey and concurrency (e2e)', () => {
   })
 
   it('registers a representative and returns a valid JWT', async () => {
-    await request(app.getHttpServer()).post(`/telemetry/queue-entry/${erId}`).expect(201)
-
     const response = await request(app.getHttpServer())
       .post('/auth/register')
       .send({
@@ -322,10 +320,6 @@ describe('Full queue journey and concurrency (e2e)', () => {
       .expect(201)
     expect(called.body.id).toBe(ticketId)
     expect(called.body.state).toBe(TicketState.CALLING)
-
-    await request(app.getHttpServer())
-      .post(`/telemetry/panel/${erId}/tickets/${ticketId}/displayed`)
-      .expect(201)
 
     const started = await request(app.getHttpServer())
       .post(`/tickets/${ticketId}/start-service`)
