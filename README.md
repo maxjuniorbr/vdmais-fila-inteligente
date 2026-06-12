@@ -28,7 +28,7 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - [MVP — escopo e validação](./docs/mvp.md)
 - [Stack técnica do MVP](./docs/stack-mvp.md)
 - [Deploy do MVP](./docs/deployment-mvp.md)
-- [Diretrizes de design e UX](./.kiro/steering/frontend-design.md) (Kiro AI steering)
+- [Diretrizes de design e UX](./.github/instructions/frontend-design.instructions.md)
 
 ---
 
@@ -94,7 +94,7 @@ Edite `apps/backend/.env`. Para usar o PostgreSQL do `compose.dev.yml`:
 DATABASE_URL="postgresql://fila:fila_dev_pass@localhost:5432/fila_inteligente?schema=public"
 NODE_ENV=development
 JWT_SECRET="change-me-in-production"
-JWT_EXPIRES_IN="7d"
+JWT_EXPIRES_IN="8h"
 PORT=3000
 FRONTEND_URL="http://localhost:5173"
 OBSERVABILITY_TOKEN="replace-with-a-random-monitoring-token"

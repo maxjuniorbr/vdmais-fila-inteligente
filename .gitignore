@@ -1,6 +1,5 @@
 node_modules/
 dist/
-build/
 coverage/
 playwright-report/
 test-results/
@@ -12,8 +11,8 @@ test-results/
 # TypeScript incremental build cache
 *.tsbuildinfo
 
-# Kiro settings (pode conter API keys)
-.kiro/settings/
+# Claude Code MCP config (contains the Render API token)
+.mcp.json
 
 # SonarQube local
 .scannerwork/
@@ -21,3 +20,8 @@ test-results/
 
 # Editor settings
 .vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
