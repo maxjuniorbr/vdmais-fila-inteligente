@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { api } from '../api/client'
 import { logoutStaffSession, getSessionERId } from '../auth/session'
 import { useStaffSession } from '../auth/useStaffSession'
 import { Alert } from '../components/Alert'
@@ -45,23 +46,15 @@ export function CheckinAttendantPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const token = sessionStorage.getItem('token')
-
   async function search(event: React.SyntheticEvent) {
     event.preventDefault()
-    void fetch('/api/telemetry/manual-checkin/start', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    void api.post('/telemetry/manual-checkin/start').catch(() => undefined)
     setError(null)
     setLoading(true)
     try {
-      const response = await fetch(
-        `/api/representatives/search?q=${encodeURIComponent(query.trim())}`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const data = await api.get<Representative[]>(
+        `/representatives/search?q=${encodeURIComponent(query.trim())}`,
       )
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message ?? 'Erro ao buscar RE')
       setResults(data)
       if (data.length === 0) setError('Nenhuma RE encontrada.')
     } catch (err: unknown) {
@@ -75,20 +68,11 @@ export function CheckinAttendantPage() {
     setError(null)
     setLoading(true)
     try {
-      const response = await fetch('/api/tickets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          erId,
-          entryChannel: 'CHECKIN_ASSISTED',
-          representativeId: representative.id,
-        }),
+      const data = await api.post<Ticket>('/tickets', {
+        erId,
+        entryChannel: 'CHECKIN_ASSISTED',
+        representativeId: representative.id,
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message ?? 'Erro ao fazer check-in')
       setSelected(representative)
       setTicket(data)
     } catch (err: unknown) {
@@ -103,18 +87,7 @@ export function CheckinAttendantPage() {
     setError(null)
     setLoading(true)
     try {
-      const response = await fetch('/api/representatives', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(registration),
-      })
-      const representative = await response.json()
-      if (!response.ok) {
-        throw new Error(representative.message ?? 'Erro ao cadastrar RE')
-      }
+      const representative = await api.post<Representative>('/representatives', registration)
       await createTicket(representative)
       setRegistration(emptyRegistration)
       setShowRegistration(false)
