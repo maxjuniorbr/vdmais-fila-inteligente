@@ -7,6 +7,7 @@ import { AuthService } from './auth.service'
 import { JwtStrategy } from './jwt.strategy'
 import { getJwtExpiresInSeconds, getJwtSecret } from './jwt.config'
 import { AuditLogModule } from '../audit-log/audit-log.module'
+import { QueueEntryTokenService } from './queue-entry-token.service'
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module'
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [JwtModule, AuthService],
+  providers: [AuthService, JwtStrategy, QueueEntryTokenService],
+  exports: [JwtModule, AuthService, QueueEntryTokenService],
 })
 export class AuthModule {}

@@ -1,10 +1,11 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import { Prisma, Role } from '@prisma/client'
+import { EntryChannel, Prisma, Role } from '@prisma/client'
 import * as bcrypt from 'bcrypt'
 import { AuditLogService } from '../../audit-log/audit-log.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuthService } from '../auth.service'
+import { QueueEntryTokenService } from '../queue-entry-token.service'
 
 jest.mock('bcrypt')
 
@@ -17,6 +18,9 @@ const prisma = {
 
 const jwt = { sign: jest.fn(() => 'signed-token') }
 const auditLog = { log: jest.fn(), logIfERExists: jest.fn() }
+const queueEntryTokens = {
+  verify: jest.fn((token, erId, entryChannel) => ({ token, erId, entryChannel })),
+}
 
 const registerDto = {
   fullName: '  Ana  Souza ',
@@ -26,6 +30,8 @@ const registerDto = {
   reCode: 're0001',
   password: 'Teste@123',
   erId: 'er-1',
+  entryToken: 'entry-token',
+  entryChannel: EntryChannel.QR_CODE,
 }
 
 describe('AuthService', () => {
@@ -37,10 +43,16 @@ describe('AuthService', () => {
       prisma as unknown as PrismaService,
       jwt as unknown as JwtService,
       auditLog as unknown as AuditLogService,
+      queueEntryTokens as unknown as QueueEntryTokenService,
     )
     mockedBcrypt.hash.mockResolvedValue('hashed' as never)
     mockedBcrypt.compare.mockResolvedValue(true as never)
     jwt.sign.mockReturnValue('signed-token')
+    queueEntryTokens.verify.mockImplementation((token, erId, entryChannel) => ({
+      token,
+      erId,
+      entryChannel,
+    }))
   })
 
   describe('createRepresentative', () => {
@@ -131,6 +143,38 @@ describe('AuthService', () => {
       expect(result.access_token).toBe('signed-token')
       expect(result.user.role).toBe(Role.REPRESENTATIVE)
     })
+
+    it('binds the representative token to a validated queue entry', async () => {
+      prisma.representative.findFirst.mockResolvedValue(null)
+      prisma.representative.create.mockResolvedValue({
+        id: 're-1',
+        fullName: 'Ana Souza',
+        cpf: '11122233344',
+        phone: '11999990000',
+        reCode: 'RE0001',
+      })
+
+      await service.register({
+        ...registerDto,
+        entryToken: 'entry-token',
+        entryChannel: EntryChannel.QR_CODE,
+      })
+
+      expect(queueEntryTokens.verify).toHaveBeenCalledWith(
+        'entry-token',
+        'er-1',
+        EntryChannel.QR_CODE,
+      )
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ erId: 'er-1', entryChannel: EntryChannel.QR_CODE }),
+      )
+    })
+
+    it('rejects an incomplete queue entry context', async () => {
+      await expect(
+        service.register({ ...registerDto, entryChannel: undefined }),
+      ).rejects.toThrow(UnauthorizedException)
+    })
   })
 
   describe('login', () => {
@@ -144,6 +188,8 @@ describe('AuthService', () => {
         credential: 'RE0001',
         password: 'Teste@123',
         erId: 'er-1',
+        entryToken: 'entry-token',
+        entryChannel: EntryChannel.QR_CODE,
       })
 
       expect(result.access_token).toBe('signed-token')
@@ -152,10 +198,40 @@ describe('AuthService', () => {
       )
     })
 
+    it('validates a signed queue entry before authenticating', async () => {
+      prisma.representative.findFirst.mockResolvedValue({
+        id: 're-1',
+        passwordHash: 'hashed',
+      })
+
+      await service.login({
+        credential: 'RE0001',
+        password: 'Teste@123',
+        erId: 'er-1',
+        entryToken: 'entry-token',
+        entryChannel: EntryChannel.LINK,
+      })
+
+      expect(queueEntryTokens.verify).toHaveBeenCalledWith(
+        'entry-token',
+        'er-1',
+        EntryChannel.LINK,
+      )
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ erId: 'er-1', entryChannel: EntryChannel.LINK }),
+      )
+    })
+
     it('rejects an unknown credential', async () => {
       prisma.representative.findFirst.mockResolvedValue(null)
       await expect(
-        service.login({ credential: '00000000000', password: 'x', erId: 'er-1' }),
+        service.login({
+          credential: '00000000000',
+          password: 'x',
+          erId: 'er-1',
+          entryToken: 'entry-token',
+          entryChannel: EntryChannel.QR_CODE,
+        }),
       ).rejects.toThrow(UnauthorizedException)
       expect(auditLog.logIfERExists).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'authentication_failed' }),
@@ -166,8 +242,21 @@ describe('AuthService', () => {
       prisma.representative.findFirst.mockResolvedValue({ id: 're-1', passwordHash: 'hashed' })
       mockedBcrypt.compare.mockResolvedValue(false as never)
       await expect(
-        service.login({ credential: 'RE0001', password: 'wrong' }),
+        service.login({
+          credential: 'RE0001',
+          password: 'wrong',
+          erId: 'er-1',
+          entryToken: 'entry-token',
+          entryChannel: EntryChannel.QR_CODE,
+        }),
       ).rejects.toThrow(UnauthorizedException)
+    })
+
+    it('rejects login without a signed queue entry', async () => {
+      await expect(
+        service.login({ credential: 'RE0001', password: 'Teste@123', erId: 'er-1' }),
+      ).rejects.toThrow('Acesso à fila inválido ou expirado')
+      expect(prisma.representative.findFirst).not.toHaveBeenCalled()
     })
   })
 

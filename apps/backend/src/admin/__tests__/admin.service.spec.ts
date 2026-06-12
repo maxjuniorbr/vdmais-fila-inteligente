@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit-log/audit-log.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { PanelTokenService } from '../../panel/panel-token.service'
 import { AdminService } from '../admin.service'
+import { QueueEntryTokenService } from '../../auth/queue-entry-token.service'
 
 jest.mock('bcrypt')
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>
@@ -16,6 +17,12 @@ const prisma = {
 }
 const auditLog = { log: jest.fn() }
 const panelTokens = { rotate: jest.fn(), revoke: jest.fn() }
+const queueEntryTokens = {
+  issue: jest.fn((erId, entryChannel) => ({
+    token: `${erId}-${entryChannel}`,
+    expiresAt: '2026-07-12T12:00:00.000Z',
+  })),
+}
 const user = { userId: 'admin-1', role: Role.ADMIN, erId: undefined }
 
 const uniqueViolation = new Prisma.PrismaClientKnownRequestError('dup', {
@@ -32,9 +39,14 @@ describe('AdminService', () => {
       prisma as unknown as PrismaService,
       auditLog as unknown as AuditLogService,
       panelTokens as unknown as PanelTokenService,
+      queueEntryTokens as unknown as QueueEntryTokenService,
     )
     mockedBcrypt.hash.mockResolvedValue('hashed' as never)
     prisma.eR.findUnique.mockResolvedValue({ id: 'er-1' })
+    queueEntryTokens.issue.mockImplementation((erId, entryChannel) => ({
+      token: `${erId}-${entryChannel}`,
+      expiresAt: '2026-07-12T12:00:00.000Z',
+    }))
   })
 
   it('lists ERs', async () => {
@@ -53,6 +65,16 @@ describe('AdminService', () => {
     expect(result.id).toBe('er-1')
     expect(result).not.toHaveProperty('panelTokenHash')
     expect(result.hasPanelToken).toBe(true)
+    expect(result.entryAccess).toEqual({
+      qrCode: {
+        token: 'er-1-QR_CODE',
+        expiresAt: '2026-07-12T12:00:00.000Z',
+      },
+      link: {
+        token: 'er-1-LINK',
+        expiresAt: '2026-07-12T12:00:00.000Z',
+      },
+    })
   })
 
   it('reports hasPanelToken false when no token is set', async () => {

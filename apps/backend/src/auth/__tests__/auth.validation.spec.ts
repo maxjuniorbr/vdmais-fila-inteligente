@@ -4,8 +4,10 @@ import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditLogService } from '../../audit-log/audit-log.service'
+import { EntryChannel } from '@prisma/client'
 import { AuthService } from '../auth.service'
 import { RegisterDto } from '../dto/register.dto'
+import { QueueEntryTokenService } from '../queue-entry-token.service'
 
 const validRegistration = {
   fullName: 'Maria da Silva',
@@ -14,6 +16,9 @@ const validRegistration = {
   birthDate: '1990-05-15',
   reCode: 'RE123456',
   password: 'senha123',
+  erId: 'er-1',
+  entryToken: 'entry-token',
+  entryChannel: EntryChannel.QR_CODE,
 }
 
 describe('RegisterDto validation', () => {
@@ -76,10 +81,12 @@ describe('AuthService uniqueness', () => {
   }
   const jwt = { sign: jest.fn() }
   const auditLog = { logIfERExists: jest.fn() }
+  const queueEntryTokens = { verify: jest.fn() }
   const service = new AuthService(
     prisma as unknown as PrismaService,
     jwt as unknown as JwtService,
     auditLog as unknown as AuditLogService,
+    queueEntryTokens as unknown as QueueEntryTokenService,
   )
 
   beforeEach(() => jest.clearAllMocks())
