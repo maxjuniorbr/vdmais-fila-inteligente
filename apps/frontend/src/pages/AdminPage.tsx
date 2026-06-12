@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import { hasStaffSession, logoutStaffSession } from '../auth/session'
+import { logoutStaffSession } from '../auth/session'
+import { useStaffSession } from '../auth/useStaffSession'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Badge } from '../components/Badge'
@@ -47,7 +48,7 @@ interface ERDetail extends Omit<ERSummary, '_count'> {
 }
 
 export function AdminPage() {
-  const [authenticated, setAuthenticated] = useState(() => hasStaffSession(['ADMIN']))
+  const [authenticated, setAuthenticated] = useStaffSession(['ADMIN'])
 
   if (!authenticated) {
     return (

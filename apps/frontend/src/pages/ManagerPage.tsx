@@ -6,10 +6,10 @@ import {
   getSessionERId,
   getStaffName,
   getStaffRole,
-  hasStaffSession,
   logoutStaffSession,
   setManagementERId,
 } from '../auth/session'
+import { useStaffSession } from '../auth/useStaffSession'
 import { ActionMenu } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
@@ -197,7 +197,7 @@ function elapsedSeconds(from: string): number {
 
 export function ManagerPage() {
   const navigate = useNavigate()
-  const [authenticated, setAuthenticated] = useState(() => hasStaffSession(['MANAGER', 'ADMIN']))
+  const [authenticated, setAuthenticated] = useStaffSession(['MANAGER', 'ADMIN'])
   const [erId, setErId] = useState(() =>
     getStaffRole() === 'ADMIN' ? getManagementERId() : getSessionERId(),
   )
