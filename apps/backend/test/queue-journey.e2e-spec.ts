@@ -203,6 +203,42 @@ describe('Full queue journey and concurrency (e2e)', () => {
     representativeToken = login.body.access_token
   })
 
+  it('revokes a staff token on logout (session version)', async () => {
+    const passwordHash = await bcrypt.hash('senha123', 10)
+    const operator = await prisma.operator.create({
+      data: {
+        name: 'Operadora Logout',
+        email: `logout_${suffix}@test.local`,
+        passwordHash,
+        role: Role.OPERATOR,
+        erId,
+      },
+    })
+
+    const loginResponse = await request(app.getHttpServer())
+      .post('/auth/staff-login')
+      .send({ email: operator.email, password: 'senha123' })
+      .expect(200)
+    const token = loginResponse.body.access_token as string
+
+    // The token works before logout.
+    await request(app.getHttpServer())
+      .get('/operators/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    await request(app.getHttpServer())
+      .post('/telemetry/staff/logout')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201)
+
+    // The same token is rejected afterwards: revocation took effect.
+    await request(app.getHttpServer())
+      .get('/operators/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(401)
+  })
+
   it('allows only one operator to acquire a counter concurrently', async () => {
     const counter = await prisma.counter.create({ data: { number: 3, erId } })
 
