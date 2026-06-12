@@ -1,3 +1,5 @@
+import { notifySessionExpired } from '../auth/session'
+
 const BASE = '/api'
 
 function authHeaders() {
@@ -15,7 +17,7 @@ async function request<T>(path: string, method: string, body?: unknown): Promise
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
-    if (res.status === 401) sessionStorage.removeItem('token')
+    if (res.status === 401) notifySessionExpired()
     throw new Error(err.message ?? 'Não foi possível concluir a solicitação')
   }
   if (res.status === 204) return undefined as T

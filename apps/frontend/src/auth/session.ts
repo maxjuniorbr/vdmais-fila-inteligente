@@ -102,6 +102,15 @@ export function clearSession() {
   sessionStorage.removeItem('erId')
 }
 
+// Broadcast when the server rejects the session (401). Staff screens listen for
+// this to drop back to the login form instead of leaving a stale, broken view.
+export const SESSION_EXPIRED_EVENT = 'staff-session-expired'
+
+export function notifySessionExpired() {
+  clearSession()
+  globalThis.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+}
+
 export async function logoutStaffSession() {
   const token = sessionStorage.getItem(TOKEN_KEY)
   try {

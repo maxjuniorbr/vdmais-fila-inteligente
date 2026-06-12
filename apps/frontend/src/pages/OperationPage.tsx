@@ -4,9 +4,9 @@ import {
   getSessionERId,
   getStaffName,
   getStaffSessionProfile,
-  hasStaffSession,
   logoutStaffSession,
 } from '../auth/session'
+import { useStaffSession } from '../auth/useStaffSession'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Button } from '../components/Button'
@@ -67,7 +67,7 @@ const QUEUE_EVENTS = [
 ]
 
 export function OperationPage() {
-  const [authenticated, setAuthenticated] = useState(() => hasStaffSession(['OPERATOR']))
+  const [authenticated, setAuthenticated] = useStaffSession(['OPERATOR'])
   const [erId, setErId] = useState(() => getSessionERId())
   const [operatorId, setOperatorId] = useState(() => getStaffSessionProfile()?.id ?? '')
   const [counterId, setCounterId] = useState(() => sessionStorage.getItem('counterId') ?? '')
