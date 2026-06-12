@@ -14,7 +14,6 @@ export class TelemetryService {
   async recordQueueEntryStarted(erId: string) {
     const er = await this.prisma.eR.findUnique({ where: { id: erId }, select: { id: true } })
     if (!er) throw new NotFoundException('ER não encontrado')
-    await this.auditLog.log({ eventType: 'queue_entry_started', erId })
     return { recorded: true }
   }
 
@@ -37,18 +36,7 @@ export class TelemetryService {
     return { recorded: true }
   }
 
-  async recordPanelCallDisplayed(erId: string, ticketId: string) {
-    const ticket = await this.prisma.ticket.findFirst({
-      where: { id: ticketId, erId },
-      select: { id: true },
-    })
-    if (!ticket) throw new NotFoundException('Senha não encontrada neste ER')
-
-    await this.auditLog.log({
-      eventType: 'ticket_call_displayed_on_panel',
-      erId,
-      ticketId,
-    })
+  recordPanelCallDisplayed() {
     return { recorded: true }
   }
 
@@ -57,9 +45,6 @@ export class TelemetryService {
       throw new ForbiddenException('Somente a saída da equipe é registrada aqui')
     }
 
-    // Revoke every active token of this staff account by bumping the session
-    // version. The current bearer token stops being accepted on the next
-    // request. Applies to ADMIN too, which has no ER bound.
     await this.prisma.operator.update({
       where: { id: user.userId },
       data: { sessionVersion: { increment: 1 } },
