@@ -42,7 +42,7 @@ function fixture(callCount: number): PanelFixture {
 }
 
 function renderPanel(state: PanelFixture, entry = '/painel/er-1') {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = input instanceof Request ? input.url : input.toString()
     if (url.includes('/api/panel/er-1/state')) {
       return new Response(JSON.stringify(state), {
