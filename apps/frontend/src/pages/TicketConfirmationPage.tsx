@@ -26,11 +26,6 @@ function formatMmSs(totalSeconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-/**
- * Countdown + progress bar shown while a ticket is paused. When the configured
- * pause timeout elapses the password is auto-cancelled by the backend; this
- * component fires `onExpire` so the card reflects it immediately.
- */
 function PauseCountdown({
   pausedAt,
   pauseTimeoutSeconds,

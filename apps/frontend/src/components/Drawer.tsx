@@ -9,7 +9,6 @@ interface DrawerProps {
   onClose: () => void
 }
 
-/** Gaveta lateral de navegação (H3 — fecha por botão, Esc ou backdrop). */
 export function Drawer({ title, children, onClose }: Readonly<DrawerProps>) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {

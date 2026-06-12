@@ -2,15 +2,10 @@ import type { CSSProperties, ReactNode } from 'react'
 import { brand } from '../styles/brand'
 
 export interface Column<T> {
-  /** Identificador único da coluna. */
   key: string
-  /** Conteúdo do cabeçalho. */
   header: ReactNode
-  /** Rótulo curto usado no modo card (container estreito). Padrão: header se string. */
   label?: string
-  /** Alinhamento do conteúdo. Padrão: left. */
   align?: 'left' | 'right' | 'center'
-  /** Renderiza a célula a partir da linha. Sem render, usa row[key]. */
   render?: (row: T) => ReactNode
 }
 
@@ -18,18 +13,10 @@ interface TableProps<T> {
   columns: Column<T>[]
   rows: T[]
   getRowKey: (row: T) => string
-  /** Mensagem exibida quando não há linhas. */
   emptyMessage?: string
-  /** Legenda acessível da tabela. */
   caption?: string
 }
 
-/**
- * Tabela de dados tabulares. Estilo via classes `.gb-table` (theme.css):
- * cabeçalho em maiúsculas, linhas com hover. Em containers estreitos, colapsa
- * para o padrão "card" (cada linha vira um cartão rótulo:valor) via container
- * query — evitando barra de rolagem horizontal dentro de blocos pequenos.
- */
 export function Table<T>({
   columns,
   rows,

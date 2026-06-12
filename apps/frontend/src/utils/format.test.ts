@@ -1,6 +1,3 @@
-/**
- * **Validates: Requirements 2.7**
- */
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
 import { formatDate, formatTime, formatDuration } from './format'
@@ -9,8 +6,6 @@ describe('format utilities — property-based tests', () => {
   /**
    * O gerador é restrito ao intervalo real de uso do sistema de filas
    * (anos 1900–2099) para garantir anos sempre com 4 dígitos.
-   *
-   * **Validates: Requirements 2.7**
    */
   it('Property 1 — formatDate sempre retorna DD/MM/AAAA para qualquer data válida', () => {
     const pattern = /^\d{2}\/\d{2}\/\d{4}$/
@@ -26,9 +21,6 @@ describe('format utilities — property-based tests', () => {
     )
   })
 
-  /**
-   * **Validates: Requirements 2.7**
-   */
   it('Property 2 — formatDuration nunca produz valores negativos e segue padrão Xm Ys', () => {
     const pattern = /^\d+m \d+s$/
     fc.assert(
@@ -45,9 +37,6 @@ describe('format utilities — property-based tests', () => {
     )
   })
 
-  /**
-   * **Validates: Requirements 2.7**
-   */
   it('Property 3 — formatTime sempre retorna HHhMM para qualquer data válida', () => {
     const pattern = /^\d{2}h\d{2}$/
     const minDate = new Date('1900-01-01T00:00:00.000Z')

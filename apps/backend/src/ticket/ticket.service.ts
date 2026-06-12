@@ -427,8 +427,6 @@ export class TicketService {
       })
     })
 
-    // Reaproveita o evento 'ticket.called' (já tratado pelos clientes) para
-    // re-destacar a senha no painel — o painel não precisa de ajuste.
     this.panelGateway.emitToER(ticket.erId, 'ticket.called', {
       ticketId,
       code: updated.code,

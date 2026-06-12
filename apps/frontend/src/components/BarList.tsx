@@ -4,9 +4,7 @@ import { brand } from '../styles/brand'
 export interface BarItem {
   label: string
   value: number
-  /** Texto exibido à direita (ex.: duração formatada). Padrão: value. */
   display?: string
-  /** Destaca a barra (ex.: horário de pico). */
   highlight?: boolean
 }
 
@@ -15,10 +13,6 @@ interface BarListProps {
   emptyMessage?: string
 }
 
-/**
- * Lista de barras proporcionais para distribuições (volume por hora, etc.).
- * Cada item expõe rótulo acessível; a barra em si é decorativa.
- */
 export function BarList({ items, emptyMessage = 'Sem dados' }: Readonly<BarListProps>) {
   if (items.length === 0) return <p style={styles.empty}>{emptyMessage}</p>
 

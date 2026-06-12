@@ -6,7 +6,6 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   containerStyle?: CSSProperties
 }
 
-/** Entrada de texto longo, com rótulo sempre visível. */
 export function Textarea({
   label,
   containerStyle,

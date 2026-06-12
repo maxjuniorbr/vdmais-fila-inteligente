@@ -3,7 +3,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PanelPage } from './PanelPage'
 
-// A controllable socket double so tests can drive the realtime refresh path.
 type SocketHandler = (...args: unknown[]) => void
 let socketDouble: {
   on: ReturnType<typeof vi.fn>
@@ -177,7 +176,6 @@ describe('PanelPage', () => {
     renderPanel(state)
 
     expect(await screen.findByText('Atendimento encerrado por hoje')).toBeInTheDocument()
-    // The live board (calling card) must not show while closed.
     expect(screen.queryByText('A001')).not.toBeInTheDocument()
     expect(screen.queryByText('Aguardando próxima chamada')).not.toBeInTheDocument()
   })
@@ -222,7 +220,6 @@ describe('PanelPage', () => {
       act(() => {
         vi.advanceTimersByTime(1000)
       })
-      // The clock element still renders after the interval fired.
       expect(screen.getByText(/\d{2}h\d{2}/)).toBeInTheDocument()
       expect(typeof before).toBe('string')
     } finally {
@@ -241,7 +238,6 @@ describe('PanelPage', () => {
       renderPanel(state)
       await screen.findByText('W1')
 
-      // First window shows W1 (fixed) plus W2..W7.
       expect(screen.getByText('W2')).toBeInTheDocument()
       expect(screen.queryByText('W8')).not.toBeInTheDocument()
 
