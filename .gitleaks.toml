@@ -1,0 +1,13 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders de exemplo e segredos de teste do CI (não são credenciais reais)"
+paths = [
+  '''apps/backend/\.env\.example''',
+]
+regexes = [
+  '''ci-test-secret-minimum-32-characters-long''',
+  '''fila_dev_pass''',
+  '''k9Xy2P8qL4mZ7wR3tV6nB1cD5fH0jA8sQ2eU4yT6oI9pL3a''',
+]
