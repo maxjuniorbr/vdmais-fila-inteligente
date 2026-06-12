@@ -348,7 +348,7 @@ Mitigações para esquecimento:
 Quando a senha está em **Chamando** e a RE não comparece de imediato, a operadora
 pode **rechamar** antes de marcar não comparecimento.
 
-1. Operadora clica em **Rechamar**.
+1. Operadora clica em **Chamar novamente**.
 2. A senha permanece em **Chamando**, no mesmo caixa (não altera a fila).
 3. O horário da chamada é atualizado e o painel **re-anuncia** a senha (o cartão
    volta a piscar).
@@ -399,6 +399,8 @@ Regras da restauração:
 >   atendimento.
 > - A restauração **não acontece** se a RE já tiver outra senha ativa no ER —
 >   isso preserva a regra "uma senha ativa por RE por ER".
+> - A restauração exige a **operação do dia aberta**: com a operação encerrada o
+>   backend recusa e o painel da gestora não oferece a ação de restaurar.
 > - A senha restaurada volta sempre para o **fim** da fila do dia atual.
 
 Motivos possíveis:
@@ -454,6 +456,13 @@ Motivos possíveis de pausa:
 3. Quando estiver pronta, a RE clica em **Retomar**.
 4. A senha volta para **Aguardando**, no **fim** da fila (nova posição).
 5. O tempo pausado é descontado das métricas de espera.
+
+> **Tempo limite da pausa.** A pausa tem tolerância configurável por ER
+> (`pauseTimeoutSeconds`, padrão 5 minutos). Se a RE não retomar dentro da janela,
+> a senha é **cancelada** automaticamente (motivo "Tempo de pausa esgotado",
+> evento `ticket_pause_expired`). A expiração é aplicada tanto por verificação
+> periódica quanto na própria tela da RE, para que ela veja o cancelamento sem
+> depender do sweep.
 
 ### 9.6 Saída da fila pela RE
 
@@ -579,6 +588,15 @@ Espera média e atendimento médio do dia.
 > própria chamada é coberto pela **rechamada** na tela da operadora. O cabeçalho
 > do painel traz título e relógio (data + hora com segundos).
 
+### Operação encerrada
+
+Quando a operação do dia está encerrada, o painel da TV substitui o quadro de
+chamadas por uma tela **"Atendimento encerrado por hoje"** (mantendo cabeçalho e
+relógio), em vez de aparentar uma operação ociosa com a fila vazia. O mesmo
+estado é sinalizado nas demais telas: a **operadora** vê um aviso de que a
+operação está encerrada (não dá para assumir caixa nem chamar) e a **gestora**
+vê um aviso no topo do painel, com a ação **Abrir operação** disponível.
+
 ---
 
 ## 11. Interface da operadora
@@ -612,7 +630,7 @@ Tela mínima:
 - tempo em atendimento;
 - botão **Chamar próximo**;
 - botão **Iniciar atendimento**;
-- botão **Rechamar**;
+- botão **Chamar novamente**;
 - botão **Finalizar atendimento**;
 - botão **Não compareceu**;
 - botão **Pausar/Retomar**;
@@ -774,6 +792,7 @@ manual_checkin_completed
 manual_override_performed
 ticket_paused
 ticket_resumed
+ticket_pause_expired
 ticket_recalled
 ticket_force_closed
 ticket_auto_no_show
