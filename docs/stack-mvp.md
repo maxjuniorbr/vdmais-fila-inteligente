@@ -121,8 +121,12 @@ Uso:
 A TV pode ser uma rota React em tela cheia:
 
 ```
-/painel/:erId
+/painel/:erId?token=...
 ```
+
+O acesso é protegido por um **token de exibição por ER**, gerado na administração.
+Não exige perfil de usuário; a URL da TV carrega o token. Sem token válido, tanto
+`GET /panel/:erId/state` quanto o handshake do WebSocket são recusados.
 
 ---
 

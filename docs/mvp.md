@@ -514,6 +514,11 @@ volta a ficar disponível, sem operadora. Registrado em `counter_force_released`
 
 ## 10. TV / painel de chamada
 
+Acesso protegido por **token de exibição por ER** (gerado/revogado na
+administração). A URL da TV é `/painel/:erId?token=...`; sem token válido o
+backend recusa tanto o estado (`GET /panel/:erId/state`) quanto o tempo real
+(WebSocket). Não exige perfil de usuário.
+
 Formato recomendado:
 
 > Senha A023 — Maria S. — Caixa 04

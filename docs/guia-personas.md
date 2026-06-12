@@ -18,7 +18,7 @@ Cada seção descreve **quem é a persona**, **qual tela ela usa**, e a
 | **Atendente (check-in)** | `/checkin` | Coloca a RE na fila quando ela não consegue sozinha |
 | **Gestora** | `/gestao` | Abre/encerra o dia, acompanha métricas e corrige exceções |
 | **Administrador** | `/admin` | Cria ERs, caixas e contas de equipe |
-| **Painel/TV (público)** | `/painel/:erId` | Exibe as chamadas para todo o salão |
+| **Painel/TV** | `/painel/:erId?token=...` | Exibe as chamadas para todo o salão (token de exibição) |
 
 > O fluxo de configuração inicial é sempre: **Admin → Gestora abre o dia →
 > Operadoras abrem os caixas → REs entram na fila**.
@@ -185,17 +185,22 @@ pode administrar vários.
 3. Em **Gerenciar ER**:
    - cadastra os **caixas** físicos;
    - cria as contas de **gestora**, **operadoras** e (se usar) **atendente**;
-   - copia/testa os três acessos do ER:
+   - copia/testa os acessos do ER:
      - **QR Code presencial** — o endereço para gerar o QR Code no balcão;
      - **Link alternativo** — com `?source=link`, exige confirmar o ER;
-     - **Painel de TV** — endereço público para abrir na TV do salão.
+     - **Painel de TV** — gera o **token de acesso** e copia a URL com o token
+       para abrir na TV do salão. O token pode ser revogado ou regerado a
+       qualquer momento se o endereço vazar.
 4. Entrega os acessos à equipe e o ER está pronto para operar.
 
 ---
 
-## 6. Painel/TV (público) — a vitrine da fila
+## 6. Painel/TV — a vitrine da fila
 
-**O que é:** a tela exibida na TV do salão, em `/painel/:erId`. Não exige login.
+**O que é:** a tela exibida na TV do salão, em `/painel/:erId`. Não exige perfil
+de usuário, mas o acesso é protegido por um **token de exibição** gerado na
+administração: a URL da TV inclui `?token=...`. Sem token válido, o painel
+(HTTP e tempo real) é recusado. O token é revogável e atrelado ao ER.
 
 **O que mostra:**
 
