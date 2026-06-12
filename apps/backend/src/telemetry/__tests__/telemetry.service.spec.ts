@@ -27,12 +27,10 @@ describe('TelemetryService', () => {
   })
 
   describe('recordQueueEntryStarted', () => {
-    it('records the entry for an existing ER', async () => {
+    it('returns recorded for an existing ER without writing audit', async () => {
       prisma.eR.findUnique.mockResolvedValue({ id: 'er-1' })
       await expect(service.recordQueueEntryStarted('er-1')).resolves.toEqual({ recorded: true })
-      expect(auditLog.log).toHaveBeenCalledWith(
-        expect.objectContaining({ eventType: 'queue_entry_started' }),
-      )
+      expect(auditLog.log).not.toHaveBeenCalled()
     })
 
     it('throws when the ER is unknown', async () => {
@@ -73,18 +71,9 @@ describe('TelemetryService', () => {
   })
 
   describe('recordPanelCallDisplayed', () => {
-    it('records a panel call for an existing ticket', async () => {
-      prisma.ticket.findFirst.mockResolvedValue({ id: 't-1' })
-      await expect(service.recordPanelCallDisplayed('er-1', 't-1')).resolves.toEqual({
-        recorded: true,
-      })
-    })
-
-    it('throws when the ticket is not in the ER', async () => {
-      prisma.ticket.findFirst.mockResolvedValue(null)
-      await expect(service.recordPanelCallDisplayed('er-1', 't-x')).rejects.toThrow(
-        NotFoundException,
-      )
+    it('returns recorded without any DB or audit side effect', () => {
+      expect(service.recordPanelCallDisplayed()).toEqual({ recorded: true })
+      expect(auditLog.log).not.toHaveBeenCalled()
     })
   })
 

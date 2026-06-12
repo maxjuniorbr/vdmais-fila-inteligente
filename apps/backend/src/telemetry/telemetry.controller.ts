@@ -18,8 +18,8 @@ export class TelemetryController {
 
   @Post('panel/:erId/tickets/:ticketId/displayed')
   @Throttle({ default: { ttl: 60000, limit: 120 } })
-  panelDisplayed(@Param('erId') erId: string, @Param('ticketId') ticketId: string) {
-    return this.telemetryService.recordPanelCallDisplayed(erId, ticketId)
+  panelDisplayed() {
+    return this.telemetryService.recordPanelCallDisplayed()
   }
 
   @Post('tickets/:ticketId/displayed')
