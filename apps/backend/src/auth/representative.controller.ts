@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { maskCpf, maskPhone } from '../common/pii-mask'
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { AuthenticatedUser } from '../common/authenticated-user'
@@ -17,11 +18,16 @@ export class RepresentativeController {
 
   @Post()
   @Roles('ATTENDANT', 'MANAGER')
-  create(@Body() dto: RegisterDto, @Request() req: { user: AuthenticatedUser }) {
-    return this.authService.createRepresentative(dto, {
+  async create(@Body() dto: RegisterDto, @Request() req: { user: AuthenticatedUser }) {
+    const representative = await this.authService.createRepresentative(dto, {
       erId: req.user.erId,
       actor: req.user,
     })
+    return {
+      ...representative,
+      cpf: maskCpf(representative.cpf),
+      phone: maskPhone(representative.phone),
+    }
   }
 
   @Get('search')
@@ -48,8 +54,8 @@ export class RepresentativeController {
     return representatives.map((representative) => ({
       id: representative.id,
       fullName: representative.fullName,
-      cpf: `***.***.${representative.cpf.slice(-3)}-**`,
-      phone: `(**) *****-${representative.phone.slice(-4)}`,
+      cpf: maskCpf(representative.cpf),
+      phone: maskPhone(representative.phone),
       reCode: representative.reCode,
     }))
   }

@@ -107,6 +107,14 @@ code and are the source of truth — do not restate hex/size literals here:
 - Route guards call `hasStaffSession(allowedRoles)`, which validates the JWT signature, role membership, and expiration in one step. Do not reimplement this check inline.
 - `sessionStorage` holds only the opaque JWT (`token`) and a display-only name (`userName`). State scoped to UI context (current counter, management ER) lives in `counterId`/`managementErId` — these are UI state, not security-sensitive.
 
+## PII display
+
+- Never render a representative's full CPF, phone, or birth date. The API already
+  returns these identifiers masked (e.g. `***.***.344-**`, `(**) *****-0000`) — display
+  the masked value as-is and never reconstruct or request the full value for display.
+- Show only what the operator needs to confirm identity (name + masked last digits).
+  Keep success/confirmation screens minimal (ticket code, first name, position).
+
 ## Writing and tone of voice
 
 - Pillars: gentle (empathetic, never blames the user), confident (direct, no

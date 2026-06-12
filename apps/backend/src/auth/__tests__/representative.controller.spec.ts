@@ -18,12 +18,26 @@ describe('RepresentativeController', () => {
     )
   })
 
-  it('delegates create with the actor context', () => {
+  it('delegates create with the actor context and masks the response PII', async () => {
     const dto = { fullName: 'Ana' } as never
-    controller.create(dto, req)
+    authService.createRepresentative.mockResolvedValue({
+      id: 're-1',
+      fullName: 'Ana Souza',
+      cpf: '11122233344',
+      phone: '11999990000',
+      reCode: 'RE0001',
+    })
+    const result = await controller.create(dto, req)
     expect(authService.createRepresentative).toHaveBeenCalledWith(dto, {
       erId: 'er-1',
       actor: req.user,
+    })
+    expect(result).toEqual({
+      id: 're-1',
+      fullName: 'Ana Souza',
+      cpf: '***.***.344-**',
+      phone: '(**) *****-0000',
+      reCode: 'RE0001',
     })
   })
 
