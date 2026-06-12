@@ -53,16 +53,26 @@ export class TelemetryService {
   }
 
   async recordLogout(user: AuthenticatedUser) {
-    if (user.role === Role.REPRESENTATIVE || !user.erId) {
+    if (user.role === Role.REPRESENTATIVE) {
       throw new ForbiddenException('Somente a saída da equipe é registrada aqui')
     }
 
-    await this.auditLog.log({
-      eventType: 'operator_logged_out',
-      erId: user.erId,
-      operatorId: user.userId,
-      metadata: { role: user.role },
+    // Revoke every active token of this staff account by bumping the session
+    // version. The current bearer token stops being accepted on the next
+    // request. Applies to ADMIN too, which has no ER bound.
+    await this.prisma.operator.update({
+      where: { id: user.userId },
+      data: { sessionVersion: { increment: 1 } },
     })
+
+    if (user.erId) {
+      await this.auditLog.log({
+        eventType: 'operator_logged_out',
+        erId: user.erId,
+        operatorId: user.userId,
+        metadata: { role: user.role },
+      })
+    }
     return { recorded: true }
   }
 

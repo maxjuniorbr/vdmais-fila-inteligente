@@ -42,6 +42,12 @@ export class AuthService {
     })
 
     if (existing) {
+      // Public self-registration must not confirm which identifier already
+      // exists (PII enumeration). The assisted flow (authenticated staff) keeps
+      // the specific message because it is operationally useful and not public.
+      if (!context.actor) {
+        throw new ConflictException('Não foi possível concluir o cadastro com os dados informados')
+      }
       if (existing.cpf === normalized.cpf) throw new ConflictException('CPF já cadastrado')
       if (existing.phone === normalized.phone) {
         throw new ConflictException('Telefone já cadastrado')
@@ -154,7 +160,7 @@ export class AuthService {
       })
     }
 
-    return this._sign(operator.id, operator.role, operator.erId ?? undefined, operator.name)
+    return this._sign(operator.id, operator.role, operator.erId ?? undefined, operator.name, operator.sessionVersion)
   }
 
   private async _recordAuthenticationFailure(
@@ -171,9 +177,9 @@ export class AuthService {
     })
   }
 
-  private _sign(userId: string, role: Role, erId?: string, name?: string) {
+  private _sign(userId: string, role: Role, erId?: string, name?: string, sessionVersion?: number) {
     return {
-      access_token: this.jwt.sign({ sub: userId, userId, role, erId }),
+      access_token: this.jwt.sign({ sub: userId, userId, role, erId, sv: sessionVersion }),
       user: { id: userId, role, erId, name },
     }
   }

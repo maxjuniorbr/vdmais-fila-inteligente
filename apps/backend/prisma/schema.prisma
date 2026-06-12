@@ -126,6 +126,11 @@ model Operator {
   passwordHash String
   role         Role   @default(OPERATOR)
 
+  // Incremented to revoke every active JWT of this staff account (logout,
+  // password change, account disable). The token carries the version it was
+  // signed with; JwtStrategy rejects tokens whose version is stale.
+  sessionVersion Int @default(0)
+
   // Null for global staff (e.g. ADMIN), which is not tied to a single ER.
   erId String?
   er   ER?     @relation(fields: [erId], references: [id])
