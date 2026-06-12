@@ -18,19 +18,18 @@ export function MetricCard({ label, value }: Readonly<MetricCardProps>) {
 const styles: Record<string, CSSProperties> = {
   card: {
     display: 'grid',
-    gap: '0.25rem',
+    gap: `${brand.spacing[4]}px`,
     textAlign: 'center',
     padding: `${brand.spacing[16]}px`,
     background: brand.surface,
     border: `1px solid ${brand.border}`,
-    borderTop: `3px solid ${brand.green500}`,
     borderRadius: brand.radius.medium,
     boxShadow: brand.shadow,
   },
   value: {
     fontSize: brand.typography.heading.fontSize,
     fontWeight: 700,
-    color: brand.green800,
+    color: brand.ink,
   },
   label: {
     fontSize: brand.typography.auxiliar.fontSize,

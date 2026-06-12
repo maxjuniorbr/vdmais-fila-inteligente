@@ -1,40 +1,79 @@
 /**
- * Tokens de marca — a organização (tema white).
+ * Design tokens — tema white, sistema semântico.
  * Fonte única de cores para estilos inline; espelha as variáveis de theme.css.
+ *
+ * Cores organizadas por intenção (nunca misturar a semântica de uma categoria
+ * com outra): Background, Non Interactive, Link, Actionable, Conversion,
+ * Non Primary, Warning/Destructive, Status, Disabled, Keyboard Focus.
  */
 export const brand = {
-  green900: '#00301f',
-  green800: '#00422c',
-  green700: '#00543d',
-  green600: '#056b4c',
-  green500: '#0d8a5f',
-  green400: '#2fae7d',
-  green100: '#d3ecdf',
-  green50: '#ecf7f1',
+  // ── Background ───────────────────────────────────────────────
+  surface: '#ffffff', // background/primary
+  canvas: '#f5f5f5', // background/secondary
+  canvasWarm: '#f5f1eb', // background/tertiary
+  overlay: 'rgba(0, 0, 0, 0.48)', // background/overlay
 
-  gold600: '#a87b2d',
-  gold400: '#d4a843',
+  // ── Non Interactive (texto) ──────────────────────────────────
+  ink: '#222222', // predominant
+  inkSoft: '#444444', // intermediário
+  inkMuted: '#666666', // auxiliar
+  emphasis: '#00325f', // ênfase institucional
 
-  ink: '#1c2b25',
-  inkSoft: '#44574e',
-  inkMuted: '#5f7369',
-  surface: '#ffffff',
-  canvas: '#f4f9f6',
-  border: '#dbe8e1',
-  borderStrong: '#c2d6cb',
+  // ── Non Interactive / Outline (exclusivo de bordas e divisores) ─
+  border: '#e2e2e2',
+  borderStrong: '#c4c4c4',
   borderMuted: '#94a3b8',
+  outline: 'rgba(0, 0, 0, 0.15)',
 
-  danger: '#b3261e',
-  dangerSoft: '#fdeceb',
-  dangerBorder: '#f3c1bd',
-  warning: '#8a5a00',
-  warningSoft: '#fff4dd',
-  warningBorder: '#f0d9a8',
-  success: '#00543d',
-  successSoft: '#ecf7f1',
+  // ── Link ─────────────────────────────────────────────────────
+  link: '#264fec',
+  linkHover: '#002ec9',
+  linkVisited: '#4c2c91',
+
+  // ── Actionable (ação primária) ───────────────────────────────
+  actionable: '#264fec',
+  actionableHover: '#002ec9',
+  actionableActive: '#001c76',
+  actionableContent: '#ffffff',
+
+  // ── Conversion (comercial / destaque) ────────────────────────
+  conversion: '#db1e8c',
+  conversionHover: '#b2006a',
+  conversionActive: '#750059',
+  conversionContent: '#ffffff',
+
+  // ── Non Primary (botão secundário/terciário sobre actionable) ─
+  nonPrimaryHover: 'rgba(38, 79, 236, 0.16)',
+  nonPrimaryActive: 'rgba(38, 79, 236, 0.32)',
+  nonPrimaryContent: '#264fec',
+
+  // ── Warning / Destructive ────────────────────────────────────
+  danger: '#d32f2f',
+  dangerHover: '#b71c1c',
+  dangerSoft: '#ffebee',
+  dangerBorder: '#f4c7c7',
+  dangerContent: '#ffffff',
+
+  // ── Status (foundations) ─────────────────────────────────────
+  success: '#1b5e20',
+  successSoft: '#e8f5e9',
+  successBorder: '#bfe3c2',
+  warning: '#f57f17', // alerta (âmbar)
+  warningSoft: '#fffde7',
+  warningBorder: '#f5e2a8',
+  info: '#0288d1',
+  infoSoft: '#e1f5fe',
+  infoBorder: '#bce6f5',
+
+  // ── Disabled ─────────────────────────────────────────────────
+  disabledBg: 'rgba(0, 0, 0, 0.16)',
+  disabledContent: 'rgba(0, 0, 0, 0.48)',
+
+  // ── Keyboard Focus ───────────────────────────────────────────
+  keyboardFocus: '#011e38',
 
   font: "'IBM Plex Sans', sans-serif",
-  shadow: '0 1px 2px rgba(0, 48, 31, 0.06), 0 4px 16px rgba(0, 48, 31, 0.05)',
+  shadow: '0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.05)',
 
   radius: {
     small: 4,
@@ -55,12 +94,12 @@ export const brand = {
   } as const,
 
   typography: {
-    display:   { fontSize: '2.4rem',  fontWeight: 800, lineHeight: 1.0  },
-    heading:   { fontSize: '1.35rem', fontWeight: 700, lineHeight: 1.2  },
-    title:     { fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.15 },
-    subtitle:  { fontSize: '1.05rem', fontWeight: 600, lineHeight: 1.3  },
-    bodyLarge: { fontSize: '1rem',    fontWeight: 400, lineHeight: 1.6  },
-    bodySmall: { fontSize: '0.9rem',  fontWeight: 400, lineHeight: 1.5  },
-    auxiliar:  { fontSize: '0.72rem', fontWeight: 700, lineHeight: 1.4  },
+    display:   { fontSize: '3.25rem', fontWeight: 700, lineHeight: 1.22 },
+    heading:   { fontSize: '2.25rem', fontWeight: 600, lineHeight: 1.28 },
+    title:     { fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.28 },
+    subtitle:  { fontSize: '1.25rem', fontWeight: 500, lineHeight: 1.4  },
+    bodyLarge: { fontSize: '1rem',    fontWeight: 400, lineHeight: 1.5  },
+    bodySmall: { fontSize: '0.875rem', fontWeight: 400, lineHeight: 1.43 },
+    auxiliar:  { fontSize: '0.75rem', fontWeight: 400, lineHeight: 1.33 },
   } as const,
 } as const

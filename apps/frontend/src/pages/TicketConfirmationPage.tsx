@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert } from '../components/Alert'
 import { BrandMark } from '../components/BrandMark'
 import { Button } from '../components/Button'
+import { Modal } from '../components/Modal'
 import { brand } from '../styles/brand'
 
 interface TicketInfo {
@@ -111,7 +112,7 @@ function TicketStatus({
     return (
       <>
         <p style={styles.positionLabel}>Situação</p>
-        <p style={{ ...styles.position, color: brand.green600 }}>Em atendimento</p>
+        <p style={{ ...styles.position, color: brand.success }}>Em atendimento</p>
         <p style={styles.hint}>Você está sendo atendida. Bom atendimento!</p>
       </>
     )
@@ -120,7 +121,7 @@ function TicketStatus({
     return (
       <>
         <p style={styles.positionLabel}>Situação</p>
-        <p style={{ ...styles.position, color: brand.gold600 }}>Chamada! Dirija-se ao caixa</p>
+        <p style={{ ...styles.position, color: brand.warning }}>Chamada! Dirija-se ao caixa</p>
         <p style={styles.hint}>Sua senha foi chamada. Dirija-se ao caixa indicado no painel.</p>
       </>
     )
@@ -139,7 +140,7 @@ function TicketStatus({
   return (
     <>
       <p style={styles.positionLabel}>Posição na fila</p>
-      <p style={{ ...styles.position, color: brand.green700 }}>
+      <p style={{ ...styles.position, color: brand.emphasis }}>
         {currentPosition > 0 ? `#${currentPosition}` : 'Em chamada'}
       </p>
       <p style={styles.hint}>
@@ -157,6 +158,7 @@ export function TicketConfirmationPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [confirmingLeave, setConfirmingLeave] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -305,10 +307,7 @@ export function TicketConfirmationPage() {
 
   async function handleLeaveQueue() {
     if (!ticket) return
-    const confirmed = globalThis.confirm(
-      'Tem certeza que deseja sair da fila? Sua senha será cancelada e você precisará entrar novamente.',
-    )
-    if (!confirmed) return
+    setConfirmingLeave(false)
     setActionLoading(true)
     try {
       const res = await fetch(`/api/tickets/${ticket.id}/self-cancel`, {
@@ -429,14 +428,31 @@ export function TicketConfirmationPage() {
             variant="danger"
             style={{ width: '100%', marginTop: '0.75rem' }}
             disabled={actionLoading}
-            onClick={() => {
-              void handleLeaveQueue()
-            }}
+            onClick={() => setConfirmingLeave(true)}
           >
             Sair da fila
           </Button>
         )}
       </div>
+
+      {confirmingLeave && (
+        <Modal
+          title="Sair da fila?"
+          onClose={() => setConfirmingLeave(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setConfirmingLeave(false)} disabled={actionLoading}>
+                Voltar
+              </Button>
+              <Button variant="danger" disabled={actionLoading} onClick={() => void handleLeaveQueue()}>
+                {actionLoading ? 'Saindo...' : 'Sair da fila'}
+              </Button>
+            </>
+          }
+        >
+          Sua senha será cancelada e você precisará entrar na fila novamente.
+        </Modal>
+      )}
     </div>
   )
 }
@@ -454,8 +470,7 @@ const styles: Record<string, React.CSSProperties> = {
   card: {
     background: brand.surface,
     border: `1px solid ${brand.border}`,
-    borderTop: `4px solid ${brand.green700}`,
-    borderRadius: 16,
+    borderRadius: brand.radius.large,
     padding: '2rem 1.5rem',
     textAlign: 'center',
     maxWidth: 380,
@@ -478,7 +493,7 @@ const styles: Record<string, React.CSSProperties> = {
   code: {
     fontSize: 'clamp(3rem, 18vw, 4.5rem)',
     fontWeight: 800,
-    color: brand.green700,
+    color: brand.emphasis,
     margin: '0 0 1.5rem',
     letterSpacing: '0.06em',
     lineHeight: 1.1,
@@ -515,6 +530,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   errorTitle: {
     margin: '0 0 0.5rem',
-    color: brand.green800,
+    color: brand.ink,
   },
 }

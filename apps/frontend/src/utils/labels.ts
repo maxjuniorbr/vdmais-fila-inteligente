@@ -45,12 +45,14 @@ export function roleLabel(role: string): string {
   return ROLE_LABELS[role] ?? 'Perfil não informado'
 }
 
-type BadgeTone = 'success' | 'warning' | 'neutral'
+type BadgeTone = 'success' | 'warning' | 'info' | 'danger' | 'neutral'
 
 const COUNTER_STATE_TONES: Record<string, BadgeTone> = {
   ACTIVE: 'success',
-  IN_SERVICE: 'success',
+  IN_SERVICE: 'info',
+  CALLING: 'info',
   PAUSED: 'warning',
+  UNAVAILABLE: 'neutral',
 }
 
 export function counterStateTone(state: string): BadgeTone {

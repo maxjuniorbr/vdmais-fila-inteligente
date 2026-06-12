@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
-import { formatDate, formatDuration, formatTime } from '../utils/format'
+import { formatDate, formatDuration, formatTimeWithSeconds } from '../utils/format'
 
 interface Call {
   ticketId: string
@@ -206,7 +206,7 @@ export function PanelPage() {
         actions={
           <span style={styles.clock}>
             <span style={styles.clockDate}>{formatDate(clock.toISOString())}</span>
-            <span style={styles.clockTime}>{formatTime(clock.toISOString())}</span>
+            <span style={styles.clockTime}>{formatTimeWithSeconds(clock.toISOString())}</span>
           </span>
         }
       />
@@ -324,22 +324,22 @@ export function PanelPage() {
 
 const CALL_PULSE_KEYFRAMES = `
 @keyframes gbPanelCall {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 84, 61, 0); }
-  50% { box-shadow: 0 0 0 10px rgba(0, 84, 61, 0.16); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(38, 79, 236, 0); }
+  50% { box-shadow: 0 0 0 10px rgba(38, 79, 236, 0.16); }
 }`
 
 const C = {
   canvas: brand.canvas,
   surface: brand.surface,
-  surfaceAlt: brand.green50,
+  surfaceAlt: brand.canvas,
   border: brand.border,
   borderStrong: brand.borderStrong,
   ink: brand.ink,
   inkSoft: brand.inkSoft,
   inkMuted: brand.inkMuted,
-  accent: brand.green700,
-  accentSoft: brand.green50,
-  accentBorder: brand.green100,
+  accent: brand.actionable,
+  accentSoft: brand.infoSoft,
+  accentBorder: brand.infoBorder,
   shadow: brand.shadow,
 }
 
@@ -365,12 +365,12 @@ const styles: Record<string, React.CSSProperties> = {
   clockDate: {
     fontSize: brand.typography.bodyLarge.fontSize,
     fontWeight: 600,
-    color: brand.green100,
+    color: brand.inkMuted,
   },
   clockTime: {
     fontSize: brand.typography.heading.fontSize,
     fontWeight: 700,
-    color: '#ffffff',
+    color: brand.ink,
     letterSpacing: '0.02em',
   },
 
@@ -411,7 +411,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box',
   },
   callCardActive: {
-    borderColor: C.accent,
+    border: `1px solid ${C.accent}`,
     animation: 'gbPanelCall 1.3s ease-in-out infinite',
   },
   callCode: {

@@ -1,0 +1,130 @@
+import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueueEntryPage } from './QueueEntryPage'
+
+interface ErOptions {
+  isDayOpen?: boolean
+  erOk?: boolean
+  authStatus?: number
+  authBody?: Record<string, unknown>
+}
+
+function stubFetch({ isDayOpen = true, erOk = true, authStatus = 200, authBody }: ErOptions = {}) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = input instanceof Request ? input.url : input.toString()
+    if (url.includes('/api/public/ers/er-1')) {
+      if (!erOk) return new Response(JSON.stringify({}), { status: 404 })
+      return new Response(JSON.stringify({ id: 'er-1', name: 'ER Teste', isDayOpen }), {
+        status: 200,
+      })
+    }
+    if (url.includes('/api/auth/login') || url.includes('/api/auth/register')) {
+      return new Response(JSON.stringify(authBody ?? { access_token: 'tok-123' }), {
+        status: authStatus,
+      })
+    }
+    return new Response(null, { status: 201 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
+function renderPage(entry = '/fila/er-1') {
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <Routes>
+        <Route path="/fila/:erId" element={<QueueEntryPage />} />
+        <Route path="/fila/:erId/senha" element={<div>Tela da senha</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+describe('QueueEntryPage flows', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
+  it('logs in and navigates to the ticket screen', async () => {
+    const fetchMock = stubFetch()
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF ou Código RE'), 'RE0001')
+    await user.type(screen.getByLabelText('Senha'), 'Teste@123')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar na fila' }))
+
+    expect(await screen.findByText('Tela da senha')).toBeInTheDocument()
+    expect(sessionStorage.getItem('token')).toBe('tok-123')
+    expect(
+      fetchMock.mock.calls.some(([url]) => url.toString().includes('/api/auth/login')),
+    ).toBe(true)
+  })
+
+  it('shows an inline error when the credentials are rejected', async () => {
+    stubFetch({ authStatus: 401, authBody: { message: 'Credenciais inválidas' } })
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF ou Código RE'), 'RE0001')
+    await user.type(screen.getByLabelText('Senha'), 'errada')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar na fila' }))
+
+    expect(await screen.findByText('Credenciais inválidas')).toBeInTheDocument()
+    expect(sessionStorage.getItem('token')).toBeNull()
+  })
+
+  it('registers a new representative and navigates to the ticket screen', async () => {
+    const fetchMock = stubFetch()
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Criar cadastro' }))
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nome completo'), 'Maria Silva')
+    await user.type(screen.getByLabelText('CPF (somente números)'), '12345678901')
+    await user.type(screen.getByLabelText('Telefone celular (somente números)'), '11999999999')
+    fireEvent.change(screen.getByLabelText('Data de nascimento'), {
+      target: { value: '1990-01-01' },
+    })
+    await user.type(screen.getByLabelText('Código de RE'), 'RE0001')
+    await user.type(screen.getByLabelText('Senha (mín. 8 caracteres)'), 'Teste@123')
+    fireEvent.click(screen.getByRole('button', { name: 'Criar cadastro e entrar' }))
+
+    expect(await screen.findByText('Tela da senha')).toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) => url.toString().includes('/api/auth/register')),
+    ).toBe(true)
+  })
+
+  it('disables the submit and signals a closed operation', async () => {
+    stubFetch({ isDayOpen: false })
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    expect(screen.getByText('Operação encerrada')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Entrar na fila' })).toBeDisabled()
+  })
+
+  it('shows an error when the ER cannot be validated', async () => {
+    stubFetch({ erOk: false })
+    renderPage()
+    expect(await screen.findByText('ER não encontrado.')).toBeInTheDocument()
+  })
+
+  it('requires confirming the ER when arriving through a link', async () => {
+    stubFetch()
+    renderPage('/fila/er-1?source=link')
+    await screen.findByText('ER Teste')
+
+    const submit = screen.getByRole('button', { name: 'Entrar na fila' })
+    expect(submit).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('checkbox'))
+    expect(submit).toBeEnabled()
+  })
+})

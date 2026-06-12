@@ -5,10 +5,12 @@ import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
+import { Modal } from '../components/Modal'
 import { SectionPanel } from '../components/SectionPanel'
 import { Select } from '../components/Select'
 import { StatusDot } from '../components/StatusDot'
 import { StaffLoginForm } from '../components/StaffLoginForm'
+import { useToast } from '../components/Toast'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
@@ -67,9 +69,11 @@ export function OperationPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [pauseReason, setPauseReason] = useState('')
+  const [confirmingClose, setConfirmingClose] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const socket = useSocket(authenticated ? erId : '')
+  const { showToast } = useToast()
 
   const refreshOverview = useCallback(async () => {
     if (!authenticated || !erId) return
@@ -128,12 +132,13 @@ export function OperationPage() {
     return () => clearInterval(interval)
   }, [currentTicket])
 
-  async function act(action: () => Promise<unknown>) {
+  async function act(action: () => Promise<unknown>, successMessage?: string) {
     setError(null)
     setLoading(true)
     try {
       await action()
       await refreshOverview()
+      if (successMessage) showToast(successMessage, 'success')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro na operação')
     } finally {
@@ -188,7 +193,7 @@ export function OperationPage() {
           <div style={styles.mainColumn}>
             <section style={styles.panel}>
               <p style={styles.sectionLabel}>
-                <StatusDot color={counterIsActive ? brand.green500 : brand.borderStrong} />
+                <StatusDot color={counterIsActive ? brand.success : brand.borderStrong} />
                 Caixa
               </p>
 
@@ -214,8 +219,8 @@ export function OperationPage() {
 
               {counterId && !currentCounter?.operator && (
                 <Button
-                  style={{ marginTop: '0.9rem' }}
-                  onClick={() => act(() => api.post(`/counters/${counterId}/open`))}
+                  style={{ marginTop: brand.spacing[12] }}
+                  onClick={() => act(() => api.post(`/counters/${counterId}/open`), 'Caixa assumido.')}
                   disabled={loading}
                 >
                   Assumir e abrir caixa
@@ -229,7 +234,7 @@ export function OperationPage() {
                       <Input
                         label="Motivo da pausa"
                         containerStyle={{ flex: 1, minWidth: 160, marginBottom: 0 }}
-                        style={{ flex: 1, minWidth: 160, borderRadius: 10 }}
+                        style={{ flex: 1, minWidth: 160, borderRadius: brand.radius.medium }}
                         placeholder="Motivo da pausa"
                         value={pauseReason}
                         onChange={(event) => setPauseReason(event.target.value)}
@@ -237,8 +242,9 @@ export function OperationPage() {
                       <Button
                         variant="secondary"
                         onClick={() =>
-                          act(() =>
-                            api.post(`/counters/${counterId}/pause`, { reason: pauseReason }),
+                          act(
+                            () => api.post(`/counters/${counterId}/pause`, { reason: pauseReason }),
+                            'Caixa pausado.',
                           ).then(() => setPauseReason(''))
                         }
                         disabled={loading || !pauseReason.trim()}
@@ -250,7 +256,7 @@ export function OperationPage() {
                   {currentCounter.state === 'PAUSED' && (
                     <Button
                       variant="secondary"
-                      onClick={() => act(() => api.post(`/counters/${counterId}/resume`))}
+                      onClick={() => act(() => api.post(`/counters/${counterId}/resume`), 'Caixa retomado.')}
                       disabled={loading}
                     >
                       Retomar
@@ -259,11 +265,10 @@ export function OperationPage() {
                   {['ACTIVE', 'PAUSED'].includes(currentCounter.state) && !currentTicket && (
                     <Button
                       variant="secondary"
-                      onClick={() =>
-                        act(() => api.post(`/counters/${counterId}/close`)).then(() =>
-                          selectCounter(''),
-                        )
-                      }
+                      onClick={() => {
+                        setError(null)
+                        setConfirmingClose(true)
+                      }}
                       disabled={loading}
                     >
                       Fechar caixa
@@ -326,7 +331,7 @@ export function OperationPage() {
                       </Button>
                       <Button
                         variant="secondary"
-                        onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/no-show`))}
+                        onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/no-show`), 'Marcada como não compareceu.')}
                         disabled={loading}
                       >
                         Não compareceu
@@ -336,7 +341,7 @@ export function OperationPage() {
                   {hasOpenService && (
                     <Button
                       onClick={() =>
-                        act(() => api.post(`/tickets/${currentTicket.id}/finish-service`))
+                        act(() => api.post(`/tickets/${currentTicket.id}/finish-service`), 'Atendimento finalizado.')
                       }
                       disabled={loading}
                     >
@@ -357,7 +362,7 @@ export function OperationPage() {
           <aside style={styles.sideColumn}>
             <SectionPanel
               label="Aguardando"
-              dotColor={brand.gold400}
+              dotColor={brand.warning}
               count={overview?.waiting.length ?? 0}
             >
               {(overview?.waiting.length ?? 0) === 0 ? (
@@ -393,7 +398,7 @@ export function OperationPage() {
             </SectionPanel>
             <SectionPanel
               label="Em atendimento"
-              dotColor={brand.green500}
+              dotColor={brand.info}
               count={overview?.inService.length ?? 0}
             >
               {(overview?.inService.length ?? 0) === 0 ? (
@@ -427,7 +432,7 @@ export function OperationPage() {
               {overview?.recent.slice(0, 8).map((ticket) => (
                 <span key={ticket.id} style={styles.chip}>
                   <StatusDot
-                    color={ticket.state === 'NO_SHOW' ? brand.warning : brand.green400}
+                    color={ticket.state === 'NO_SHOW' ? brand.warning : brand.success}
                   />
                   <strong>{ticket.code}</strong>
                   <span style={styles.chipState}>{ticketStateLabel(ticket.state)}</span>
@@ -437,6 +442,40 @@ export function OperationPage() {
           )}
         </section>
       </main>
+
+      {confirmingClose && (
+        <Modal
+          title="Fechar caixa?"
+          onClose={() => setConfirmingClose(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setConfirmingClose(false)} disabled={loading}>
+                Voltar
+              </Button>
+              <Button
+                variant="danger"
+                disabled={loading}
+                onClick={() =>
+                  act(() => api.post(`/counters/${counterId}/close`), 'Caixa fechado.').then(() => {
+                    selectCounter('')
+                    setConfirmingClose(false)
+                  })
+                }
+              >
+                {loading ? 'Fechando...' : 'Fechar caixa'}
+              </Button>
+            </>
+          }
+        >
+          {error && (
+            <Alert tone="error" style={{ marginBottom: `${brand.spacing[12]}px` }}>
+              {error}
+            </Alert>
+          )}
+          O caixa será encerrado e você deixará de receber novas senhas. É possível assumir um
+          caixa novamente depois.
+        </Modal>
+      )}
     </div>
   )
 }
@@ -483,7 +522,7 @@ const styles: Record<string, React.CSSProperties> = {
   currentCode: {
     fontSize: brand.typography.display.fontSize,
     fontWeight: brand.typography.display.fontWeight,
-    color: brand.green800,
+    color: brand.emphasis,
     letterSpacing: '0.04em',
     lineHeight: 1,
   },

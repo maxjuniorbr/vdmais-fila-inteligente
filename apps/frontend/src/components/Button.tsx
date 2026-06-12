@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, CSSProperties } from 'react'
 import { layout } from '../styles/layout'
 import { brand } from '../styles/brand'
 
-type Variant = 'primary' | 'secondary' | 'danger'
+type Variant = 'primary' | 'secondary' | 'danger' | 'conversion'
 type Size = 'md' | 'sm'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -14,11 +14,12 @@ const VARIANT_STYLE: Record<Variant, CSSProperties> = {
   primary: layout.primaryButton,
   secondary: layout.ghostButton,
   danger: layout.dangerButton,
+  conversion: layout.conversionButton,
 }
 
 const SIZE_STYLE: Record<Size, CSSProperties> = {
   md: {},
-  sm: { padding: `${brand.spacing[8]}px ${brand.spacing[16]}px`, minHeight: 36, fontSize: brand.typography.bodySmall.fontSize, borderRadius: brand.radius.medium },
+  sm: { padding: `${brand.spacing[8]}px ${brand.spacing[16]}px`, minHeight: 36, fontSize: brand.typography.bodySmall.fontSize, borderRadius: brand.radius.pill },
 }
 
 export function Button({

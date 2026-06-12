@@ -23,12 +23,12 @@ const TONE_STYLE: Record<Tone, CSSProperties> = {
   success: {
     color: brand.success,
     background: brand.successSoft,
-    border: `1px solid ${brand.green100}`,
+    border: `1px solid ${brand.successBorder}`,
   },
   info: {
-    color: brand.inkSoft,
-    background: brand.green50,
-    border: `1px solid ${brand.border}`,
+    color: brand.info,
+    background: brand.infoSoft,
+    border: `1px solid ${brand.infoBorder}`,
   },
 }
 

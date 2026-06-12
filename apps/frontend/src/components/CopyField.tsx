@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { brand } from '../styles/brand'
-import { layout } from '../styles/layout'
-import { Button } from './Button'
 
 interface CopyFieldProps {
   label: string
   value: string
   description?: string
+  /** Rótulo acessível do link (ação de abrir). */
   openLabel?: string
 }
 
@@ -40,6 +39,19 @@ async function copyText(value: string): Promise<void> {
     input.remove()
   }
 }
+
+const CopyIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+)
+
+const CheckIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 6 9 17l-5-5" />
+  </svg>
+)
 
 export function CopyField({
   label,
@@ -76,33 +88,32 @@ export function CopyField({
         {description && <p style={styles.description}>{description}</p>}
       </div>
 
-      <input
-        aria-label={`${label}: endereço`}
-        className="gb-control"
-        readOnly
-        style={styles.value}
-        value={value}
-        onFocus={(event) => event.currentTarget.select()}
-      />
-
-      <div style={styles.actions}>
-        <Button variant="secondary" size="sm" type="button" onClick={copy}>
-          {copyState === 'copied' ? 'Copiado' : 'Copiar endereço'}
-        </Button>
+      <div style={styles.field}>
         <a
-          className="gb-action-link"
           href={value}
           target="_blank"
           rel="noreferrer"
+          className="gb-copy-link"
+          title={openLabel}
+          aria-label={`${openLabel} (abre em nova aba)`}
           style={styles.link}
         >
-          {openLabel}
+          {value}
         </a>
+        <button
+          type="button"
+          className="gb-icon-button"
+          onClick={copy}
+          aria-label={copyState === 'copied' ? 'Endereço copiado' : `Copiar ${label}`}
+          style={{ ...styles.copyButton, color: copyState === 'copied' ? brand.success : brand.inkMuted }}
+        >
+          {copyState === 'copied' ? CheckIcon : CopyIcon}
+        </button>
       </div>
 
       <span aria-live="polite" style={styles.feedback}>
         {copyState === 'copied' && 'Endereço copiado para a área de transferência.'}
-        {copyState === 'error' && 'Não foi possível copiar. Selecione o endereço manualmente.'}
+        {copyState === 'error' && 'Não foi possível copiar. Use o link ao lado.'}
       </span>
     </article>
   )
@@ -112,56 +123,61 @@ const styles: Record<string, CSSProperties> = {
   card: {
     display: 'grid',
     alignContent: 'start',
-    gap: '0.8rem',
+    gap: `${brand.spacing[8]}px`,
     minWidth: 0,
-    padding: '1rem',
+    padding: `${brand.spacing[16]}px`,
     border: `1px solid ${brand.border}`,
-    borderRadius: 12,
+    borderRadius: brand.radius.medium,
     background: brand.surface,
   },
   label: {
     display: 'block',
-    color: brand.green800,
-    fontSize: '0.95rem',
+    color: brand.ink,
+    fontSize: brand.typography.bodyLarge.fontSize,
   },
   description: {
-    margin: '0.25rem 0 0',
+    margin: `${brand.spacing[4]}px 0 0`,
     color: brand.inkMuted,
-    fontSize: '0.82rem',
+    fontSize: brand.typography.bodySmall.fontSize,
     lineHeight: 1.45,
   },
-  value: {
-    width: '100%',
-    minWidth: 0,
-    padding: '0.6rem 0.7rem',
-    border: `1px solid ${brand.borderStrong}`,
-    borderRadius: 8,
-    background: brand.green50,
-    color: brand.inkSoft,
-    fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace',
-    fontSize: '0.8rem',
-    textOverflow: 'ellipsis',
-  },
-  actions: {
+  field: {
     display: 'flex',
-    alignItems: 'center',
-    gap: '0.55rem',
-    flexWrap: 'wrap',
+    alignItems: 'stretch',
+    minWidth: 0,
+    border: `1px solid ${brand.borderStrong}`,
+    borderRadius: brand.radius.small,
+    background: brand.surface,
   },
   link: {
-    ...layout.ghostButton,
+    flex: 1,
+    minWidth: 0,
+    alignSelf: 'center',
+    padding: `${brand.spacing[8]}px ${brand.spacing[12]}px`,
+    color: brand.link,
+    fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace',
+    fontSize: brand.typography.bodySmall.fontSize,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    textDecoration: 'none',
+  },
+  copyButton: {
+    flexShrink: 0,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
-    padding: '0.45rem 0.9rem',
-    borderRadius: 8,
-    fontSize: '0.85rem',
-    textDecoration: 'none',
+    width: 44,
+    height: 44,
+    border: 'none',
+    borderLeft: `1px solid ${brand.border}`,
+    borderRadius: `0 ${brand.radius.small}px ${brand.radius.small}px 0`,
+    background: 'transparent',
+    cursor: 'pointer',
   },
   feedback: {
     minHeight: '1.2rem',
     color: brand.inkMuted,
-    fontSize: '0.78rem',
+    fontSize: brand.typography.auxiliar.fontSize,
   },
 }
