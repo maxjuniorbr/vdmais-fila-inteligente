@@ -16,7 +16,9 @@ function renderPage() {
 
 describe('TicketConfirmationPage', () => {
   beforeEach(() => {
+    sessionStorage.clear()
     sessionStorage.setItem('token', 'rep-token')
+    sessionStorage.setItem('queue-entry:er-1', 'QR_CODE')
   })
 
   it('joins the queue and shows the ticket code and position', async () => {
@@ -45,6 +47,38 @@ describe('TicketConfirmationPage', () => {
     expect(await screen.findByText('A001')).toBeInTheDocument()
     expect(screen.getByText('#2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sair da fila' })).toBeInTheDocument()
+  })
+
+  it('creates the ticket with the validated entry channel', async () => {
+    sessionStorage.setItem('queue-entry:er-1', 'LINK')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (input.toString().endsWith('/api/tickets') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            id: 't-1',
+            code: 'A001',
+            queuePosition: 1,
+            currentPosition: 1,
+            state: 'WAITING',
+            erId: 'er-1',
+          }),
+          { status: 201 },
+        )
+      }
+      return new Response(null, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    await screen.findByText('A001')
+
+    const createCall = fetchMock.mock.calls.find(
+      ([input, init]) => input.toString().endsWith('/api/tickets') && init?.method === 'POST',
+    )
+    expect(JSON.parse(String(createCall?.[1]?.body))).toEqual({
+      erId: 'er-1',
+      entryChannel: 'LINK',
+    })
   })
 
   it('confirms leaving the queue through the modal and calls self-cancel', async () => {
