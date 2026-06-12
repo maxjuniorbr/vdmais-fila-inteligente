@@ -102,12 +102,18 @@ code and are the source of truth — do not restate hex/size literals here:
 
 ## Auth and session
 
-- `auth/session.ts` is the only module that reads/writes `sessionStorage`. Never access `sessionStorage` directly from pages or hooks.
+- Pages and hooks must use `auth/session.ts` helpers for queue-entry token/channel state. Raw token reads are limited to established transport boundaries (`api/client.ts`, `useSocket.ts`) and legacy representative-ticket transport until it is migrated.
 - The JWT is the single source of truth for identity and authorization. Derive `role`, `userId`, and `erId` exclusively from `getStaffSessionProfile()`, `getStaffRole()`, and `getSessionERId()`. Never read or write raw keys like `staffRole`, `staffUserId`, or `erId` in storage.
 - Route guards call `hasStaffSession(allowedRoles)`, which validates the JWT signature, role membership, and expiration in one step. Do not reimplement this check inline.
 - Staff screens hold their authenticated state via the `useStaffSession(allowedRoles)` hook, never a raw `useState(() => hasStaffSession(...))`. The hook listens for the global `SESSION_EXPIRED_EVENT` so a server-side 401 drops the screen back to the login form.
 - Every authenticated staff request must use the API client (`api/client.ts`), including fire-and-forget telemetry. The client calls `notifySessionExpired()` on any 401, clearing the session and dispatching `SESSION_EXPIRED_EVENT`; never issue authenticated staff `fetch` calls directly from pages.
-- `sessionStorage` holds only the opaque JWT (`token`) and a display-only name (`userName`). State scoped to UI context (current counter, management ER) lives in `counterId`/`managementErId` — these are UI state, not security-sensitive.
+- Public queue URLs keep the signed access in `#entry=...`, never in query
+  parameters. Validate it through `x-entry-token`, forward it in representative
+  login/register, and preserve the backend-confirmed channel through
+  `getQueueEntryChannel()`/`saveQueueEntryChannel()`.
+- `sessionStorage` holds the opaque JWT, display name, UI context, and the
+  validated public queue token/channel scoped by ER. Do not derive authorization
+  from writable storage; the backend validates all signed claims.
 
 ## PII display
 
