@@ -17,7 +17,7 @@ describe('format utilities — property-based tests', () => {
     const minDate = new Date('1900-01-01T00:00:00.000Z')
     const maxDate = new Date('2099-12-31T23:59:59.999Z')
     fc.assert(
-      fc.property(fc.date({ min: minDate, max: maxDate }), (date) => {
+      fc.property(fc.date({ min: minDate, max: maxDate, noInvalidDate: true }), (date) => {
         const isoString = date.toISOString()
         const result = formatDate(isoString)
         expect(result).toMatch(pattern)
@@ -53,7 +53,7 @@ describe('format utilities — property-based tests', () => {
     const minDate = new Date('1900-01-01T00:00:00.000Z')
     const maxDate = new Date('2099-12-31T23:59:59.999Z')
     fc.assert(
-      fc.property(fc.date({ min: minDate, max: maxDate }), (date) => {
+      fc.property(fc.date({ min: minDate, max: maxDate, noInvalidDate: true }), (date) => {
         const isoString = date.toISOString()
         const result = formatTime(isoString)
         expect(result).toMatch(pattern)
