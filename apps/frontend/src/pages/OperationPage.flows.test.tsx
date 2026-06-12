@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
+import { seedStaffSession } from '../test/staffToken'
 import { OperationPage } from './OperationPage'
 
 vi.mock('../api/client', () => ({ api: { get: vi.fn(), post: vi.fn() } }))
@@ -10,11 +11,7 @@ vi.mock('../hooks/useSocket', () => ({ useSocket: () => null }))
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 
 function authenticate() {
-  sessionStorage.setItem('token', 'op-token')
-  sessionStorage.setItem('staffRole', 'OPERATOR')
-  sessionStorage.setItem('staffUserId', 'op-1')
-  sessionStorage.setItem('erId', 'er-1')
-  sessionStorage.setItem('userName', 'Operadora')
+  seedStaffSession({ id: 'op-1', name: 'Operadora', role: 'OPERATOR', erId: 'er-1' })
 }
 
 const base = { waiting: [], calling: [], inService: [], paused: [], recent: [] }

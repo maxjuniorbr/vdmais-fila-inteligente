@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
-import { hasStaffSession, logoutStaffSession } from '../auth/session'
+import {
+  getSessionERId,
+  getStaffName,
+  getStaffSessionProfile,
+  hasStaffSession,
+  logoutStaffSession,
+} from '../auth/session'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Button } from '../components/Button'
@@ -62,8 +68,8 @@ const QUEUE_EVENTS = [
 
 export function OperationPage() {
   const [authenticated, setAuthenticated] = useState(() => hasStaffSession(['OPERATOR']))
-  const [erId, setErId] = useState(() => sessionStorage.getItem('erId') ?? '')
-  const [operatorId, setOperatorId] = useState(() => sessionStorage.getItem('staffUserId') ?? '')
+  const [erId, setErId] = useState(() => getSessionERId())
+  const [operatorId, setOperatorId] = useState(() => getStaffSessionProfile()?.id ?? '')
   const [counterId, setCounterId] = useState(() => sessionStorage.getItem('counterId') ?? '')
   const [overview, setOverview] = useState<QueueOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -164,7 +170,6 @@ export function OperationPage() {
         title="Operação da fila"
         allowedRoles={['OPERATOR']}
         onAuthenticated={(profile) => {
-          sessionStorage.setItem('staffUserId', profile.id)
           setOperatorId(profile.id)
           setErId(profile.erId ?? '')
           setAuthenticated(true)
@@ -182,7 +187,7 @@ export function OperationPage() {
     <div style={styles.shell}>
       <AppHeader
         title="Painel da Operadora"
-        subtitle={sessionStorage.getItem('userName') ?? 'Operador'}
+        subtitle={getStaffName() || 'Operador'}
         onLogout={() => void logout()}
       />
 

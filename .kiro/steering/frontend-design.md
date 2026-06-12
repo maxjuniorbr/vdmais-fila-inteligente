@@ -100,6 +100,13 @@ code and are the source of truth — do not restate hex/size literals here:
 - H8 Aesthetic and minimalism: no redundant elements; use spacing strategically
   (dividers only when necessary).
 
+## Auth and session
+
+- `auth/session.ts` is the only module that reads/writes `sessionStorage`. Never access `sessionStorage` directly from pages or hooks.
+- The JWT is the single source of truth for identity and authorization. Derive `role`, `userId`, and `erId` exclusively from `getStaffSessionProfile()`, `getStaffRole()`, and `getSessionERId()`. Never read or write raw keys like `staffRole`, `staffUserId`, or `erId` in storage.
+- Route guards call `hasStaffSession(allowedRoles)`, which validates the JWT signature, role membership, and expiration in one step. Do not reimplement this check inline.
+- `sessionStorage` holds only the opaque JWT (`token`) and a display-only name (`userName`). State scoped to UI context (current counter, management ER) lives in `counterId`/`managementErId` — these are UI state, not security-sensitive.
+
 ## Writing and tone of voice
 
 - Pillars: gentle (empathetic, never blames the user), confident (direct, no

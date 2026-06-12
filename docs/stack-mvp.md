@@ -286,6 +286,15 @@ manager
 admin
 ```
 
+### 7.3 Sessão da equipe no cliente
+
+- O backend assina um JWT com as claims `userId`, `role`, `erId`, `sv` (sessionVersion) e `exp`.
+- No frontend, **o JWT é a única fonte de verdade** de identidade/perfil/ER: a SPA decodifica o token e nunca confia em chaves separadas e graváveis (`staffRole`/`erId`). Manipular o storage não escala privilégio, pois exigiria um token validamente assinado.
+- `sessionStorage` guarda apenas o token e o nome de exibição (cosmético). Tokens expirados (`exp`) são tratados como ausência de sessão já no bootstrap, não só no próximo `401`.
+- Revogação imediata: o logout, a troca de senha e a desativação de conta incrementam `sessionVersion` no backend; o token anterior deixa de validar.
+
+> Endurecimento futuro (backend): mover o token para cookie `HttpOnly`+`Secure`+`SameSite` e adotar refresh token rotativo, eliminando o token do alcance de scripts no navegador.
+
 ---
 
 ## 8. Infraestrutura mínima

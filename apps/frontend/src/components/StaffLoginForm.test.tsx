@@ -59,7 +59,9 @@ describe('StaffLoginForm', () => {
       }),
     )
     expect(sessionStorage.getItem('token')).toBe('token-1')
-    expect(sessionStorage.getItem('staffRole')).toBe('OPERATOR')
+    expect(sessionStorage.getItem('userName')).toBe('Pessoa Operadora')
+    // Role/identity are derived from the JWT, not stored as a separate key.
+    expect(sessionStorage.getItem('staffRole')).toBeNull()
   })
 
   it('rejects a valid account that lacks access to the requested area', async () => {

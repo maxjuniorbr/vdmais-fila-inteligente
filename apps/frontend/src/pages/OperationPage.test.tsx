@@ -2,6 +2,7 @@ import axe from 'axe-core'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
+import { seedStaffSession } from '../test/staffToken'
 import { OperationPage } from './OperationPage'
 
 vi.mock('../api/client', () => ({
@@ -17,11 +18,7 @@ vi.mock('../hooks/useSocket', () => ({
 
 describe('OperationPage accessibility', () => {
   beforeEach(() => {
-    sessionStorage.setItem('token', 'test-token')
-    sessionStorage.setItem('staffRole', 'OPERATOR')
-    sessionStorage.setItem('staffUserId', 'operator-1')
-    sessionStorage.setItem('erId', 'er-1')
-    sessionStorage.setItem('userName', 'Operadora Teste')
+    seedStaffSession({ id: 'operator-1', name: 'Operadora Teste', role: 'OPERATOR', erId: 'er-1' })
 
     vi.mocked(api.get).mockResolvedValue({
       waiting: [],

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import {
   getManagementERId,
+  getSessionERId,
+  getStaffName,
+  getStaffRole,
   hasStaffSession,
   logoutStaffSession,
   setManagementERId,
@@ -196,9 +199,7 @@ export function ManagerPage() {
   const navigate = useNavigate()
   const [authenticated, setAuthenticated] = useState(() => hasStaffSession(['MANAGER', 'ADMIN']))
   const [erId, setErId] = useState(() =>
-    sessionStorage.getItem('staffRole') === 'ADMIN'
-      ? getManagementERId()
-      : (sessionStorage.getItem('erId') ?? ''),
+    getStaffRole() === 'ADMIN' ? getManagementERId() : getSessionERId(),
   )
   const [availableERs, setAvailableERs] = useState<ERSelection[]>([])
   const [overview, setOverview] = useState<Overview | null>(null)
@@ -209,7 +210,7 @@ export function ManagerPage() {
   const [pendingDayToggle, setPendingDayToggle] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const isAdmin = sessionStorage.getItem('staffRole') === 'ADMIN'
+  const isAdmin = getStaffRole() === 'ADMIN'
   const socket = useSocket(authenticated ? erId : '')
   const { showToast } = useToast()
 
@@ -367,7 +368,7 @@ export function ManagerPage() {
     <div style={styles.shell}>
       <AppHeader
         title="Painel da Gestora"
-        subtitle={er?.name ?? sessionStorage.getItem('userName') ?? 'Gestora'}
+        subtitle={er?.name ?? (getStaffName() || 'Gestora')}
         onLogout={() => {
           void logoutStaffSession().then(() => {
             setAuthenticated(false)
