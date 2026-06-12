@@ -210,7 +210,7 @@ npm run sonar:down                # para o servidor
 
 O CI (GitHub Actions) roda a cada push e pull request para `master`:
 
-- **CI** (`ci.yml`): lint, build, testes unitários com cobertura (backend e frontend), pisos globais de 80% para linhas/statements/functions e 75% para branches, gate de 80% sobre o código alterado, e2e do backend (Postgres de serviço), e2e de browser do frontend (Playwright) e `npm audit` (nível high).
+- **CI** (`ci.yml`): lint, build, testes unitários com cobertura (backend e frontend), pisos globais de 90% para linhas/statements/functions/branches, gate de 80% sobre o código alterado, e2e do backend (Postgres de serviço), e2e de browser do frontend (Playwright) e `npm audit` (nível high).
 - **CodeQL** (`codeql.yml`): análise estática de segurança (SAST) para JavaScript/TypeScript; também roda semanalmente.
 - **Secret scan** (`secret-scan.yml`): gitleaks varre commits em busca de segredos. Placeholders de exemplo e segredos de teste ficam na allowlist do `.gitleaks.toml`.
 - **Dependabot** (`dependabot.yml`): atualizações semanais de dependências npm e GitHub Actions. Atualizações de rotina (minor/patch) vêm agrupadas; majors vêm isolados para revisão. `prisma` e `@prisma/client` sobem em lockstep, e o major do Prisma é deliberadamente adiado (migração planejada).

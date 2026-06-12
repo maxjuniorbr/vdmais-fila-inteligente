@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common'
+import { AuthenticatedUser } from '../../common/authenticated-user'
 import { CounterState, Prisma, Role } from '@prisma/client'
 import { PanelGateway } from '../../panel/panel.gateway'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -66,6 +72,35 @@ describe('CounterService', () => {
     })
     tx.auditEvent.create.mockResolvedValue({})
     tx.ticket.findFirst.mockResolvedValue(null)
+  })
+
+  it('lists the counters of the operator ER', async () => {
+    prisma.counter.findMany.mockResolvedValue([{ ...counterBase }])
+
+    const result = await service.listForER(operator)
+
+    expect(prisma.counter.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { erId: 'er-1' } }),
+    )
+    expect(result).toHaveLength(1)
+  })
+
+  it('rejects listForER when the user is not bound to an ER', async () => {
+    const unboundUser: AuthenticatedUser = { userId: 'op-1', role: Role.OPERATOR }
+    expect(() => service.listForER(unboundUser)).toThrow(ForbiddenException)
+    expect(prisma.counter.findMany).not.toHaveBeenCalled()
+  })
+
+  it('rejects operating a counter that does not exist', async () => {
+    prisma.counter.findUnique.mockResolvedValue(null)
+
+    await expect(service.openCounter('counter-1', operator)).rejects.toThrow(NotFoundException)
+  })
+
+  it('rejects operating a counter from another ER', async () => {
+    prisma.counter.findUnique.mockResolvedValue({ ...counterBase, erId: 'er-2' })
+
+    await expect(service.openCounter('counter-1', operator)).rejects.toThrow(ForbiddenException)
   })
 
   it('opens an UNAVAILABLE counter and assigns the operator', async () => {
@@ -191,6 +226,16 @@ describe('CounterService', () => {
     expect(result.state).toBe(CounterState.ACTIVE)
   })
 
+  it('rejects resumeCounter if counter belongs to another operator', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.PAUSED,
+      operatorId: 'other-op',
+    })
+
+    await expect(service.resumeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+  })
+
   it('rejects resumeCounter if counter is not PAUSED', async () => {
     prisma.counter.findUnique.mockResolvedValue({
       ...counterBase,
@@ -218,6 +263,16 @@ describe('CounterService', () => {
     })
     expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'counter.closed', expect.any(Object))
     expect(result.state).toBe(CounterState.UNAVAILABLE)
+  })
+
+  it('rejects closeCounter if counter belongs to another operator', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.ACTIVE,
+      operatorId: 'other-op',
+    })
+
+    await expect(service.closeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
   })
 
   it('rejects closeCounter when there is an open ticket on the counter', async () => {
@@ -330,6 +385,23 @@ describe('CounterService', () => {
         metadata: expect.objectContaining({ hadOpenTicket: false }),
       }),
     })
+  })
+
+  it('lets an admin force-release a counter from any ER', async () => {
+    const admin = { userId: 'adm-1', role: Role.ADMIN, erId: 'er-9' }
+    prisma.counter.findUnique.mockResolvedValue({ ...counterBase, erId: 'er-2' })
+    tx.ticket.findFirst.mockResolvedValue(null)
+    tx.counter.update.mockResolvedValue({
+      ...counterBase,
+      erId: 'er-2',
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+    })
+
+    const result = await service.forceReleaseCounter('counter-1', admin)
+
+    expect(panel.emitToER).toHaveBeenCalledWith('er-2', 'counter.closed', expect.any(Object))
+    expect(result.state).toBe(CounterState.UNAVAILABLE)
   })
 
   it('does not let an operator force-release a counter', async () => {

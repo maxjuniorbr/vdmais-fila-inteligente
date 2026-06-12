@@ -134,6 +134,133 @@ describe('QueueEntryPage flows', () => {
     expect(submit).toBeEnabled()
   })
 
+  it('shows an error when the route has no unit id', async () => {
+    stubFetch()
+    render(
+      <MemoryRouter initialEntries={['/fila']}>
+        <Routes>
+          <Route path="/fila" element={<QueueEntryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(
+      await screen.findByText('Unidade não encontrada. Verifique o QR Code ou o link utilizados.'),
+    ).toBeInTheDocument()
+  })
+
+  it('surfaces the error message when the unit request rejects', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('Network down')
+      }),
+    )
+    renderPage()
+    expect(await screen.findByText('Network down')).toBeInTheDocument()
+  })
+
+  it('falls back to a generic message when the rejection has no message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject('boom')),
+    )
+    renderPage()
+    expect(
+      await screen.findByText('Não foi possível carregar os dados da unidade. Tente novamente.'),
+    ).toBeInTheDocument()
+  })
+
+  it('defaults the entry channel to QR_CODE when the API omits it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input instanceof Request ? input.url : input.toString()
+        if (url.includes('/api/public/ers/er-1')) {
+          return new Response(
+            JSON.stringify({ id: 'er-1', name: 'ER Teste', isDayOpen: true }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ access_token: 'tok-123' }), { status: 200 })
+      }),
+    )
+    renderPage()
+    await screen.findByText('ER Teste')
+    // QR_CODE channel means there is no confirmation checkbox and submit is enabled.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Entrar na fila' })).toBeEnabled()
+  })
+
+  it('shows an inline error when registration is rejected', async () => {
+    stubFetch({ authStatus: 400, authBody: { message: 'CPF já cadastrado' } })
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Criar cadastro' }))
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nome completo'), 'Maria Silva')
+    await user.type(screen.getByLabelText('CPF (somente números)'), '12345678901')
+    await user.type(screen.getByLabelText('Telefone celular (somente números)'), '11999999999')
+    fireEvent.change(screen.getByLabelText('Data de nascimento'), {
+      target: { value: '1990-01-01' },
+    })
+    await user.type(screen.getByLabelText('Código de RE'), 'RE0001')
+    await user.type(screen.getByLabelText('Senha (mín. 8 caracteres)'), 'Teste@123')
+    fireEvent.click(screen.getByRole('button', { name: 'Criar cadastro e entrar' }))
+
+    expect(await screen.findByText('CPF já cadastrado')).toBeInTheDocument()
+    expect(sessionStorage.getItem('token')).toBeNull()
+  })
+
+  it('blocks registration when the operation is closed', async () => {
+    stubFetch({ isDayOpen: false })
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Criar cadastro' }))
+    const form = screen.getByLabelText('Nome completo').closest('form') as HTMLFormElement
+    fireEvent.submit(form)
+
+    expect(await screen.findByText('O atendimento está encerrado no momento.')).toBeInTheDocument()
+    expect(sessionStorage.getItem('token')).toBeNull()
+  })
+
+  it('uses the default login error message when the response omits one', async () => {
+    stubFetch({ authStatus: 401, authBody: {} })
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF ou Código RE'), 'RE0001')
+    await user.type(screen.getByLabelText('Senha'), 'errada')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar na fila' }))
+
+    expect(await screen.findByText('Credenciais inválidas')).toBeInTheDocument()
+  })
+
+  it('blocks submission and warns when the operation is closed', async () => {
+    stubFetch({ isDayOpen: false })
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    // Submit the form directly (bypassing the disabled button) to hit the guard.
+    const form = screen.getByLabelText('CPF ou Código RE').closest('form') as HTMLFormElement
+    fireEvent.submit(form)
+
+    expect(await screen.findByText('O atendimento está encerrado no momento.')).toBeInTheDocument()
+  })
+
+  it('blocks submission until the link entry is confirmed', async () => {
+    stubFetch()
+    renderPage('/fila/er-1?source=link')
+    await screen.findByText('ER Teste')
+
+    const form = screen.getByLabelText('CPF ou Código RE').closest('form') as HTMLFormElement
+    fireEvent.submit(form)
+
+    expect(await screen.findByText('Confirme sua entrada antes de continuar.')).toBeInTheDocument()
+  })
+
   it('forwards a signed link token without exposing it in the query string', async () => {
     const fetchMock = stubFetch()
     renderPage('/fila/er-1?source=link#entry=signed-entry-token')

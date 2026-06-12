@@ -130,6 +130,49 @@ describe('TicketTimeoutService.sweepExpiredCalls', () => {
     expect(panel.emitToER).not.toHaveBeenCalled()
   })
 
+  it('skips freeing a counter when the expired ticket has no counter assigned', async () => {
+    const now = new Date('2026-06-11T12:00:00Z')
+    const calledAt = new Date('2026-06-11T11:49:00Z')
+    prisma.ticket.findMany.mockResolvedValue([makeTicket('t1', 'er-1', calledAt, 600, null)])
+    const service = buildService()
+
+    const closed = await service.sweepExpiredCalls(now)
+
+    expect(closed).toBe(1)
+    expect(tx.ticket.updateMany).toHaveBeenCalledTimes(1)
+    expect(tx.counter.updateMany).not.toHaveBeenCalled()
+    expect(panel.emitToER).toHaveBeenCalledWith(
+      'er-1',
+      'ticket.no_show',
+      expect.objectContaining({ ticketId: 't1' }),
+    )
+  })
+
+  it('scopes the query to a single ER when an erId is provided', async () => {
+    const service = buildService()
+
+    await service.sweepExpiredCalls(new Date('2026-06-11T12:00:00Z'), 'er-9')
+
+    expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          state: TicketState.CALLING,
+          erId: 'er-9',
+        }),
+      }),
+    )
+  })
+
+  it('defaults the reference time to now when called without arguments', async () => {
+    prisma.ticket.findMany.mockResolvedValue([])
+    const service = buildService()
+
+    const closed = await service.sweepExpiredCalls()
+
+    expect(closed).toBe(0)
+    expect(prisma.ticket.findMany).toHaveBeenCalledTimes(1)
+  })
+
   describe('handleCron', () => {
     it('delegates to the sweep on each tick', async () => {
       const service = buildService()
@@ -138,6 +181,17 @@ describe('TicketTimeoutService.sweepExpiredCalls', () => {
       await service.handleCron()
 
       expect(sweep).toHaveBeenCalledTimes(1)
+      expect(Logger.prototype.log).toHaveBeenCalled()
+    })
+
+    it('stays quiet when the sweep closes nothing', async () => {
+      const service = buildService()
+      const sweep = jest.spyOn(service, 'sweepExpiredCalls').mockResolvedValue(0)
+
+      await service.handleCron()
+
+      expect(sweep).toHaveBeenCalledTimes(1)
+      expect(Logger.prototype.log).not.toHaveBeenCalled()
     })
 
     it('swallows sweep failures so the scheduler keeps running', async () => {

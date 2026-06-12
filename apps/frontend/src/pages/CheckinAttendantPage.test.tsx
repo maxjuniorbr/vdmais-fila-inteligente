@@ -178,4 +178,209 @@ describe('CheckinAttendantPage', () => {
       fetchMock.mock.calls.some(([url]) => url.toString().endsWith('/api/representatives')),
     ).toBe(true)
   })
+
+  it('surfaces an error when creating the ticket fails', async () => {
+    authenticate()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString()
+        if (url.includes('/representatives/search')) {
+          return new Response(
+            JSON.stringify([
+              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+            ]),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/tickets')) {
+          return new Response(JSON.stringify({ message: 'Senha já existe' }), { status: 409 })
+        }
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF, telefone ou código RE'), 'ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Criar senha' }))
+
+    expect(await screen.findByText('Senha já existe')).toBeInTheDocument()
+    expect(screen.queryByText('Check-in realizado')).not.toBeInTheDocument()
+  })
+
+  it('surfaces an error when registering a new representative fails', async () => {
+    authenticate()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString()
+        if (url.endsWith('/api/representatives') && init?.method === 'POST') {
+          return new Response(JSON.stringify({ message: 'CPF inválido' }), { status: 400 })
+        }
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar nova RE' }))
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nome completo'), 'Bruna Lima')
+    await user.type(screen.getByLabelText('CPF'), '00000000000')
+    await user.type(screen.getByLabelText('Telefone'), '11988887777')
+    fireEvent.change(screen.getByLabelText('Data de nascimento'), {
+      target: { value: '1992-05-05' },
+    })
+    await user.type(screen.getByLabelText('Código RE'), 'RE0099')
+    await user.type(screen.getByLabelText('Senha inicial'), 'Teste@123')
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar e criar senha' }))
+
+    expect(await screen.findByText('CPF inválido')).toBeInTheDocument()
+    expect(screen.queryByText('Check-in realizado')).not.toBeInTheDocument()
+  })
+
+  it('falls back to an empty ER when the profile has no erId', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            access_token: 'tok',
+            user: { id: 'att-2', name: 'Atendente', role: 'ATTENDANT' },
+          }),
+          { status: 200 },
+        ),
+      ),
+    )
+
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('E-mail'), 'att@x.com')
+    await user.type(screen.getByLabelText('Senha'), 'segredo123')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByText('ER:')).toBeInTheDocument()
+  })
+
+  it('shows a generic message when the search rejects with a non-error value', async () => {
+    authenticate()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString()
+        if (url.includes('/representatives/search')) throw 'boom'
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF, telefone ou código RE'), 'ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+
+    expect(await screen.findByText('Erro na busca')).toBeInTheDocument()
+  })
+
+  it('shows a generic message when the ticket request rejects with a non-error value', async () => {
+    authenticate()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString()
+        if (url.includes('/representatives/search')) {
+          return new Response(
+            JSON.stringify([
+              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+            ]),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/tickets')) throw 'boom'
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF, telefone ou código RE'), 'ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Criar senha' }))
+
+    expect(await screen.findByText('Erro no check-in')).toBeInTheDocument()
+  })
+
+  it('shows a generic message when registration rejects with a non-error value', async () => {
+    authenticate()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString()
+        if (url.endsWith('/api/representatives') && init?.method === 'POST') {
+          throw 'boom'
+        }
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar nova RE' }))
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nome completo'), 'Bruna Lima')
+    await user.type(screen.getByLabelText('CPF'), '99988877766')
+    await user.type(screen.getByLabelText('Telefone'), '11988887777')
+    fireEvent.change(screen.getByLabelText('Data de nascimento'), {
+      target: { value: '1992-05-05' },
+    })
+    await user.type(screen.getByLabelText('Código RE'), 'RE0099')
+    await user.type(screen.getByLabelText('Senha inicial'), 'Teste@123')
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar e criar senha' }))
+
+    expect(await screen.findByText('Erro no cadastro')).toBeInTheDocument()
+  })
+
+  it('logs out from the search screen', async () => {
+    authenticate()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
+
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /sair/i }))
+
+    expect(await screen.findByLabelText('E-mail')).toBeInTheDocument()
+  })
+
+  it('logs out from the confirmation screen', async () => {
+    authenticate()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString()
+        if (url.includes('/representatives/search')) {
+          return new Response(
+            JSON.stringify([
+              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+            ]),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/tickets')) {
+          return new Response(
+            JSON.stringify({ id: 't-1', code: 'A001', queuePosition: 1, currentPosition: 1 }),
+            { status: 201 },
+          )
+        }
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF, telefone ou código RE'), 'ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Criar senha' }))
+    await screen.findByText('Check-in realizado')
+
+    fireEvent.click(screen.getByRole('button', { name: /sair/i }))
+    expect(await screen.findByLabelText('E-mail')).toBeInTheDocument()
+  })
 })
