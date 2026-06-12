@@ -137,7 +137,14 @@ for (const lcovPath of lcovPaths) {
   }
 }
 
-const diff = readFileSync(0, 'utf8')
+const diff = await new Promise((resolve, reject) => {
+  const chunks = []
+  process.stdin.on('data', (chunk) => chunks.push(chunk))
+  process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+  process.stdin.on('error', reject)
+  // If stdin is a TTY or was already closed (empty pipe), resolve immediately.
+  if (process.stdin.readableEnded || !process.stdin.readable) resolve('')
+})
 const changedLines = parseChangedLines(diff)
 const coverage = new Map(
   lcovPaths.flatMap((lcovPath) => [...parseLcov(lcovPath).entries()]),
