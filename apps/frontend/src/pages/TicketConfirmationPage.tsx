@@ -267,7 +267,7 @@ export function TicketConfirmationPage() {
     )
   }
 
-  if (error) {
+  if (error && !ticket) {
     return (
       <div style={styles.container}>
         <div style={styles.card}>
@@ -289,6 +289,7 @@ export function TicketConfirmationPage() {
   async function togglePause() {
     if (!ticket) return
     setActionLoading(true)
+    setError(null)
     try {
       const endpoint = isPaused ? 'resume' : 'pause'
       const res = await fetch(`/api/tickets/${ticket.id}/${endpoint}`, {
@@ -309,6 +310,7 @@ export function TicketConfirmationPage() {
     if (!ticket) return
     setConfirmingLeave(false)
     setActionLoading(true)
+    setError(null)
     try {
       const res = await fetch(`/api/tickets/${ticket.id}/self-cancel`, {
         method: 'POST',

@@ -299,5 +299,8 @@ describe('TicketConfirmationPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sair da fila' }))
 
     expect(await screen.findByText('Não foi possível cancelar')).toBeInTheDocument()
+    // The action error shows inline; the ticket stays visible (no full "Ops!" screen).
+    expect(screen.getByText('A001')).toBeInTheDocument()
+    expect(screen.queryByText('Ops!')).not.toBeInTheDocument()
   })
 })
