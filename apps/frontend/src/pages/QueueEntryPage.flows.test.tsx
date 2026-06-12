@@ -12,13 +12,19 @@ interface ErOptions {
 }
 
 function stubFetch({ isDayOpen = true, erOk = true, authStatus = 200, authBody }: ErOptions = {}) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = input instanceof Request ? input.url : input.toString()
     if (url.includes('/api/public/ers/er-1')) {
       if (!erOk) return new Response(JSON.stringify({}), { status: 404 })
-      return new Response(JSON.stringify({ id: 'er-1', name: 'ER Teste', isDayOpen }), {
-        status: 200,
-      })
+      return new Response(
+        JSON.stringify({
+          id: 'er-1',
+          name: 'ER Teste',
+          isDayOpen,
+          entryChannel: url.includes('source=link') ? 'LINK' : 'QR_CODE',
+        }),
+        { status: 200 },
+      )
     }
     if (url.includes('/api/auth/login') || url.includes('/api/auth/register')) {
       return new Response(JSON.stringify(authBody ?? { access_token: 'tok-123' }), {
@@ -126,5 +132,35 @@ describe('QueueEntryPage flows', () => {
 
     fireEvent.click(screen.getByRole('checkbox'))
     expect(submit).toBeEnabled()
+  })
+
+  it('forwards a signed link token without exposing it in the query string', async () => {
+    const fetchMock = stubFetch()
+    renderPage('/fila/er-1?source=link#entry=signed-entry-token')
+    await screen.findByText('ER Teste')
+
+    const publicCall = fetchMock.mock.calls.find(([input]) =>
+      input.toString().includes('/api/public/ers/er-1'),
+    )
+    expect(publicCall?.[0].toString()).not.toContain('signed-entry-token')
+    expect(new Headers(publicCall?.[1]?.headers).get('x-entry-token')).toBe('signed-entry-token')
+
+    const user = userEvent.setup()
+    fireEvent.click(screen.getByRole('checkbox'))
+    await user.type(screen.getByLabelText('CPF ou Código RE'), 'RE0001')
+    await user.type(screen.getByLabelText('Senha'), 'Teste@123')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar na fila' }))
+
+    expect(await screen.findByText('Tela da senha')).toBeInTheDocument()
+    const authCall = fetchMock.mock.calls.find(([input]) =>
+      input.toString().includes('/api/auth/login'),
+    )
+    expect(JSON.parse(String(authCall?.[1]?.body))).toMatchObject({
+      erId: 'er-1',
+      entryToken: 'signed-entry-token',
+      entryChannel: 'LINK',
+    })
+    expect(sessionStorage.getItem('queue-entry-token:er-1')).toBe('signed-entry-token')
+    expect(sessionStorage.getItem('queue-entry:er-1')).toBe('LINK')
   })
 })

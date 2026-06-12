@@ -13,6 +13,9 @@ const COUNTER_KEY = 'counterId'
 const MANAGEMENT_ER_KEY = 'managementErId'
 
 const VALID_ROLES = new Set<StaffRole>(['OPERATOR', 'ATTENDANT', 'MANAGER', 'ADMIN'])
+const QUEUE_ENTRY_CHANNELS = new Set(['QR_CODE', 'LINK'])
+
+export type QueueEntryChannel = 'QR_CODE' | 'LINK'
 
 interface TokenClaims {
   sub?: string
@@ -89,6 +92,32 @@ export function setManagementERId(erId: string): void {
   } else {
     sessionStorage.removeItem(MANAGEMENT_ER_KEY)
   }
+}
+
+export function getQueueEntryToken(erId: string | undefined): string | null {
+  return erId ? sessionStorage.getItem(`queue-entry-token:${erId}`) : null
+}
+
+export function saveQueueEntryToken(erId: string, token: string): void {
+  sessionStorage.setItem(`queue-entry-token:${erId}`, token)
+}
+
+export function getQueueEntryChannel(erId: string | undefined): QueueEntryChannel | null {
+  if (!erId) return null
+  const channel = sessionStorage.getItem(`queue-entry:${erId}`)
+  return channel && QUEUE_ENTRY_CHANNELS.has(channel) ? (channel as QueueEntryChannel) : null
+}
+
+export function saveQueueEntryChannel(erId: string, channel: QueueEntryChannel): void {
+  sessionStorage.setItem(`queue-entry:${erId}`, channel)
+}
+
+export function getQueueEntryPath(erId: string | undefined): string {
+  if (!erId) return '/'
+  const source = getQueueEntryChannel(erId) === 'LINK' ? '?source=link' : ''
+  const token = getQueueEntryToken(erId)
+  const entry = token ? `#entry=${token}` : ''
+  return `/fila/${erId}${source}${entry}`
 }
 
 export function clearSession() {

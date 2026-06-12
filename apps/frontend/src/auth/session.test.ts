@@ -2,11 +2,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { makeStaffToken } from '../test/staffToken'
 import {
   clearSession,
+  getQueueEntryChannel,
+  getQueueEntryPath,
+  getQueueEntryToken,
   getManagementERId,
   getStaffSessionProfile,
   hasStaffSession,
   logoutStaffSession,
   saveStaffSession,
+  saveQueueEntryChannel,
+  saveQueueEntryToken,
   setManagementERId,
   type StaffRole,
 } from './session'
@@ -127,5 +132,24 @@ describe('staff session', () => {
     await logoutStaffSession()
 
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('queue entry session', () => {
+  it('stores the validated channel and token by ER', () => {
+    saveQueueEntryChannel('er-1', 'LINK')
+    saveQueueEntryToken('er-1', 'entry-token')
+
+    expect(getQueueEntryChannel('er-1')).toBe('LINK')
+    expect(getQueueEntryToken('er-1')).toBe('entry-token')
+    expect(getQueueEntryPath('er-1')).toBe('/fila/er-1?source=link#entry=entry-token')
+  })
+
+  it('ignores invalid channel values and handles a missing ER', () => {
+    sessionStorage.setItem('queue-entry:er-1', 'CHECKIN_ASSISTED')
+
+    expect(getQueueEntryChannel('er-1')).toBeNull()
+    expect(getQueueEntryToken(undefined)).toBeNull()
+    expect(getQueueEntryPath(undefined)).toBe('/')
   })
 })

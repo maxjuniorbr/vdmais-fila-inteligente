@@ -14,7 +14,7 @@ import { StaffLoginForm } from '../components/StaffLoginForm'
 import { useToast } from '../components/Toast'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
-import { formatDate } from '../utils/format'
+import { formatDate, formatTime } from '../utils/format'
 import { counterStateLabel, counterStateTone, roleLabel } from '../utils/labels'
 
 interface ERSummary {
@@ -45,6 +45,10 @@ interface ERDetail extends Omit<ERSummary, '_count'> {
   counters: Counter[]
   operators: Staff[]
   hasPanelToken: boolean
+  entryAccess?: {
+    qrCode: { token: string; expiresAt: string }
+    link: { token: string; expiresAt: string }
+  }
 }
 
 export function AdminPage() {
@@ -268,9 +272,19 @@ function ERDetailSection({
 
   if (!er) return <p>{error ?? 'Carregando...'}</p>
 
-  const qrEntryUrl = `${globalThis.location.origin}/fila/${er.id}`
-  const siteEntryUrl = `${globalThis.location.origin}/fila/${er.id}?source=link`
+  const qrEntryUrl = er.entryAccess
+    ? `${globalThis.location.origin}/fila/${er.id}#entry=${er.entryAccess.qrCode.token}`
+    : `${globalThis.location.origin}/fila/${er.id}`
+  const siteEntryUrl = er.entryAccess
+    ? `${globalThis.location.origin}/fila/${er.id}?source=link#entry=${er.entryAccess.link.token}`
+    : `${globalThis.location.origin}/fila/${er.id}?source=link`
   const panelUrl = `${globalThis.location.origin}/painel/${er.id}`
+  const qrEntryDescription = er.entryAccess
+    ? `Use no QR Code do ER. Válido até ${formatDate(er.entryAccess.qrCode.expiresAt)} às ${formatTime(er.entryAccess.qrCode.expiresAt)}.`
+    : 'Use este endereço para gerar o QR Code exposto dentro do ER.'
+  const linkEntryDescription = er.entryAccess
+    ? `Compartilhe como alternativa ao QR Code. Válido até ${formatDate(er.entryAccess.link.expiresAt)} às ${formatTime(er.entryAccess.link.expiresAt)}.`
+    : 'Compartilhe como alternativa ao QR Code. A RE deverá confirmar o ER.'
 
   return (
     <section ref={sectionRef} style={styles.managementCard}>
@@ -324,13 +338,13 @@ function ERDetailSection({
           <CopyField
             label="QR Code presencial"
             value={qrEntryUrl}
-            description="Use este endereço para gerar o QR Code exposto dentro do ER."
+            description={qrEntryDescription}
             openLabel="Testar entrada"
           />
           <CopyField
             label="Link alternativo"
             value={siteEntryUrl}
-            description="Compartilhe como alternativa ao QR Code. A RE deverá confirmar o ER."
+            description={linkEntryDescription}
             openLabel="Testar link"
           />
         </div>
