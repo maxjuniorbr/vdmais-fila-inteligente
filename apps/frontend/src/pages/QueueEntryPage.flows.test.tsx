@@ -112,14 +112,14 @@ describe('QueueEntryPage flows', () => {
     renderPage()
     await screen.findByText('ER Teste')
 
-    expect(screen.getByText('Operação encerrada')).toBeInTheDocument()
+    expect(screen.getByText('Atendimento encerrado')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Entrar na fila' })).toBeDisabled()
   })
 
   it('shows an error when the ER cannot be validated', async () => {
     stubFetch({ erOk: false })
     renderPage()
-    expect(await screen.findByText('ER não encontrado.')).toBeInTheDocument()
+    expect(await screen.findByText('Unidade não encontrada. Verifique o QR Code ou o link utilizados.')).toBeInTheDocument()
   })
 
   it('requires confirming the ER when arriving through a link', async () => {

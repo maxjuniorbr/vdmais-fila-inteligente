@@ -114,7 +114,7 @@ function TicketStatus({
       <>
         <p style={styles.positionLabel}>Situação</p>
         <p style={{ ...styles.position, color: brand.success }}>Em atendimento</p>
-        <p style={styles.hint}>Você está sendo atendida. Bom atendimento!</p>
+        <p style={styles.hint}>Você está em atendimento. Bom atendimento!</p>
       </>
     )
   }
@@ -145,7 +145,7 @@ function TicketStatus({
         {currentPosition > 0 ? `#${currentPosition}` : 'Em chamada'}
       </p>
       <p style={styles.hint}>
-        Fique atento ao painel. Você será chamado pelo número da senha acima.
+        Fique de olho no painel. Sua senha será chamada pelo número acima.
       </p>
     </>
   )

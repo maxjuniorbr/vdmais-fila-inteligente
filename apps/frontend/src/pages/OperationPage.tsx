@@ -332,7 +332,7 @@ export function OperationPage() {
                         onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/recall`))}
                         disabled={loading}
                       >
-                        Rechamar
+                        Chamar novamente
                       </Button>
                       <Button
                         variant="secondary"
