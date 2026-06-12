@@ -1,12 +1,14 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { Logger, ValidationPipe } from '@nestjs/common'
+import { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { validationExceptionFactory } from './common/validation-exception.factory'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule)
+  app.set('trust proxy', true)
   app.use(helmet())
   app.enableShutdownHooks()
 

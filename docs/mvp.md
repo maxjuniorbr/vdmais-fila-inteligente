@@ -92,11 +92,13 @@ A RE poderá entrar na fila por três canais:
 
 1. **QR Code no ER**  
     
-    Canal preferencial. A RE escaneia o QR Code dentro da unidade e acessa a fila daquele ER.
+    Canal preferencial. A RE escaneia o QR Code assinado dentro da unidade e
+    acessa a fila daquele ER. O acesso expira em 30 dias.
     
 2. **Link do site**  
     
-    Canal alternativo. Deve ser usado com orientação clara para evitar entrada indevida fora do contexto do ER.
+    Canal alternativo assinado, válido por 24 horas. Deve ser usado com
+    orientação clara para evitar entrada indevida fora do contexto do ER.
     
 3. **Check-in assistido**  
     
@@ -193,8 +195,12 @@ Risco:
 Mitigações mínimas:
 
 - orientar uso somente no ER ou chegando para atendimento;
+- exigir token assinado vinculado ao ER/canal e com expiração;
+- aplicar quotas de autenticação e criação de senha por IP/ER/canal;
 - registrar canal de entrada;
 - acompanhar no-show por canal.
+
+CAPTCHA não faz parte do MVP 0.
 
 ### 6.3 Check-in assistido
 

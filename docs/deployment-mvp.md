@@ -28,7 +28,7 @@ menos 32 bytes e rotacione-o conforme a política do ambiente.
 3. Aplique `prisma migrate deploy` como etapa one-shot antes de liberar a nova versão.
 4. Publique o backend e aguarde `GET /health/ready`.
 5. Publique o front-end e valide `/healthz`, `/api/health/live` e o WebSocket.
-6. Gere o QR Code do ER apontando para `/fila/:erId`.
+6. Em `/admin`, copie o acesso assinado do ER e gere o QR Code com a URL completa.
 
 Tags Git `v*` publicam imagens versionadas de backend, migration e frontend no GHCR. O
 deploy no ambiente corporativo deve promover essas mesmas imagens, sem reconstrução.
@@ -39,6 +39,30 @@ HTTPS.
 
 > Regras operacionais de migrations (paridade, pipeline e segurança) vivem no AI
 > steering `.kiro/steering/database-migrations.md`.
+
+## Canais GitHub e Vercel
+
+- Pull requests e branches geram o ambiente GitHub/Vercel **Preview**.
+- `master` gera o ambiente **Production**.
+- Antes de promover uma mudança de contrato entre frontend e backend, valide o
+  frontend compatível em Preview e publique-o em Production primeiro.
+- Depois do deploy, valide a raiz do frontend e `/api/health/live`.
+
+## Acessos assinados da fila
+
+- O admin entrega duas URLs por ER: QR Code presencial e link alternativo.
+- O token fica em `#entry=...`, não na query string, para não ser enviado em
+  referrers ou logs HTTP comuns.
+- O QR Code expira em 30 dias; o link alternativo expira em 24 horas. A validade
+  aparece na administração.
+- Ao expirar, abra **Gerenciar ER**, copie a URL atual e regenere o QR Code ou
+  redistribua o link.
+- Links antigos sem `#entry=` deixam de funcionar. Regere os QR Codes existentes
+  na implantação desta versão.
+- O backend limita autenticação e criação de senha por IP, ER e canal. CAPTCHA
+  permanece fora do escopo do MVP.
+
+Esta entrega não altera schema nem migrations; não há comando Supabase a aplicar.
 
 ## Segurança de borda
 
