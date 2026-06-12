@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 import { ConfigService } from '@nestjs/config'
-import { Role } from '@prisma/client'
+import { EntryChannel, Role } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { getJwtSecret } from './jwt.config'
 
@@ -12,6 +12,7 @@ export interface JwtPayload {
   role: Role
   erId?: string
   sv?: number
+  entryChannel?: EntryChannel
 }
 
 @Injectable()
@@ -28,7 +29,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    const user = { userId: payload.userId ?? payload.sub, role: payload.role, erId: payload.erId }
+    if (!Object.values(Role).includes(payload.role)) {
+      throw new UnauthorizedException('Token inválido')
+    }
+    const user = {
+      userId: payload.userId ?? payload.sub,
+      role: payload.role,
+      erId: payload.erId,
+      entryChannel: payload.entryChannel,
+    }
 
     // Staff tokens carry a session version. Incrementing it on the account
     // (logout, password change, disable) revokes every token signed earlier.

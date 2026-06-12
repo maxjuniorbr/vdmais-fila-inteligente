@@ -269,6 +269,20 @@ Recomendação:
 
 Se OTP/SMS for caro ou complexo para o piloto, usar telefone + senha.
 
+O acesso público começa por uma URL assinada emitida na administração:
+
+- QR Code: token JWT derivado do segredo da aplicação, vinculado ao ER e ao canal
+  `QR_CODE`, com validade de 30 dias;
+- link alternativo: mesmo vínculo, canal `LINK` e validade de 24 horas;
+- o token viaja no fragmento `#entry=...`, é enviado ao backend no header
+  `x-entry-token` e nos DTOs de login/cadastro;
+- o JWT da representante replica `erId` e `entryChannel`; a criação da senha
+  rejeita troca de ER ou canal;
+- autenticação e criação de senha usam quotas contextuais por IP, ER e canal.
+
+Não há CAPTCHA no MVP. O token assinado, a expiração e as quotas são as barreiras
+de automação adotadas nesta fase.
+
 ### 7.2 Operação
 
 Opções:
@@ -290,7 +304,9 @@ admin
 
 - O backend assina um JWT com as claims `userId`, `role`, `erId`, `sv` (sessionVersion) e `exp`.
 - No frontend, **o JWT é a única fonte de verdade** de identidade/perfil/ER: a SPA decodifica o token e nunca confia em chaves separadas e graváveis (`staffRole`/`erId`). Manipular o storage não escala privilégio, pois exigiria um token validamente assinado.
-- `sessionStorage` guarda apenas o token e o nome de exibição (cosmético). Tokens expirados (`exp`) são tratados como ausência de sessão já no bootstrap, não só no próximo `401`.
+- `sessionStorage` guarda o JWT da sessão, o nome de exibição e, no fluxo público,
+  o token/canal já validados para o ER atual. O acesso a essas chaves é
+  centralizado em `auth/session.ts`.
 - Todas as chamadas autenticadas das telas de staff, inclusive telemetria em segundo plano, usam o client central. Qualquer `401` limpa a sessão, emite `SESSION_EXPIRED_EVENT` e devolve a tela ao formulário de login.
 - Revogação imediata: o logout, a troca de senha e a desativação de conta incrementam `sessionVersion` no backend; o token anterior deixa de validar.
 

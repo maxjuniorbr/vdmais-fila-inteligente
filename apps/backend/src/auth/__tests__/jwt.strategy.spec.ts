@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { Role } from '@prisma/client'
+import { EntryChannel, Role } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { JwtStrategy } from '../jwt.strategy'
 
@@ -20,8 +20,18 @@ describe('JwtStrategy', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('maps a representative payload without touching the database', async () => {
-    const result = await strategy().validate({ sub: 're-1', role: Role.REPRESENTATIVE, erId: 'er-1' })
-    expect(result).toEqual({ userId: 're-1', role: Role.REPRESENTATIVE, erId: 'er-1' })
+    const result = await strategy().validate({
+      sub: 're-1',
+      role: Role.REPRESENTATIVE,
+      erId: 'er-1',
+      entryChannel: EntryChannel.QR_CODE,
+    })
+    expect(result).toEqual({
+      userId: 're-1',
+      role: Role.REPRESENTATIVE,
+      erId: 'er-1',
+      entryChannel: EntryChannel.QR_CODE,
+    })
     expect(prisma.operator.findUnique).not.toHaveBeenCalled()
   })
 
@@ -34,7 +44,12 @@ describe('JwtStrategy', () => {
       erId: 'er-1',
       sv: 2,
     })
-    expect(result).toEqual({ userId: 'op-1', role: Role.MANAGER, erId: 'er-1' })
+    expect(result).toEqual({
+      userId: 'op-1',
+      role: Role.MANAGER,
+      erId: 'er-1',
+      entryChannel: undefined,
+    })
   })
 
   it('treats a missing sv as version 0', async () => {
@@ -56,5 +71,12 @@ describe('JwtStrategy', () => {
     await expect(
       strategy().validate({ sub: 'op-x', role: Role.ADMIN, sv: 0 }),
     ).rejects.toThrow(UnauthorizedException)
+  })
+
+  it('rejects an unknown role before database access', async () => {
+    await expect(
+      strategy().validate({ sub: 'user-1', role: 'UNKNOWN' as Role }),
+    ).rejects.toThrow(UnauthorizedException)
+    expect(prisma.operator.findUnique).not.toHaveBeenCalled()
   })
 })

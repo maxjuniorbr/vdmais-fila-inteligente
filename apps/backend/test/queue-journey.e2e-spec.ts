@@ -1,17 +1,19 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Role, TicketState } from '@prisma/client'
+import { EntryChannel, Role, TicketState } from '@prisma/client'
 import * as bcrypt from 'bcrypt'
 import request from 'supertest'
 import { AppModule } from '../src/app.module'
 import { validationExceptionFactory } from '../src/common/validation-exception.factory'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { QueueEntryTokenService } from '../src/auth/queue-entry-token.service'
 
 describe('Full queue journey and concurrency (e2e)', () => {
   let app: INestApplication
   let prisma: PrismaService
   let jwt: JwtService
+  let queueEntryTokens: QueueEntryTokenService
   let erId: string
   let otherErId: string
   let counter1Id: string
@@ -31,6 +33,8 @@ describe('Full queue journey and concurrency (e2e)', () => {
   let assignedOperatorToken: string
   let adminToken: string
   let panelToken: string
+  let qrEntryToken: string
+  let linkEntryToken: string
 
   const suffix = Date.now()
 
@@ -52,6 +56,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
 
     prisma = app.get(PrismaService)
     jwt = app.get(JwtService)
+    queueEntryTokens = app.get(QueueEntryTokenService)
 
     const [er, otherEr] = await Promise.all([
       prisma.eR.create({ data: { name: `ER E2E ${suffix}` } }),
@@ -144,6 +149,13 @@ describe('Full queue journey and concurrency (e2e)', () => {
     raceOperator2Token = await login(raceOperator2.email)
     adminToken = await login(admin.email)
 
+    const erAccess = await request(app.getHttpServer())
+      .get(`/admin/ers/${erId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+    qrEntryToken = erAccess.body.entryAccess.qrCode.token
+    linkEntryToken = erAccess.body.entryAccess.link.token
+
     const panelTokenResponse = await request(app.getHttpServer())
       .post(`/admin/ers/${erId}/panel-token`)
       .set('Authorization', `Bearer ${adminToken}`)
@@ -183,7 +195,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
   })
 
   it('registers a representative and returns a valid JWT', async () => {
-    const response = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post('/auth/register')
       .send({
         fullName: 'Maria Teste E2E',
@@ -194,18 +206,48 @@ describe('Full queue journey and concurrency (e2e)', () => {
         password: 'senha123',
         erId,
       })
+      .expect(401)
+
+    const response = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        fullName: 'Maria Teste E2E',
+        cpf: '52998224725',
+        phone: `119${String(suffix).slice(-8)}`,
+        birthDate: '1990-01-01',
+        reCode: `E2E_${suffix}_1`,
+        password: 'senha123',
+        erId,
+        entryChannel: EntryChannel.QR_CODE,
+        entryToken: qrEntryToken,
+      })
       .expect(201)
 
     expect(response.body.access_token).toBeDefined()
-    const login = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post('/auth/login')
       .send({
         credential: `E2E_${suffix}_1`,
         password: 'senha123',
         erId,
       })
+      .expect(401)
+
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        credential: `E2E_${suffix}_1`,
+        password: 'senha123',
+        erId,
+        entryChannel: EntryChannel.QR_CODE,
+        entryToken: qrEntryToken,
+      })
       .expect(200)
     representativeToken = login.body.access_token
+    expect(jwt.verify(representativeToken)).toMatchObject({
+      erId,
+      entryChannel: EntryChannel.QR_CODE,
+    })
   })
 
   it('revokes a staff token on logout (session version)', async () => {
@@ -389,6 +431,8 @@ describe('Full queue journey and concurrency (e2e)', () => {
       sub: representative.id,
       userId: representative.id,
       role: Role.REPRESENTATIVE,
+      erId,
+      entryChannel: EntryChannel.LINK,
     })
 
     const created = await request(app.getHttpServer())
@@ -453,15 +497,60 @@ describe('Full queue journey and concurrency (e2e)', () => {
   })
 
   it('exposes public ER identification and rejects an unknown ER', async () => {
-    const response = await request(app.getHttpServer()).get(`/public/ers/${erId}`).expect(200)
+    await request(app.getHttpServer()).get(`/public/ers/${erId}`).expect(401)
+
+    const response = await request(app.getHttpServer())
+      .get(`/public/ers/${erId}`)
+      .set('x-entry-token', qrEntryToken)
+      .expect(200)
     expect(response.body).toEqual({
       id: erId,
       name: expect.any(String),
       isDayOpen: true,
+      entryChannel: EntryChannel.QR_CODE,
     })
     expect(response.body).not.toHaveProperty('dayOpenedAt')
 
-    await request(app.getHttpServer()).get('/public/ers/unknown-er').expect(404)
+    const unknownToken = queueEntryTokens.issue('unknown-er', EntryChannel.QR_CODE).token
+    await request(app.getHttpServer())
+      .get('/public/ers/unknown-er')
+      .set('x-entry-token', unknownToken)
+      .expect(404)
+
+    await request(app.getHttpServer())
+      .get(`/public/ers/${erId}?source=link`)
+      .set('x-entry-token', linkEntryToken)
+      .expect(200)
+
+    await request(app.getHttpServer())
+      .get(`/public/ers/${erId}?source=link`)
+      .set('x-entry-token', qrEntryToken)
+      .expect(401)
+  })
+
+  it('limits ticket creation attempts by IP, ER and channel', async () => {
+    const rateLimitErId = `rate-limit-${suffix}`
+    const token = jwt.sign({
+      sub: 'rate-limit-representative',
+      userId: 'rate-limit-representative',
+      role: Role.REPRESENTATIVE,
+      erId: rateLimitErId,
+      entryChannel: EntryChannel.QR_CODE,
+    })
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const response = await request(app.getHttpServer())
+        .post('/tickets')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ erId: rateLimitErId, entryChannel: EntryChannel.QR_CODE })
+      expect(response.status).not.toBe(429)
+    }
+
+    await request(app.getHttpServer())
+      .post('/tickets')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ erId: rateLimitErId, entryChannel: EntryChannel.QR_CODE })
+      .expect(429)
   })
 
   it('exposes liveness, readiness and protected Prometheus metrics', async () => {
@@ -517,6 +606,8 @@ describe('Full queue journey and concurrency (e2e)', () => {
       sub: pauseRep.id,
       userId: pauseRep.id,
       role: Role.REPRESENTATIVE,
+      erId,
+      entryChannel: EntryChannel.QR_CODE,
     })
 
     // Step 1: enter the queue

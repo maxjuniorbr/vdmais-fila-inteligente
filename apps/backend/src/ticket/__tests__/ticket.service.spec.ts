@@ -8,6 +8,8 @@ import { TicketService } from '../ticket.service'
 const representative = {
   userId: 'rep-1',
   role: Role.REPRESENTATIVE,
+  erId: 'er-1',
+  entryChannel: EntryChannel.QR_CODE,
 }
 const attendant = {
   userId: 'att-1',
@@ -209,6 +211,36 @@ describe('TicketService', () => {
         representativeId: 'rep-2',
       }),
     ).rejects.toThrow(ForbiddenException)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects a legacy representative token without queue context', async () => {
+    await expect(
+      service.create(
+        { userId: 'rep-1', role: Role.REPRESENTATIVE },
+        { erId: 'er-1', entryChannel: EntryChannel.QR_CODE },
+      ),
+    ).rejects.toThrow('Acesso à fila inválido ou expirado')
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects a representative token bound to another ER', async () => {
+    await expect(
+      service.create(
+        { ...representative, erId: 'er-2', entryChannel: EntryChannel.QR_CODE },
+        { erId: 'er-1', entryChannel: EntryChannel.QR_CODE },
+      ),
+    ).rejects.toThrow('O acesso à fila pertence a outro ER')
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects a representative token bound to another entry channel', async () => {
+    await expect(
+      service.create(
+        { ...representative, erId: 'er-1', entryChannel: EntryChannel.LINK },
+        { erId: 'er-1', entryChannel: EntryChannel.QR_CODE },
+      ),
+    ).rejects.toThrow('O acesso à fila pertence a outro canal')
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 

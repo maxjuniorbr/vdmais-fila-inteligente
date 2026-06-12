@@ -5,6 +5,7 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 **Funcionalidades principais:**
 
 - Entrada na fila por QR Code, link alternativo ou check-in assistido
+- QR Code e link público protegidos por token assinado, vinculado ao ER e ao canal, sem CAPTCHA
 - Pausa voluntária da senha pela RE (volta ao fim da fila ao retomar; tempo pausado excluído das métricas)
 - Saída real da fila via cancelamento próprio
 - Operação por caixa logado com chamada atômica do próximo (sem conflito entre operadoras)
@@ -214,7 +215,7 @@ O CI (GitHub Actions) roda a cada push e pull request para `master`:
 - **Secret scan** (`secret-scan.yml`): gitleaks varre commits em busca de segredos. Placeholders de exemplo e segredos de teste ficam na allowlist do `.gitleaks.toml`.
 - **Dependabot** (`dependabot.yml`): atualizações semanais de dependências npm e GitHub Actions. Atualizações de rotina (minor/patch) vêm agrupadas; majors vêm isolados para revisão. `prisma` e `@prisma/client` sobem em lockstep, e o major do Prisma é deliberadamente adiado (migração planejada).
 
-Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS) tanto no nginx do contêiner quanto na entrega via Vercel. Dados pessoais sensíveis (CPF e telefone) são mascarados nas respostas de cadastro assistido. Chamadas autenticadas das telas de staff passam pelo client central, que encerra a sessão e retorna ao login quando o backend responde `401`. Detalhes em [`docs/deployment-mvp.md`](docs/deployment-mvp.md) e [`docs/stack-mvp.md`](docs/stack-mvp.md).
+Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS) tanto no nginx do contêiner quanto na entrega via Vercel. QR Codes e links da fila carregam tokens assinados no fragmento da URL; o backend valida ER, canal e expiração antes de autenticar a RE, com quotas por IP/ER/canal. Dados pessoais sensíveis (CPF e telefone) são mascarados nas respostas de cadastro assistido. Chamadas autenticadas das telas de staff passam pelo client central, que encerra a sessão e retorna ao login quando o backend responde `401`. Detalhes em [`docs/deployment-mvp.md`](docs/deployment-mvp.md) e [`docs/stack-mvp.md`](docs/stack-mvp.md).
 
 ---
 
