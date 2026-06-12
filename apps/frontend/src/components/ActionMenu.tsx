@@ -43,14 +43,12 @@ export function ActionMenu({ items, label = 'Abrir ações' }: Readonly<ActionMe
     setOpen(true)
   }
 
-  // Foca o primeiro item ao abrir.
   useEffect(() => {
     if (!open) return
     const first = menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not([disabled])')
     first?.focus()
   }, [open])
 
-  // Fecha em clique fora, rolagem ou redimensionamento.
   useEffect(() => {
     if (!open) return
     function onPointerDown(event: MouseEvent) {
