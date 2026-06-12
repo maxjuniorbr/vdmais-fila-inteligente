@@ -25,8 +25,8 @@ describe('TelemetryController', () => {
   })
 
   it('records a panel display', () => {
-    controller.panelDisplayed('er-1', 't-1')
-    expect(service.recordPanelCallDisplayed).toHaveBeenCalledWith('er-1', 't-1')
+    controller.panelDisplayed()
+    expect(service.recordPanelCallDisplayed).toHaveBeenCalledWith()
   })
 
   it('records a ticket display', () => {
