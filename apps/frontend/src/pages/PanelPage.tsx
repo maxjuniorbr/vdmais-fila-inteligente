@@ -22,6 +22,7 @@ interface WaitingTicket {
 }
 
 interface PanelState {
+  isDayOpen: boolean
   current: Call | null
   calling: Call[]
   inService: InService[]
@@ -87,6 +88,8 @@ export function PanelPage() {
   const [waiting, setWaiting] = useState<WaitingTicket[]>([])
   const [avgServiceSeconds, setAvgServiceSeconds] = useState<number | null>(null)
   const [avgWaitSeconds, setAvgWaitSeconds] = useState<number | null>(null)
+  // Defaults to open so the TV never flashes "encerrada" before the first load.
+  const [dayOpen, setDayOpen] = useState(true)
   const [accessDenied, setAccessDenied] = useState(false)
   const [clock, setClock] = useState(() => new Date())
   const [nextPage, setNextPage] = useState(0)
@@ -141,6 +144,7 @@ export function PanelPage() {
       if (!response.ok) return
       const state = (await response.json()) as PanelState
       setAccessDenied(false)
+      setDayOpen(state.isDayOpen ?? true)
       setCurrent(state.current)
       setCalling(state.calling ?? [])
       setInService(state.inService)
@@ -197,6 +201,29 @@ export function PanelPage() {
           <span style={styles.blockedText}>
             Gere o token do painel na administração do ER e abra a TV com a URL que inclui o
             token.
+          </span>
+        </div>
+      </main>
+    )
+  }
+
+  if (!dayOpen) {
+    return (
+      <main style={styles.page}>
+        <AppHeader
+          title="Painel de Atendimento"
+          subtitle="Acompanhe a chamada da sua senha"
+          actions={
+            <span style={styles.clock}>
+              <span style={styles.clockDate}>{formatDate(clock.toISOString())}</span>
+              <span style={styles.clockTime}>{formatTimeWithSeconds(clock.toISOString())}</span>
+            </span>
+          }
+        />
+        <div style={styles.blockedScreen}>
+          <span style={styles.blockedTitle}>Atendimento encerrado por hoje</span>
+          <span style={styles.blockedText}>
+            A fila reabre no próximo horário de atendimento. Até logo!
           </span>
         </div>
       </main>

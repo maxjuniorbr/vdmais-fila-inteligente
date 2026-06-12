@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { CounterState, EntryChannel, Role, TicketState } from '@prisma/client'
 import { PanelGateway } from '../../panel/panel.gateway'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -67,6 +67,7 @@ const tx = {
 const prisma = {
   $transaction: jest.fn((callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
   auditEvent: { create: jest.fn() },
+  eR: { findUnique: jest.fn() },
   ticket: { findMany: jest.fn() },
   counter: { findMany: jest.fn() },
 }
@@ -96,10 +97,12 @@ describe('QueueService.callNext', () => {
     prisma.auditEvent.create.mockResolvedValue({})
     prisma.ticket.findMany.mockResolvedValue([])
     prisma.counter.findMany.mockResolvedValue([])
+    prisma.eR.findUnique.mockResolvedValue({ isDayOpen: true })
   })
 
   it('allows a global administrator to view a selected ER queue', async () => {
     await expect(service.getQueueOverview('er-2', admin)).resolves.toEqual({
+      isDayOpen: true,
       waiting: [],
       calling: [],
       inService: [],
@@ -109,11 +112,57 @@ describe('QueueService.callNext', () => {
     })
   })
 
+  it('reports the operation as closed in the overview when the day is not open', async () => {
+    prisma.eR.findUnique.mockResolvedValue({ isDayOpen: false })
+
+    await expect(service.getQueueOverview('er-1', operator)).resolves.toMatchObject({
+      isDayOpen: false,
+    })
+  })
+
+  it('rejects non-operators before opening a transaction', async () => {
+    await expect(service.callNext('er-1', 'counter-1', admin)).rejects.toThrow(ForbiddenException)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
   it('rejects access to another ER before opening a transaction', async () => {
     await expect(service.callNext('er-2', 'counter-1', operator)).rejects.toThrow(
       ForbiddenException,
     )
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('fails when the counter does not exist', async () => {
+    tx.counter.findUnique.mockResolvedValue(null)
+
+    await expect(service.callNext('er-1', 'counter-1', operator)).rejects.toThrow(NotFoundException)
+  })
+
+  it('rejects a counter that belongs to a different ER', async () => {
+    tx.counter.findUnique.mockResolvedValue({ ...counter, erId: 'er-2' })
+
+    await expect(service.callNext('er-1', 'counter-1', operator)).rejects.toThrow(
+      BadRequestException,
+    )
+  })
+
+  it('rejects calling when the counter is not active', async () => {
+    tx.counter.findUnique.mockResolvedValue({
+      ...counter,
+      state: CounterState.PAUSED,
+    })
+
+    await expect(service.callNext('er-1', 'counter-1', operator)).rejects.toThrow(
+      BadRequestException,
+    )
+  })
+
+  it('rejects calling when the ER operation is not open today', async () => {
+    tx.queue.findUnique.mockResolvedValue(null)
+
+    await expect(service.callNext('er-1', 'counter-1', operator)).rejects.toThrow(
+      BadRequestException,
+    )
   })
 
   it('requires the authenticated operator to own an active counter', async () => {
@@ -189,5 +238,24 @@ describe('QueueService.callNext', () => {
         eventType: 'ticket_locked_for_call',
       }),
     })
+  })
+
+  it('falls back to counter number zero when the called ticket has no counter', async () => {
+    tx.ticket.update.mockResolvedValue({ ...calledTicket, counter: null })
+
+    const result = await service.callNext('er-1', 'counter-1', operator)
+
+    expect(result.counter).toBeNull()
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'ticket_called',
+        metadata: expect.objectContaining({ counterNumber: 0 }),
+      }),
+    })
+    expect(panel.emitToER).toHaveBeenCalledWith(
+      'er-1',
+      'ticket.called',
+      expect.objectContaining({ counterNumber: 0 }),
+    )
   })
 })

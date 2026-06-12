@@ -11,7 +11,7 @@ export class PanelService {
   async getState(erId: string) {
     const er = await this.prisma.eR.findUnique({
       where: { id: erId },
-      select: { id: true },
+      select: { id: true, isDayOpen: true },
     })
     if (!er) throw new NotFoundException('ER não encontrado')
 
@@ -93,6 +93,7 @@ export class PanelService {
         : null
 
     return {
+      isDayOpen: er.isDayOpen,
       current,
       calling,
       inService: inService.map((ticket) => ({

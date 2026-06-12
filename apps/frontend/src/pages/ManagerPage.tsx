@@ -149,6 +149,10 @@ function CancelTicketAction({
   )
 }
 
+// Com a operação encerrada o backend rejeita o restore; sem ações possíveis,
+// a coluna não exibe menu (ActionMenu retorna null com lista vazia).
+const NoTicketActions: TicketActionComponent = () => null
+
 function RestoreTicketAction({
   ticket,
   onSelect,
@@ -456,6 +460,13 @@ export function ManagerPage() {
           </Alert>
         )}
 
+        {er && !er.isDayOpen && (
+          <Alert tone="warning">
+            Operação encerrada. Os indicadores abaixo são do último dia operado.
+            Para chamar senhas, restaurar e movimentar a fila, abra a operação.
+          </Alert>
+        )}
+
         {metrics && (
           <>
             <section
@@ -566,7 +577,7 @@ export function ManagerPage() {
           </div>
           <TicketTable
             tickets={overview?.recent ?? []}
-            ActionComponent={RestoreTicketAction}
+            ActionComponent={er?.isDayOpen ? RestoreTicketAction : NoTicketActions}
             onSelect={openTicketAction}
           />
         </section>

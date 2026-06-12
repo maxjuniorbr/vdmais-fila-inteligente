@@ -19,9 +19,17 @@ describe('PanelService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks()
-    prisma.eR.findUnique.mockResolvedValue({ id: 'er-1' })
+    prisma.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: true })
     prisma.ticket.findFirst.mockResolvedValue(null)
     prisma.ticket.findMany.mockResolvedValue([])
+  })
+
+  it('exposes whether the operation day is open', async () => {
+    const service = new PanelService(prisma as unknown as PrismaService)
+    await expect(service.getState('er-1')).resolves.toMatchObject({ isDayOpen: true })
+
+    prisma.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: false })
+    await expect(service.getState('er-1')).resolves.toMatchObject({ isDayOpen: false })
   })
 
   it('returns every calling ticket (one per counter) and the most recent as current', async () => {
