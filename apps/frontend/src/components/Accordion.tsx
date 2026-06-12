@@ -39,6 +39,7 @@ export function Accordion({ items, allowMultiple = false }: Readonly<AccordionPr
           >
             <button
               type="button"
+              id={`${regionId}-label`}
               className="gb-button"
               aria-expanded={isOpen}
               aria-controls={regionId}
@@ -65,14 +66,14 @@ export function Accordion({ items, allowMultiple = false }: Readonly<AccordionPr
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </button>
-            <div
+            <section
               id={regionId}
-              role="region"
+              aria-labelledby={`${regionId}-label`}
               hidden={!isOpen}
               style={styles.content}
             >
               {item.content}
-            </div>
+            </section>
           </div>
         )
       })}

@@ -117,6 +117,7 @@ export function ActionMenu({ items, label = 'Abrir ações' }: Readonly<ActionMe
           <div
             ref={menuRef}
             role="menu"
+            tabIndex={-1}
             aria-label={label}
             onKeyDown={onMenuKeyDown}
             style={{ ...styles.menu, top: position.top, left: position.left }}

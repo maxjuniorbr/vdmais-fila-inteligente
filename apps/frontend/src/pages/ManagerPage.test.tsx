@@ -35,6 +35,12 @@ function makeSocketDouble() {
 
 vi.mock('../hooks/useSocket', () => ({ useSocket: () => socketDouble }))
 
+const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }))
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>()
+  return { ...actual, useNavigate: () => navigateSpy }
+})
+
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 
 const overview = {
@@ -400,11 +406,15 @@ describe('ManagerPage', () => {
       if (path.startsWith('/ers/')) return Promise.resolve(er)
       return Promise.resolve([])
     })
+    navigateSpy.mockClear()
     renderManager()
     await screen.findByText('ER acompanhado')
 
     fireEvent.click(screen.getByRole('button', { name: 'Voltar ao início' }))
     fireEvent.click(screen.getByRole('button', { name: 'Administração' }))
+
+    expect(navigateSpy).toHaveBeenCalledWith('/')
+    expect(navigateSpy).toHaveBeenCalledWith('/admin')
   })
 
   it('refetches the dashboard when a realtime queue event arrives', async () => {

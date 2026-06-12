@@ -28,13 +28,18 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const nextId = useRef(0)
 
-  const showToast = useCallback((message: string, tone: ToastTone = 'info') => {
-    const id = nextId.current++
-    setToasts((current) => [...current, { id, message, tone }])
-    setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id))
-    }, 4000)
+  const removeToast = useCallback((id: number) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id))
   }, [])
+
+  const showToast = useCallback(
+    (message: string, tone: ToastTone = 'info') => {
+      const id = nextId.current++
+      setToasts((current) => [...current, { id, message, tone }])
+      setTimeout(() => removeToast(id), 4000)
+    },
+    [removeToast],
+  )
 
   const value = useMemo(() => ({ showToast }), [showToast])
 
