@@ -1,6 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { clearSession } from '../auth/session'
+import { useLocation, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  clearSession,
+  getQueueEntryToken,
+  saveQueueEntryChannel,
+  saveQueueEntryToken,
+} from '../auth/session'
 import { Alert } from '../components/Alert'
 import { BrandMark } from '../components/BrandMark'
 import { Button } from '../components/Button'
@@ -15,14 +20,18 @@ interface PublicER {
   id: string
   name: string
   isDayOpen: boolean
+  entryChannel: 'QR_CODE' | 'LINK'
 }
 
 export function QueueEntryPage() {
   const { erId } = useParams<{ erId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
-  const isLink = searchParams.get('source') === 'link'
-  const sourceQuery = isLink ? '?source=link' : ''
+  const sourceIsLink = searchParams.get('source') === 'link'
+  const entryToken =
+    new URLSearchParams(location.hash.replace(/^#/, '')).get('entry') ??
+    getQueueEntryToken(erId)
   const [mode, setMode] = useState<Mode>('login')
   const loginTabId = useId()
   const registerTabId = useId()
@@ -37,6 +46,8 @@ export function QueueEntryPage() {
   const [erConfirmed, setERConfirmed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const isLink = er?.entryChannel === 'LINK' || (!er && sourceIsLink)
+  const sourceQuery = isLink ? '?source=link' : ''
 
   const [loginForm, setLoginForm] = useState({ credential: '', password: '' })
   const [registerForm, setRegisterForm] = useState({
@@ -57,13 +68,22 @@ export function QueueEntryPage() {
 
     const controller = new AbortController()
     setLoadingER(true)
-    fetch(`/api/public/ers/${erId}`, { signal: controller.signal })
+    const headers = entryToken ? { 'x-entry-token': entryToken } : undefined
+    const source = sourceIsLink ? '?source=link' : ''
+    fetch(`/api/public/ers/${erId}${source}`, { signal: controller.signal, headers })
       .then(async (response) => {
-        if (!response.ok) throw new Error('ER não encontrado.')
-        return response.json() as Promise<PublicER>
+        const data = (await response.json().catch(() => ({}))) as Partial<PublicER> & {
+          message?: string
+        }
+        if (!response.ok) throw new Error(data.message ?? 'ER não encontrado.')
+        return {
+          ...data,
+          entryChannel: data.entryChannel ?? (sourceIsLink ? 'LINK' : 'QR_CODE'),
+        } as PublicER
       })
       .then((data) => {
         setER(data)
+        if (entryToken) saveQueueEntryToken(erId, entryToken)
         setError(null)
       })
       .catch((err: unknown) => {
@@ -74,7 +94,7 @@ export function QueueEntryPage() {
       .finally(() => setLoadingER(false))
 
     return () => controller.abort()
-  }, [erId])
+  }, [entryToken, erId, sourceIsLink])
 
   function confirmEntry() {
     if (!erId || !er?.isDayOpen) {
@@ -86,7 +106,7 @@ export function QueueEntryPage() {
       return false
     }
 
-    sessionStorage.setItem(`queue-entry:${erId}`, isLink ? 'LINK' : 'QR_CODE')
+    saveQueueEntryChannel(erId, er.entryChannel)
     return true
   }
 
@@ -121,10 +141,13 @@ export function QueueEntryPage() {
     if (!confirmEntry()) return
     setLoading(true)
     try {
+      const entryContext = entryToken
+        ? { entryToken, entryChannel: er?.entryChannel }
+        : {}
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...loginForm, erId }),
+        body: JSON.stringify({ ...loginForm, erId, ...entryContext }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -147,10 +170,13 @@ export function QueueEntryPage() {
     if (!confirmEntry()) return
     setLoading(true)
     try {
+      const entryContext = entryToken
+        ? { entryToken, entryChannel: er?.entryChannel }
+        : {}
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...registerForm, erId }),
+        body: JSON.stringify({ ...registerForm, erId, ...entryContext }),
       })
       if (!res.ok) {
         const data = await res.json()

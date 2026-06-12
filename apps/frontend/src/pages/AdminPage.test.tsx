@@ -90,6 +90,16 @@ const erDetail = {
     { id: 'o1', name: 'Operadora 1', email: 'op1@x.com', role: 'OPERATOR', createdAt: '2026-01-01T12:00:00.000Z' },
   ],
   hasPanelToken: false,
+  entryAccess: {
+    qrCode: {
+      token: 'qr-entry-token',
+      expiresAt: '2026-07-12T12:00:00.000Z',
+    },
+    link: {
+      token: 'link-entry-token',
+      expiresAt: '2026-06-13T12:00:00.000Z',
+    },
+  },
 }
 
 const erSummary = {
@@ -123,6 +133,13 @@ describe('AdminPage — ER management', () => {
   it('opens the management panel with access links, counters and team', async () => {
     await openManagement()
     expect(screen.getByText('QR Code presencial')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Testar entrada (abre em nova aba)' }),
+    ).toHaveAttribute('href', expect.stringMatching(/\/fila\/er-1#entry=qr-entry-token$/))
+    expect(screen.getByRole('link', { name: 'Testar link (abre em nova aba)' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/fila\/er-1\?source=link#entry=link-entry-token$/),
+    )
     expect(screen.getByText('Painel de TV')).toBeInTheDocument()
     expect(screen.getByText('Caixa 1')).toBeInTheDocument()
     expect(screen.getByText('op1@x.com')).toBeInTheDocument()
