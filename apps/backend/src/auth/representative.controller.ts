@@ -26,7 +26,9 @@ export class RepresentativeController {
 
   @Get('search')
   @Roles('ATTENDANT', 'MANAGER')
-  async search(@Query('q') q: string) {
+  async search(@Query('q') q: string, @Request() req: { user: AuthenticatedUser }) {
+    const erId = req.user.erId
+    if (!erId) return []
     if (!q || q.trim().length < 3) return []
 
     const term = q.trim()
@@ -34,7 +36,10 @@ export class RepresentativeController {
 
     const representatives = await this.prisma.representative.findMany({
       where: {
-        OR: [{ cpf: digits }, { phone: digits }, { reCode: term.toUpperCase() }],
+        AND: [
+          { OR: [{ cpf: digits }, { phone: digits }, { reCode: term.toUpperCase() }] },
+          { tickets: { some: { erId } } },
+        ],
       },
       select: { id: true, fullName: true, cpf: true, phone: true, reCode: true },
       take: 10,

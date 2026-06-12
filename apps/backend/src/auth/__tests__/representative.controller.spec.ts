@@ -28,15 +28,31 @@ describe('RepresentativeController', () => {
   })
 
   it('returns an empty list for short queries', async () => {
-    await expect(controller.search('ab')).resolves.toEqual([])
+    await expect(controller.search('ab', req)).resolves.toEqual([])
     expect(prisma.representative.findMany).not.toHaveBeenCalled()
   })
 
-  it('masks PII for matching representatives', async () => {
+  it('returns an empty list when the caller has no ER scope', async () => {
+    const noErReq = { user: { userId: 'admin-1', role: Role.ADMIN, erId: undefined } }
+    await expect(controller.search('11122233344', noErReq)).resolves.toEqual([])
+    expect(prisma.representative.findMany).not.toHaveBeenCalled()
+  })
+
+  it('scopes the search to representatives with a ticket in the caller ER and masks PII', async () => {
     prisma.representative.findMany.mockResolvedValue([
       { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
     ])
-    const result = await controller.search('11122233344')
+    const result = await controller.search('11122233344', req)
+    expect(prisma.representative.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            { OR: [{ cpf: '11122233344' }, { phone: '11122233344' }, { reCode: '11122233344' }] },
+            { tickets: { some: { erId: 'er-1' } } },
+          ],
+        },
+      }),
+    )
     expect(result).toEqual([
       {
         id: 're-1',
