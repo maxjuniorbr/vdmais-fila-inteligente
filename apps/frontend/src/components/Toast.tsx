@@ -12,7 +12,6 @@ interface ToastItem {
 }
 
 interface ToastContextValue {
-  /** Exibe um aviso temporário (H1 — feedback de conclusão). */
   showToast: (message: string, tone?: ToastTone) => void
 }
 

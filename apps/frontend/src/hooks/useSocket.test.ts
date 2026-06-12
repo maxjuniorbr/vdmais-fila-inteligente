@@ -47,7 +47,6 @@ describe('useSocket', () => {
     expect(options).toMatchObject({ auth: { token: 'sock-token' } })
     expect(result.current).toBe(socket)
 
-    // Trigger the registered connect handler and assert the joinER emit.
     const connectHandler = socket.on.mock.calls.find(([event]) => event === 'connect')?.[1]
     expect(connectHandler).toBeTypeOf('function')
     connectHandler()

@@ -4,14 +4,11 @@ import { brand } from '../styles/brand'
 interface EmptyStateProps {
   title: string
   description?: string
-  /** Ícone outline opcional, exibido em um círculo neutro. */
   icon?: ReactNode
-  /** Ação opcional (ex.: um Button para recarregar). */
   action?: ReactNode
   style?: CSSProperties
 }
 
-/** Estado vazio (tela sem dados) — orienta a próxima ação sem culpar o usuário. */
 export function EmptyState({ title, description, icon, action, style }: Readonly<EmptyStateProps>) {
   return (
     <div style={{ ...styles.wrap, ...style }}>

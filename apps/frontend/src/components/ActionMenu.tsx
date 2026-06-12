@@ -12,17 +12,11 @@ export interface ActionMenuItem {
 
 interface ActionMenuProps {
   items: ActionMenuItem[]
-  /** Rótulo acessível do botão. Padrão: "Abrir ações". */
   label?: string
 }
 
 const MENU_WIDTH = 208
 
-/**
- * Menu de ações compacto (três pontos verticais / overflow menu).
- * Agrupa ações secundárias de uma linha ou card. Acessível: aria-haspopup,
- * navegação por setas/Home/End, fechamento por Esc, clique fora e rolagem.
- */
 export function ActionMenu({ items, label = 'Abrir ações' }: Readonly<ActionMenuProps>) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)

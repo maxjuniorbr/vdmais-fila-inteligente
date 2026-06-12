@@ -52,15 +52,11 @@ interface PanelLayout {
   caixaSize: string
 }
 
-// Layout responsivo do quadro "Chamando agora" em função de quantos caixas
-// chamam ao mesmo tempo. Fica fora do componente para manter sua complexidade
-// cognitiva baixa e evitar ternários aninhados.
 function resolvePanelLayout(callCount: number): PanelLayout {
   let columns = 3
   if (callCount <= 1) columns = 1
   else if (callCount === 2 || callCount === 4) columns = 2
 
-  // Fonte da senha diminui conforme mais caixas chamam, para o card não estourar.
   let codeSize = 'min(5vw, 9vh)'
   if (callCount <= 1) codeSize = 'min(11vw, 17vh)'
   else if (callCount <= 2) codeSize = 'min(7vw, 12vh)'
@@ -71,8 +67,6 @@ function resolvePanelLayout(callCount: number): PanelLayout {
   return { columns, codeSize, nameSize, caixaSize }
 }
 
-// "Próximas senhas": total de linhas visíveis e quantas rotacionam abaixo da
-// primeira (que fica sempre fixa, indicando quem é a próxima a ser chamada).
 const NEXT_VISIBLE = 7
 const NEXT_WINDOW = NEXT_VISIBLE - 1
 const NEXT_ROTATE_MS = 5000
@@ -95,7 +89,6 @@ export function PanelPage() {
   const [nextPage, setNextPage] = useState(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Lock body scroll while panel is mounted (TV mode)
   useEffect(() => {
     const prev = {
       overflow: document.documentElement.style.overflow,
@@ -179,8 +172,6 @@ export function PanelPage() {
 
   const callCount = calling.length
 
-  // Rodízio das "próximas senhas": a 1ª fica fixa (próxima a chamar) e as demais
-  // alternam em janelas, para que toda a fila apareça ao longo do tempo.
   const rotatingPool = waiting.slice(1)
   const rotatingPages = Math.max(1, Math.ceil(rotatingPool.length / NEXT_WINDOW))
   const needsRotation = waiting.length > NEXT_VISIBLE
@@ -232,7 +223,6 @@ export function PanelPage() {
 
   return (
     <main style={styles.page}>
-      {/* Keyframes do efeito de "piscar" ao chamar (respeita prefers-reduced-motion via theme.css) */}
       <style>{CALL_PULSE_KEYFRAMES}</style>
       <AppHeader
         title="Painel de Atendimento"

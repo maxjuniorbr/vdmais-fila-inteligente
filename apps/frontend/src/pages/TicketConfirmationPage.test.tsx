@@ -333,7 +333,6 @@ describe('TicketConfirmationPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sair da fila' }))
 
     expect(await screen.findByText('Não foi possível cancelar')).toBeInTheDocument()
-    // The action error shows inline; the ticket stays visible (no full "Ops!" screen).
     expect(screen.getByText('A001')).toBeInTheDocument()
     expect(screen.queryByText('Ops!')).not.toBeInTheDocument()
   })
@@ -537,7 +536,6 @@ describe('TicketConfirmationPage', () => {
     })
     renderPage()
     expect(await screen.findByText('Pausada')).toBeInTheDocument()
-    // pauseTimeoutSeconds is absent, so the (?? 0) > 0 guard suppresses the countdown.
     expect(screen.queryByText('Tempo restante para retomar')).not.toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Estou pronta — retomar senha' }),
@@ -622,7 +620,6 @@ describe('TicketConfirmationPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronta — pausar' }))
 
     expect(await screen.findByText('Não foi possível pausar')).toBeInTheDocument()
-    // The ticket card stays in place — pausing failed without losing state.
     expect(screen.getByText('A001')).toBeInTheDocument()
   })
 
@@ -689,7 +686,6 @@ describe('TicketConfirmationPage', () => {
       })
       vi.stubGlobal('fetch', fetchMock)
       renderPage()
-      // Flush the join promise chain that resolves the initial ticket.
       await vi.waitFor(() => expect(screen.getByText('A001')).toBeInTheDocument())
       return fetchMock
     }

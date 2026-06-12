@@ -6,11 +6,6 @@ interface BrandMarkProps {
   size?: number
 }
 
-/**
- * Marca neutra do produto (VD+ Fila Inteligente) — monograma abstrato de fila.
- * Não representa nenhuma marca corporativa: três traços decrescentes que
- * remetem a uma fila/atendimento.
- */
 export function BrandMark({ onDark = false, size = 30 }: Readonly<BrandMarkProps>) {
   const emblemBg = onDark ? 'rgba(255,255,255,0.16)' : brand.canvas
   const markColor = onDark ? '#ffffff' : brand.emphasis

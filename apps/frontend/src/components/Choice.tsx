@@ -2,16 +2,10 @@ import type { InputHTMLAttributes, ReactNode } from 'react'
 import { brand } from '../styles/brand'
 
 interface ChoiceProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  /** Conteúdo do rótulo (sempre visível). */
   children: ReactNode
-  /** checkbox → seleção múltipla; radio → seleção exclusiva. */
   control: 'checkbox' | 'radio'
 }
 
-/**
- * Controle selecionável com rótulo visível.
- * checkbox: múltipla escolha. radio: escolha exclusiva (até 5 opções).
- */
 export function Choice({ children, control, className, ...rest }: Readonly<ChoiceProps>) {
   const cls = [control === 'checkbox' ? 'gb-checkbox' : 'gb-radio', className]
     .filter(Boolean)

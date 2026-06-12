@@ -186,7 +186,6 @@ describe('QueueEntryPage flows', () => {
     )
     renderPage()
     await screen.findByText('ER Teste')
-    // QR_CODE channel means there is no confirmation checkbox and submit is enabled.
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Entrar na fila' })).toBeEnabled()
   })

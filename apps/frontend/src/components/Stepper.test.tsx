@@ -19,7 +19,6 @@ describe('Stepper', () => {
 
   it('shows the step number for upcoming steps', () => {
     render(<Stepper steps={steps} current={1} />)
-    // Upcoming step keeps its index number (3rd step).
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 

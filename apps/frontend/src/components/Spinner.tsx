@@ -5,7 +5,6 @@ interface SpinnerProps {
   label?: string
 }
 
-/** Loader genérico para ações sem progresso previsível (H1). */
 export function Spinner({ size = 20, label = 'Carregando' }: Readonly<SpinnerProps>) {
   return (
     <span

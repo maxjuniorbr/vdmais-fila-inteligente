@@ -32,10 +32,6 @@ const TONE_STYLE: Record<Tone, CSSProperties> = {
   },
 }
 
-/**
- * Inline feedback message. Errors are announced assertively (role="alert");
- * other tones render as a polite live region via <output>.
- */
 export function Alert({ tone = 'error', children, style }: Readonly<AlertProps>) {
   const mergedStyle = { ...base, ...TONE_STYLE[tone], ...style }
   if (tone === 'error') {
