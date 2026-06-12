@@ -41,6 +41,7 @@ interface Counter {
 }
 
 interface QueueOverview {
+  isDayOpen: boolean
   waiting: Ticket[]
   calling: Ticket[]
   inService: Ticket[]
@@ -193,6 +194,13 @@ export function OperationPage() {
 
       <main className="gb-page-content" style={styles.content}>
         {error && <Alert tone="error">{error}</Alert>}
+
+        {overview && !overview.isDayOpen && (
+          <Alert tone="warning">
+            Operação encerrada. Aguarde a gestora abrir a operação do dia para assumir um caixa e
+            chamar senhas.
+          </Alert>
+        )}
 
         <div className="gb-grid-operation" style={styles.grid}>
           <div style={styles.mainColumn}>

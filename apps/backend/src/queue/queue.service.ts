@@ -150,7 +150,8 @@ export class QueueService {
     this._assertERAccess(erId, user)
     const businessDate = getBusinessDate()
 
-    const [waiting, calling, inService, paused, recent, counters] = await Promise.all([
+    const [er, waiting, calling, inService, paused, recent, counters] = await Promise.all([
+      this.prisma.eR.findUnique({ where: { id: erId }, select: { isDayOpen: true } }),
       this.prisma.ticket.findMany({
         where: { erId, state: TicketState.WAITING, queue: { businessDate } },
         orderBy: { queuePosition: 'asc' },
@@ -199,7 +200,7 @@ export class QueueService {
       }),
     ])
 
-    return { waiting, calling, inService, paused, recent, counters }
+    return { isDayOpen: er?.isDayOpen ?? false, waiting, calling, inService, paused, recent, counters }
   }
 
   private _assertERAccess(erId: string, user: AuthenticatedUser) {

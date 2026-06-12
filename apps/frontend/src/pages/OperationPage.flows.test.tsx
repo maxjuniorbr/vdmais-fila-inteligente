@@ -14,7 +14,7 @@ function authenticate() {
   seedStaffSession({ id: 'op-1', name: 'Operadora', role: 'OPERATOR', erId: 'er-1' })
 }
 
-const base = { waiting: [], calling: [], inService: [], paused: [], recent: [] }
+const base = { isDayOpen: true, waiting: [], calling: [], inService: [], paused: [], recent: [] }
 
 function setOverview(overview: Record<string, unknown>) {
   vi.mocked(api.get).mockResolvedValue({ ...base, ...overview })
