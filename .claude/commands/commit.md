@@ -14,6 +14,9 @@ environment/secrets manager, never in source code. Relevant variables for this r
 `DATABASE_URL`, `JWT_SECRET`, `OBSERVABILITY_TOKEN`, and any Supabase key
 (`sb_secret_*`, `service_role`), and the Render token (`rnd_*`).
 
+Comments in code should be used only when they add necessary clarity; remove any
+unnecessary comments when the code can already explain itself.
+
 ## Steps
 
 ### 1. Run validation gates
