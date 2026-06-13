@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { makeStaffToken } from '../test/staffToken'
 import {
   clearSession,
+  consumeQueueEntryPending,
   getQueueEntryChannel,
   getQueueEntryPath,
   getQueueEntryToken,
   getManagementERId,
+  markQueueEntryPending,
   getStaffSessionProfile,
   hasStaffSession,
   logoutStaffSession,
@@ -151,5 +153,13 @@ describe('queue entry session', () => {
     expect(getQueueEntryChannel('er-1')).toBeNull()
     expect(getQueueEntryToken(undefined)).toBeNull()
     expect(getQueueEntryPath(undefined)).toBe('/')
+  })
+
+  it('marks and consumes the entry intent exactly once', () => {
+    markQueueEntryPending('er-1')
+    expect(consumeQueueEntryPending('er-1')).toBe(true)
+    // A second read (e.g. a refresh) no longer sees the intent.
+    expect(consumeQueueEntryPending('er-1')).toBe(false)
+    expect(consumeQueueEntryPending(undefined)).toBe(false)
   })
 })
