@@ -124,16 +124,20 @@ OBSERVABILITY_TOKEN="replace-with-a-random-monitoring-token"
 
 ### 3. Subir o banco de dados
 
+O `npm run dev` (passo 5) já sobe o Postgres automaticamente. Suba-o manualmente
+apenas se for rodar o backend isolado (`npm run dev:backend`) ou as migrations
+antes do primeiro `dev`:
+
 ```bash
-docker compose -f compose.dev.yml up -d postgres
-# ou
 podman-compose -f compose.dev.yml up -d postgres
+# ou
+docker compose -f compose.dev.yml up -d postgres
 ```
 
 Aguarde o healthcheck passar (alguns segundos). Para verificar:
 
 ```bash
-docker compose -f compose.dev.yml ps
+podman-compose -f compose.dev.yml ps
 ```
 
 ### 4. Rodar as migrations do Prisma
@@ -161,7 +165,7 @@ npm run db:seed --workspace=apps/backend
 > O seed é idempotente: se já existir um `ADMIN`, nada é alterado.
 > As variáveis também podem ser definidas em `apps/backend/.env` (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`).
 
-### 5. Iniciar backend e frontend simultaneamente
+### 5. Iniciar a stack completa
 
 Na raiz do projeto:
 
@@ -169,14 +173,22 @@ Na raiz do projeto:
 npm run dev
 ```
 
-Isso sobe em paralelo:
+Isso sobe a stack inteira:
 
+- **Postgres** (`compose.dev.yml`, via `podman-compose` com fallback para `docker compose`) → `localhost:5432`
 - **Backend** → `http://localhost:3000`
 - **Frontend** → `http://localhost:5173`
+
+> O Postgres sobe primeiro (passo `predev` → `dev:db`); o backend só inicia
+> depois que a porta `5432` responde. O container do banco permanece de pé entre
+> reinícios do `dev`.
 
 Ou separadamente:
 
 ```bash
+# Banco (se ainda não estiver de pé)
+npm run dev:db
+
 # Terminal 1: backend
 npm run dev:backend
 
