@@ -1,5 +1,12 @@
 # Stack técnica do MVP 0
 
+← [Voltar ao README](../README.md) · [Arquitetura Backend](./arquitetura-backend.md) · [Arquitetura Frontend](./arquitetura-frontend.md)
+
+> **Natureza deste documento.** É um **registro de decisão técnica anterior à
+> implementação** — explica *por que* a stack foi escolhida. Para o estado **como
+> construído** (API, modelo de dados, eventos e módulos atuais), use os documentos de
+> arquitetura. Onde este registro divergir da arquitetura, **a arquitetura prevalece**.
+
 ## Contexto
 
 Este registro define a stack mínima recomendada para o **MVP 0 — Fila Digital Presencial Operável**, considerando que o Grupo Boticário já utiliza **React** no front-end e **Node.js com NestJS** no BFF.
@@ -169,6 +176,10 @@ MetricsModule
 AuditLogModule
 ```
 
+> Esta foi a divisão **proposta**. Os módulos efetivamente implementados (incluindo
+> `admin`, `telemetry` e `observability`) estão descritos em
+> [Arquitetura Backend](./arquitetura-backend.md).
+
 ---
 
 ## 4. Comunicação em tempo real
@@ -201,6 +212,10 @@ counter.paused
 counter.resumed
 panel.updated
 ```
+
+> Esta é a lista de eventos **proposta**. O conjunto efetivamente emitido pelo gateway
+> WebSocket (`ticket.called`, `counter.opened`, `panel.updated`, `joinER.denied`) está em
+> [Arquitetura Backend](./arquitetura-backend.md), seção *Painel TV*.
 
 Alternativa possível:
 
@@ -370,143 +385,21 @@ Se o Grupo já usa Kubernetes, o backend pode rodar em Kubernetes. Se isso for p
 
 ## 9. APIs mínimas
 
-Endpoints mínimos:
-
-```
-POST /auth/register
-POST /auth/login
-POST /auth/staff-login
-POST /tickets                       # cria senha (RE ou check-in assistido)
-GET  /queues/:erId/overview
-POST /counters/:counterId/open
-POST /counters/:counterId/pause
-POST /counters/:counterId/resume
-POST /counters/:counterId/close
-POST /queues/:erId/call-next
-POST /tickets/:ticketId/start-service
-POST /tickets/:ticketId/finish-service
-POST /tickets/:ticketId/no-show
-POST /tickets/:ticketId/recall       # segunda chamada (senha em chamada)
-POST /tickets/:ticketId/cancel       # cancelamento por staff (com motivo)
-POST /tickets/:ticketId/restore      # restaura no-show (gestora) → fim da fila
-POST /tickets/:ticketId/correct      # corrige atendimento em aberto (gestora)
-POST /tickets/:ticketId/pause        # RE pausa a própria senha
-POST /tickets/:ticketId/resume       # RE retoma → fim da fila
-POST /tickets/:ticketId/self-cancel  # RE sai da fila
-GET  /tickets/my-active              # senha ativa da RE no ER
-GET  /metrics/:erId/daily
-GET  /panel/:erId/state
-```
-
-WebSocket:
-
-```
-/ws/queues/:erId
-```
+> A lista de endpoints **implementada e atual** — com métodos, perfis, parâmetros e
+> exemplos de payload — vive em [Arquitetura Backend](./arquitetura-backend.md), seção
+> *Referência de API*. O esboço original previa um WebSocket em `/ws/queues/:erId`; a
+> implementação adotou **Socket.IO** com o evento `joinER` e salas por ER. Consulte a
+> arquitetura como fonte da verdade.
 
 ---
 
 ## 10. Modelo mínimo de dados
 
-### representatives
-
-```
-id
-full_name
-cpf
-birth_date
-phone
-email
-re_code
-created_at
-updated_at
-```
-
-### ers
-
-```
-id
-name
-code
-status
-created_at
-```
-
-### operators
-
-```
-id
-name
-email
-role
-status
-```
-
-### counters
-
-```
-id
-er_id
-name
-number
-status
-```
-
-### operator_counter_sessions
-
-```
-id
-operator_id
-counter_id
-opened_at
-closed_at
-status
-```
-
-### queue_tickets
-
-```
-id
-er_id
-representative_id
-ticket_number
-status
-entry_channel
-counter_id
-operator_id
-created_at
-called_at
-service_started_at
-service_finished_at
-cancelled_at
-no_show_at
-restored_at
-```
-
-### ticket_events
-
-```
-id
-ticket_id
-event_type
-actor_type
-actor_id
-metadata
-created_at
-```
-
-### audit_logs
-
-```
-id
-actor_type
-actor_id
-action
-entity_type
-entity_id
-metadata
-created_at
-```
+> O modelo de dados **implementado** (entidades, nomes e relacionamentos reais) está em
+> [Arquitetura Backend](./arquitetura-backend.md), seção *Modelo de dados*, e tem como
+> fonte canônica `apps/backend/prisma/schema.prisma`. O esboço inicial (tabelas em
+> `snake_case`) foi superado pelo schema Prisma atual e foi removido daqui para evitar
+> divergência.
 
 ---
 
@@ -581,3 +474,12 @@ Essa stack é suficiente para:
 - evoluir posteriormente para o MVP Full.
 
 Confiança: alta.
+
+---
+
+## Documentação relacionada
+
+- [README](../README.md) — setup local e infraestrutura necessária
+- [Arquitetura Backend](./arquitetura-backend.md) — estado como construído (fonte da verdade)
+- [Arquitetura Frontend](./arquitetura-frontend.md)
+- [MVP — escopo e validação](./mvp.md) · [Deploy do MVP](./deployment-mvp.md)

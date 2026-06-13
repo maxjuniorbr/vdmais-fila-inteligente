@@ -1,5 +1,7 @@
 # MVP 0 — Escopo e validação
 
+← [Voltar ao README](../README.md) · [Guia de personas](./guia-personas.md) · [Stack do MVP](./stack-mvp.md)
+
 ## Relação com o MVP Full
 
 O **MVP Full** continua sendo o alvo do produto e deve representar a visão completa discutida até aqui: fila virtual, previsibilidade, segmentação de jornadas, Pedido Expresso, regras avançadas, dados operacionais e evolução da gestão de fluxo dos ERs.
@@ -921,4 +923,11 @@ Ele serve para validar o núcleo operacional do SaaS antes de avançar para fila
 
 A versão completa do MVP permanece como alvo de produto. O MVP 0 é o menor recorte para testar a hipótese em campo.
 
-Stack mínima — MVP 0 Gestão de Filas
+---
+
+## Documentação relacionada
+
+- [README](../README.md) — setup local e infraestrutura necessária
+- [Guia de uso por persona](./guia-personas.md) — jornada de cada perfil na prática
+- [Stack técnica do MVP](./stack-mvp.md) — decisões de tecnologia
+- [Arquitetura Backend](./arquitetura-backend.md) · [Arquitetura Frontend](./arquitetura-frontend.md) — estado como construído
