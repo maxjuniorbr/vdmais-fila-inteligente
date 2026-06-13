@@ -5,6 +5,7 @@ import { TicketService } from '../ticket.service'
 const service = {
   create: jest.fn(),
   getMyActiveTicket: jest.fn(),
+  getMyTicketStatus: jest.fn(),
   cancel: jest.fn(),
   restore: jest.fn(),
   recall: jest.fn(),
@@ -35,6 +36,11 @@ describe('TicketController', () => {
   it('gets the active ticket', () => {
     controller.getMyActive('er-1', req)
     expect(service.getMyActiveTicket).toHaveBeenCalledWith('re-1', 'er-1')
+  })
+
+  it('gets the ticket status', () => {
+    controller.getMyStatus('er-1', req)
+    expect(service.getMyTicketStatus).toHaveBeenCalledWith('re-1', 'er-1')
   })
 
   it('cancels a ticket', () => {
