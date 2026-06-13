@@ -22,6 +22,15 @@ export const ACTIVE_STATES: TicketState[] = [
   TicketState.PAUSED,
 ]
 
+const REPRESENTATIVE_TICKET_INCLUDE = {
+  representative: { select: { fullName: true } },
+  er: { select: { pauseTimeoutSeconds: true, callTimeoutSeconds: true } },
+} satisfies Prisma.TicketInclude
+
+type RepresentativeTicket = Prisma.TicketGetPayload<{
+  include: typeof REPRESENTATIVE_TICKET_INCLUDE
+}>
+
 export interface IntegrationActionContext {
   client?: string
   scopes?: string[]
@@ -632,15 +641,12 @@ export class TicketService {
   async getMyActiveTicket(representativeId: string, erId: string) {
     const ticket = await this.prisma.ticket.findFirst({
       where: { representativeId, erId, state: { in: ACTIVE_STATES } },
-      include: {
-        representative: { select: { fullName: true } },
-        er: { select: { pauseTimeoutSeconds: true } },
-      },
+      include: REPRESENTATIVE_TICKET_INCLUDE,
     })
     if (!ticket) throw new NotFoundException('Nenhuma senha ativa encontrada para este ER')
 
-    // Enforce the pause timeout on read so the RE sees the cancellation
-    // promptly even before the periodic sweep runs.
+    // Enforce the pause/call timeouts on read so the RE sees the outcome
+    // promptly even before the periodic sweeps run.
     if (this._isPauseExpired(ticket.state, ticket.pausedAt, ticket.er.pauseTimeoutSeconds)) {
       await this._expirePause({
         id: ticket.id,
@@ -650,7 +656,61 @@ export class TicketService {
       })
       throw new NotFoundException('Nenhuma senha ativa encontrada para este ER')
     }
+    if (this._isCallExpired(ticket.state, ticket.calledAt, ticket.er.callTimeoutSeconds)) {
+      await this._expireCallTimeout(ticket)
+      throw new NotFoundException('Nenhuma senha ativa encontrada para este ER')
+    }
 
+    return this._buildRepresentativeTicketView(ticket)
+  }
+
+  // Like getMyActiveTicket, but returns the representative's most recent ticket
+  // for the ER in ANY state (NO_SHOW, CANCELLED, FINISHED, or a restored
+  // WAITING). The RE's screen polls this to render the real status instead of
+  // guessing it from a 404 — so a no-show no longer reads as "concluded" and a
+  // manager restore brings the live status back.
+  async getMyTicketStatus(representativeId: string, erId: string) {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { representativeId, erId },
+      orderBy: { createdAt: 'desc' },
+      include: REPRESENTATIVE_TICKET_INCLUDE,
+    })
+    if (!ticket) throw new NotFoundException('Nenhuma senha encontrada para este ER')
+
+    // Same pause/call timeout enforcement as getMyActiveTicket, but the RE keeps
+    // seeing the resulting (CANCELLED / NO_SHOW) ticket instead of a 404.
+    const pauseExpired = this._isPauseExpired(
+      ticket.state,
+      ticket.pausedAt,
+      ticket.er.pauseTimeoutSeconds,
+    )
+    const callExpired = this._isCallExpired(
+      ticket.state,
+      ticket.calledAt,
+      ticket.er.callTimeoutSeconds,
+    )
+    if (pauseExpired || callExpired) {
+      if (pauseExpired) {
+        await this._expirePause({
+          id: ticket.id,
+          code: ticket.code,
+          erId: ticket.erId,
+          representativeId: ticket.representativeId,
+        })
+      } else {
+        await this._expireCallTimeout(ticket)
+      }
+      const refreshed = await this.prisma.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: REPRESENTATIVE_TICKET_INCLUDE,
+      })
+      return this._buildRepresentativeTicketView(refreshed)
+    }
+
+    return this._buildRepresentativeTicketView(ticket)
+  }
+
+  private async _buildRepresentativeTicketView(ticket: RepresentativeTicket) {
     const currentPosition =
       ticket.state === TicketState.WAITING
         ? await this.prisma.ticket.count({
@@ -662,7 +722,12 @@ export class TicketService {
           })
         : 0
     const { er, ...rest } = ticket
-    return { ...rest, currentPosition, pauseTimeoutSeconds: er.pauseTimeoutSeconds }
+    return {
+      ...rest,
+      currentPosition,
+      pauseTimeoutSeconds: er.pauseTimeoutSeconds,
+      callTimeoutSeconds: er.callTimeoutSeconds,
+    }
   }
 
   private _isPauseExpired(
@@ -672,6 +737,57 @@ export class TicketService {
   ): boolean {
     if (state !== TicketState.PAUSED || !pausedAt || pauseTimeoutSeconds <= 0) return false
     return Date.now() >= pausedAt.getTime() + pauseTimeoutSeconds * 1000
+  }
+
+  private _isCallExpired(
+    state: TicketState,
+    calledAt: Date | null,
+    callTimeoutSeconds: number,
+  ): boolean {
+    if (state !== TicketState.CALLING || !calledAt || callTimeoutSeconds <= 0) return false
+    return Date.now() >= calledAt.getTime() + callTimeoutSeconds * 1000
+  }
+
+  // Read-time counterpart of TicketTimeoutService.sweepExpiredCalls: marks this
+  // called ticket as NO_SHOW and frees its counter once the ER's call tolerance
+  // is exceeded, so the RE sees the no-show without waiting for the cron.
+  private async _expireCallTimeout(ticket: {
+    id: string
+    code: string
+    erId: string
+    counterId: string | null
+  }) {
+    const expired = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.ticket.updateMany({
+        where: { id: ticket.id, state: TicketState.CALLING },
+        data: { state: TicketState.NO_SHOW, noShowAt: new Date() },
+      })
+      if (result.count !== 1) return false
+
+      if (ticket.counterId) {
+        await tx.counter.updateMany({
+          where: { id: ticket.counterId, state: CounterState.CALLING },
+          data: { state: CounterState.ACTIVE },
+        })
+      }
+
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_auto_no_show',
+          erId: ticket.erId,
+          ticketId: ticket.id,
+          metadata: { counterId: ticket.counterId, reason: 'call_timeout' },
+        },
+      })
+      return true
+    })
+
+    if (expired) {
+      this.panelGateway.emitToER(ticket.erId, 'ticket.no_show', {
+        ticketId: ticket.id,
+        code: ticket.code,
+      })
+    }
   }
 
   /**
