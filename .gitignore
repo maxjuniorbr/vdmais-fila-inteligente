@@ -11,8 +11,13 @@ test-results/
 # TypeScript incremental build cache
 *.tsbuildinfo
 
-# Claude Code MCP config (contains the Render API token)
+# Private keys / certificates (never commit; integration RS256 keys live in .env)
+*.pem
+*.key
+
+# Claude Code (MCP token + personal local settings)
 .mcp.json
+.claude/settings.local.json
 
 # SonarQube local
 .scannerwork/
