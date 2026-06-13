@@ -95,7 +95,7 @@ const erDetail = {
   pauseTimeoutSeconds: 300,
   callTimeoutSeconds: 600,
   createdAt: '2026-01-01T12:00:00.000Z',
-  counters: [{ id: 'c1', number: 1, state: 'ACTIVE' }],
+  counters: [{ id: 'c1', number: 1, state: 'UNAVAILABLE', _count: { tickets: 0 } }],
   operators: [
     { id: 'o1', name: 'Operadora 1', email: 'op1@x.com', role: 'OPERATOR', createdAt: '2026-01-01T12:00:00.000Z' },
   ],
@@ -156,15 +156,67 @@ describe('AdminPage — ER management', () => {
     expect(screen.getByText('op1@x.com')).toBeInTheDocument()
   })
 
-  it('adds a counter', async () => {
+  it('adds the next available counter number with one button', async () => {
     vi.mocked(api.post).mockResolvedValue({})
     await openManagement()
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('Número do caixa'), '4')
-    fireEvent.click(screen.getByRole('button', { name: 'Adicionar caixa' }))
+    // Counter 1 is taken, so the next free number is 2.
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar caixa 2' }))
     await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/admin/ers/er-1/counters', { number: 4 }),
+      expect(api.post).toHaveBeenCalledWith('/admin/ers/er-1/counters', { number: 2 }),
     )
+  })
+
+  it('fills the lowest free number when there is a gap', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      Promise.resolve(
+        path === '/admin/ers'
+          ? [erSummary]
+          : {
+              ...erDetail,
+              counters: [
+                { id: 'c1', number: 1, state: 'UNAVAILABLE', _count: { tickets: 0 } },
+                { id: 'c3', number: 3, state: 'UNAVAILABLE', _count: { tickets: 0 } },
+              ],
+            },
+      ),
+    )
+    await openManagement()
+    expect(screen.getByRole('button', { name: 'Adicionar caixa 2' })).toBeInTheDocument()
+  })
+
+  it('removes a closed counter without service history via the menu', async () => {
+    vi.mocked(api.delete).mockResolvedValue(undefined)
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Ações do caixa 1' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remover caixa' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remover' }))
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/admin/ers/er-1/counters/c1'))
+  })
+
+  it('disables removing a counter with service history', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      Promise.resolve(
+        path === '/admin/ers'
+          ? [erSummary]
+          : { ...erDetail, counters: [{ id: 'c1', number: 1, state: 'UNAVAILABLE', _count: { tickets: 5 } }] },
+      ),
+    )
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Ações do caixa 1' }))
+    expect(screen.getByRole('menuitem', { name: 'Remover caixa' })).toBeDisabled()
+  })
+
+  it('disables removing an open counter', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      Promise.resolve(
+        path === '/admin/ers'
+          ? [erSummary]
+          : { ...erDetail, counters: [{ id: 'c1', number: 1, state: 'ACTIVE', _count: { tickets: 0 } }] },
+      ),
+    )
+    await openManagement()
+    fireEvent.click(screen.getByRole('button', { name: 'Ações do caixa 1' }))
+    expect(screen.getByRole('menuitem', { name: 'Remover caixa' })).toBeDisabled()
   })
 
   it('creates a staff account', async () => {
@@ -342,9 +394,7 @@ describe('AdminPage — ER management', () => {
   it('surfaces an error when creating a counter fails', async () => {
     vi.mocked(api.post).mockRejectedValue(new Error('Falha ao criar caixa'))
     await openManagement()
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('Número do caixa'), '7')
-    fireEvent.click(screen.getByRole('button', { name: 'Adicionar caixa' }))
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar caixa/ }))
     expect(await screen.findByText('Falha ao criar caixa')).toBeInTheDocument()
   })
 
