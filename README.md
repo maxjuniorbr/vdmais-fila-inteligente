@@ -24,10 +24,12 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 
 ## Documentação complementar
 
+- [Arquitetura do backend](./docs/arquitetura-backend.md) — módulos, modelo de dados, referência de API e integração corporativa planejada
+- [Arquitetura do frontend](./docs/arquitetura-frontend.md) — rotas, sessão, design system e comunicação em tempo real
 - [Guia de uso por persona](./docs/guia-personas.md)
 - [MVP — escopo e validação](./docs/mvp.md)
-- [Stack técnica do MVP](./docs/stack-mvp.md)
-- [Deploy do MVP](./docs/deployment-mvp.md)
+- [Stack técnica do MVP](./docs/stack-mvp.md) _(decisões e justificativas do MVP; não é prescrição para produção corporativa)_
+- [Deploy do MVP](./docs/deployment-mvp.md) _(infraestrutura de validação — Vercel + Render + Supabase; não é requisito)_
 - [Diretrizes de design e UX](./.github/instructions/frontend-design.instructions.md)
 
 ---
@@ -37,6 +39,23 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 Este README cobre apenas setup local, execução e comandos de desenvolvimento.
 Decisões de produto, stack, deploy e jornada de uso ficam centralizadas nos
 documentos da seção **Documentação complementar**.
+
+---
+
+## Infraestrutura necessária
+
+O sistema é composto por dois artefatos independentes — uma API HTTP/WebSocket e uma SPA estática — mais um banco de dados relacional. Para qualquer ambiente de produção (on-premise, nuvem corporativa ou PaaS), os seguintes recursos devem estar disponíveis:
+
+| Componente | Requisito mínimo |
+|---|---|
+| **Runtime do backend** | Node.js ≥ 22, executável como contêiner, serviço systemd ou processo gerenciado |
+| **Banco de dados relacional** | PostgreSQL ≥ 14 (padrão das migrations atuais). Outros SGBDs suportados pelo Prisma — MySQL, SQL Server, CockroachDB — requerem ajuste do `provider` no schema e revisão das migrations; a lógica de aplicação não muda |
+| **Hospedagem do frontend** | Qualquer servidor HTTP ou CDN capaz de entregar arquivos estáticos (output de `vite build`) |
+| **Terminação TLS / proxy reverso** | HTTPS obrigatório em produção; o `compose.prod.yml` usa nginx como referência para cabeçalhos de segurança e deve ser replicado no proxy da organização |
+| **Variáveis de ambiente** | Injetadas na inicialização do processo (ver seção de setup abaixo) |
+| **Conectividade interna** | Backend ↔ banco; frontend ↔ backend (domínio do frontend declarado em `FRONTEND_URL` para CORS) |
+
+> **Infraestrutura do MVP:** Vercel (frontend), Render (backend) e Supabase (PostgreSQL gerenciado) foram escolhidos exclusivamente para validação rápida do produto, antes das etapas de SI, LGPD e aprovações corporativas de infraestrutura. Não constituem dependência do sistema e podem ser substituídos integralmente por infraestrutura aprovada pela organização.
 
 ---
 
@@ -215,7 +234,7 @@ O CI (GitHub Actions) roda a cada push e pull request para `master`:
 - **Secret scan** (`secret-scan.yml`): gitleaks varre commits em busca de segredos. Placeholders de exemplo e segredos de teste ficam na allowlist do `.gitleaks.toml`.
 - **Dependabot** (`dependabot.yml`): atualizações semanais de dependências npm e GitHub Actions. Atualizações de rotina (minor/patch) vêm agrupadas; majors vêm isolados para revisão. `prisma` e `@prisma/client` sobem em lockstep, e o major do Prisma é deliberadamente adiado (migração planejada).
 
-Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS) tanto no nginx do contêiner quanto na entrega via Vercel. QR Codes e links da fila carregam tokens assinados no fragmento da URL; o backend valida ER, canal e expiração antes de autenticar a RE, com quotas por IP/ER/canal. Dados pessoais sensíveis (CPF e telefone) são mascarados nas respostas de cadastro assistido. Chamadas autenticadas das telas de staff passam pelo client central, que encerra a sessão e retorna ao login quando o backend responde `401`. Detalhes em [`docs/deployment-mvp.md`](docs/deployment-mvp.md) e [`docs/stack-mvp.md`](docs/stack-mvp.md).
+Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS) configurados no nginx do `compose.prod.yml`; esses cabeçalhos devem ser replicados no proxy reverso ou CDN utilizado em produção. QR Codes e links da fila carregam tokens assinados no fragmento da URL; o backend valida ER, canal e expiração antes de autenticar a RE, com quotas por IP/ER/canal. Dados pessoais sensíveis (CPF e telefone) são mascarados nas respostas de cadastro assistido. Chamadas autenticadas das telas de staff passam pelo client central, que encerra a sessão e retorna ao login quando o backend responde `401`. Detalhes em [`docs/stack-mvp.md`](docs/stack-mvp.md).
 
 ---
 
