@@ -17,6 +17,8 @@ interface TicketInfo {
   representative?: { fullName: string }
   pausedAt?: string | null
   pauseTimeoutSeconds?: number
+  calledAt?: string | null
+  callTimeoutSeconds?: number
 }
 
 function formatMmSs(totalSeconds: number): string {
@@ -26,11 +28,19 @@ function formatMmSs(totalSeconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-function PauseCountdown({
-  pausedAt,
-  pauseTimeoutSeconds,
+function Countdown({
+  startAt,
+  timeoutSeconds,
+  label,
+  hint,
   onExpire,
-}: Readonly<{ pausedAt: string; pauseTimeoutSeconds: number; onExpire: () => void }>) {
+}: Readonly<{
+  startAt: string
+  timeoutSeconds: number
+  label: string
+  hint: string
+  onExpire: () => void
+}>) {
   const [now, setNow] = useState(() => Date.now())
   const firedRef = useRef(false)
 
@@ -39,8 +49,8 @@ function PauseCountdown({
     return () => clearInterval(id)
   }, [])
 
-  const deadline = new Date(pausedAt).getTime() + pauseTimeoutSeconds * 1000
-  const totalMs = pauseTimeoutSeconds * 1000
+  const deadline = new Date(startAt).getTime() + timeoutSeconds * 1000
+  const totalMs = timeoutSeconds * 1000
   const remainingMs = Math.max(0, deadline - now)
   const remainingSeconds = remainingMs / 1000
   const ratio = totalMs > 0 ? remainingMs / totalMs : 0
@@ -57,7 +67,7 @@ function PauseCountdown({
 
   return (
     <div style={countdownStyles.wrapper} aria-live="polite">
-      <p style={countdownStyles.label}>Tempo restante para retomar</p>
+      <p style={countdownStyles.label}>{label}</p>
       <p style={{ ...countdownStyles.time, color: barColor }}>{formatMmSs(remainingSeconds)}</p>
       <div style={countdownStyles.track}>
         <div
@@ -68,9 +78,7 @@ function PauseCountdown({
           }}
         />
       </div>
-      <p style={countdownStyles.hint}>
-        Se o tempo acabar, sua senha será cancelada automaticamente.
-      </p>
+      <p style={countdownStyles.hint}>{hint}</p>
     </div>
   )
 }
@@ -155,14 +163,18 @@ export function TicketConfirmationPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmingLeave, setConfirmingLeave] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const entryStartedRef = useRef(false)
 
   useEffect(() => {
     if (!ticket) {
       if (pollRef.current) clearInterval(pollRef.current)
       return
     }
-    const activeStates = ['WAITING', 'PAUSED', 'CALLING', 'IN_SERVICE']
-    if (!activeStates.includes(ticket.state)) {
+    // Keep polling until the engagement is truly over. NO_SHOW and CANCELLED are
+    // restorable by a manager, so we keep polling to surface a restore (→ WAITING);
+    // only FINISHED is final. Polling my-status (not my-active) returns the real
+    // state, so a no-show shows as "não comparecimento" instead of "concluído".
+    if (ticket.state === 'FINISHED') {
       if (pollRef.current) clearInterval(pollRef.current)
       return
     }
@@ -170,17 +182,9 @@ export function TicketConfirmationPage() {
     if (!token) return
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`/api/tickets/my-active?erId=${erId}`, {
+        const res = await fetch(`/api/tickets/my-status?erId=${erId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        if (res.status === 404) {
-          // Ticket is no longer active. A paused ticket that vanishes was
-          // auto-cancelled (pause timeout); otherwise service completed.
-          setTicket((prev) =>
-            prev ? { ...prev, state: prev.state === 'PAUSED' ? 'CANCELLED' : 'FINISHED' } : prev,
-          )
-          return
-        }
         if (!res.ok) return
         const data = (await res.json()) as TicketInfo
         setTicket(data)
@@ -216,6 +220,13 @@ export function TicketConfirmationPage() {
       return
     }
 
+    // A single page entry must create exactly one ticket. React StrictMode
+    // double-invokes effects on mount (and remounts can re-run this), so without
+    // this guard a second POST fires, gets correctly rejected as a duplicate,
+    // and inflates "Duplicidades bloqueadas" on every entry.
+    if (entryStartedRef.current) return
+    entryStartedRef.current = true
+
     fetch('/api/tickets', {
       method: 'POST',
       headers: {
@@ -244,6 +255,10 @@ export function TicketConfirmationPage() {
 
   const handlePauseExpired = useCallback(() => {
     setTicket((prev) => (prev?.state === 'PAUSED' ? { ...prev, state: 'CANCELLED' } : prev))
+  }, [])
+
+  const handleCallExpired = useCallback(() => {
+    setTicket((prev) => (prev?.state === 'CALLING' ? { ...prev, state: 'NO_SHOW' } : prev))
   }, [])
 
   async function fetchCurrentTicket(token: string): Promise<TicketInfo> {
@@ -396,10 +411,22 @@ export function TicketConfirmationPage() {
         </div>
 
         {isPaused && ticket.pausedAt && (ticket.pauseTimeoutSeconds ?? 0) > 0 && (
-          <PauseCountdown
-            pausedAt={ticket.pausedAt}
-            pauseTimeoutSeconds={ticket.pauseTimeoutSeconds as number}
+          <Countdown
+            startAt={ticket.pausedAt}
+            timeoutSeconds={ticket.pauseTimeoutSeconds as number}
+            label="Tempo restante para retomar"
+            hint="Se o tempo acabar, sua senha será cancelada automaticamente."
             onExpire={handlePauseExpired}
+          />
+        )}
+
+        {ticket.state === 'CALLING' && ticket.calledAt && (ticket.callTimeoutSeconds ?? 0) > 0 && (
+          <Countdown
+            startAt={ticket.calledAt}
+            timeoutSeconds={ticket.callTimeoutSeconds as number}
+            label="Tempo para chegar ao caixa"
+            hint="Se o tempo acabar, sua senha será marcada como não comparecimento."
+            onExpire={handleCallExpired}
           />
         )}
 

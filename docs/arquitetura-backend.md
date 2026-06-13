@@ -193,6 +193,7 @@ Endpoints centrais para operação e integração.
 |---|---|---|---|---|
 | `POST` | `/tickets` | REPRESENTATIVE, ATTENDANT | 20/min | Criar senha na fila |
 | `GET` | `/tickets/my-active?erId=` | REPRESENTATIVE | — | Senha ativa da RE |
+| `GET` | `/tickets/my-status?erId=` | REPRESENTATIVE | — | Senha mais recente da RE em qualquer estado (polling da tela da RE: reflete não-comparecimento, cancelamento e restauração) |
 | `POST` | `/tickets/:id/start-service` | OPERATOR | — | Iniciar atendimento (CALLING → IN_SERVICE) |
 | `POST` | `/tickets/:id/finish-service` | OPERATOR | — | Finalizar atendimento (IN_SERVICE → FINISHED) |
 | `POST` | `/tickets/:id/no-show` | OPERATOR | — | Marcar não comparecimento |

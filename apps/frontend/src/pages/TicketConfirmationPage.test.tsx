@@ -1,17 +1,19 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TicketConfirmationPage } from './TicketConfirmationPage'
 
-function renderPage() {
-  return render(
+function renderPage({ strict = false } = {}) {
+  const tree = (
     <MemoryRouter initialEntries={['/fila/er-1/senha']}>
       <Routes>
         <Route path="/fila/:erId/senha" element={<TicketConfirmationPage />} />
         <Route path="/fila/:erId" element={<div>Tela de entrada</div>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   )
+  return render(strict ? <StrictMode>{tree}</StrictMode> : tree)
 }
 
 describe('TicketConfirmationPage', () => {
@@ -81,6 +83,34 @@ describe('TicketConfirmationPage', () => {
     })
   })
 
+  it('creates a single ticket under StrictMode double-invoke', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (input.toString().endsWith('/api/tickets') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            id: 't-1',
+            code: 'A001',
+            queuePosition: 1,
+            currentPosition: 1,
+            state: 'WAITING',
+            erId: 'er-1',
+          }),
+          { status: 201 },
+        )
+      }
+      return new Response(null, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage({ strict: true })
+    await screen.findByText('A001')
+
+    const createCalls = fetchMock.mock.calls.filter(
+      ([input, init]) => input.toString().endsWith('/api/tickets') && init?.method === 'POST',
+    )
+    expect(createCalls).toHaveLength(1)
+  })
+
   it('confirms leaving the queue through the modal and calls self-cancel', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString()
@@ -148,6 +178,22 @@ describe('TicketConfirmationPage', () => {
     })
     renderPage()
     expect(await screen.findByText('Chamada! Dirija-se ao caixa')).toBeInTheDocument()
+  })
+
+  it('shows a countdown while called with a configured call timeout', async () => {
+    stubJoinWith({
+      id: 't-1',
+      code: 'B010',
+      queuePosition: 0,
+      currentPosition: 0,
+      state: 'CALLING',
+      erId: 'er-1',
+      calledAt: new Date().toISOString(),
+      callTimeoutSeconds: 600,
+    })
+    renderPage()
+    expect(await screen.findByText('Chamada! Dirija-se ao caixa')).toBeInTheDocument()
+    expect(screen.getByText('Tempo para chegar ao caixa')).toBeInTheDocument()
   })
 
   it('shows the in-service state', async () => {
@@ -690,20 +736,25 @@ describe('TicketConfirmationPage', () => {
       return fetchMock
     }
 
-    it('polls my-active and updates the ticket position', async () => {
+    function statusResponse(overrides: Record<string, unknown>) {
+      return new Response(
+        JSON.stringify({
+          id: 't-1',
+          code: 'A001',
+          queuePosition: 1,
+          currentPosition: 0,
+          state: 'WAITING',
+          erId: 'er-1',
+          ...overrides,
+        }),
+        { status: 200 },
+      )
+    }
+
+    it('polls my-status and updates the ticket position', async () => {
       await renderWaitingTicket(async (input) => {
-        if (input.toString().includes('/api/tickets/my-active')) {
-          return new Response(
-            JSON.stringify({
-              id: 't-1',
-              code: 'A001',
-              queuePosition: 1,
-              currentPosition: 1,
-              state: 'WAITING',
-              erId: 'er-1',
-            }),
-            { status: 200 },
-          )
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return statusResponse({ currentPosition: 1 })
         }
         return new Response(null, { status: 200 })
       })
@@ -715,10 +766,10 @@ describe('TicketConfirmationPage', () => {
       expect(screen.getByText('#1')).toBeInTheDocument()
     })
 
-    it('marks the ticket as finished when polling returns 404', async () => {
+    it('shows finished when polling reports a finished service', async () => {
       await renderWaitingTicket(async (input) => {
-        if (input.toString().includes('/api/tickets/my-active')) {
-          return new Response(null, { status: 404 })
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return statusResponse({ state: 'FINISHED' })
         }
         return new Response(null, { status: 200 })
       })
@@ -729,26 +780,48 @@ describe('TicketConfirmationPage', () => {
       expect(screen.getByText('Atendimento concluído')).toBeInTheDocument()
     })
 
-    it('marks a paused ticket as cancelled when polling returns 404', async () => {
-      await renderWaitingTicket(
-        async (input) => {
-          if (input.toString().includes('/api/tickets/my-active')) {
-            return new Response(null, { status: 404 })
-          }
-          return new Response(null, { status: 200 })
-        },
-        { state: 'PAUSED', pausedAt: new Date().toISOString(), pauseTimeoutSeconds: 600 },
-      )
+    it('shows não comparecimento (not concluído) when polling reports NO_SHOW', async () => {
+      await renderWaitingTicket(async (input) => {
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return statusResponse({ state: 'NO_SHOW' })
+        }
+        return new Response(null, { status: 200 })
+      })
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10000)
       })
-      expect(screen.getByText('Senha cancelada')).toBeInTheDocument()
+      expect(screen.getByText('Não comparecimento')).toBeInTheDocument()
+      expect(screen.queryByText('Atendimento concluído')).not.toBeInTheDocument()
     })
 
-    it('ignores a non-ok, non-404 polling response and keeps the last state', async () => {
+    it('recovers the live status when a no-show ticket is restored to waiting', async () => {
+      let state = 'NO_SHOW'
       await renderWaitingTicket(async (input) => {
-        if (input.toString().includes('/api/tickets/my-active')) {
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return statusResponse({ state, currentPosition: state === 'WAITING' ? 5 : 0 })
+        }
+        return new Response(null, { status: 200 })
+      })
+
+      // First poll: the operator marked a no-show.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000)
+      })
+      expect(screen.getByText('Não comparecimento')).toBeInTheDocument()
+
+      // The manager restores the ticket; the next poll brings the live view back.
+      state = 'WAITING'
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000)
+      })
+      expect(screen.queryByText('Não comparecimento')).not.toBeInTheDocument()
+      expect(screen.getByText('#5')).toBeInTheDocument()
+    })
+
+    it('ignores a non-ok polling response and keeps the last state', async () => {
+      await renderWaitingTicket(async (input) => {
+        if (input.toString().includes('/api/tickets/my-status')) {
           return new Response(null, { status: 500 })
         }
         return new Response(null, { status: 200 })
@@ -762,7 +835,7 @@ describe('TicketConfirmationPage', () => {
 
     it('keeps the last known state when polling rejects', async () => {
       await renderWaitingTicket(async (input) => {
-        if (input.toString().includes('/api/tickets/my-active')) {
+        if (input.toString().includes('/api/tickets/my-status')) {
           throw new Error('offline')
         }
         return new Response(null, { status: 200 })

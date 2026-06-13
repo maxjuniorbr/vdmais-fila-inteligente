@@ -26,6 +26,12 @@ export class TicketController {
     return this.ticketService.getMyActiveTicket(req.user.userId, erId)
   }
 
+  @Get('my-status')
+  @Roles('REPRESENTATIVE')
+  getMyStatus(@Query('erId') erId: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.ticketService.getMyTicketStatus(req.user.userId, erId)
+  }
+
   @Post(':id/cancel')
   @Roles('ATTENDANT', 'MANAGER')
   cancel(
