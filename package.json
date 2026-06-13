@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "npm run dev:db",
     "dev": "concurrently --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:db": "(podman-compose -f compose.dev.yml up -d postgres || docker compose -f compose.dev.yml up -d postgres) && wait-on tcp:127.0.0.1:5432",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "dev:frontend": "wait-on http-get://127.0.0.1:3000/health/ready && npm run dev --workspace=apps/frontend",
     "build": "npm run build --workspace=apps/backend && npm run build --workspace=apps/frontend",
