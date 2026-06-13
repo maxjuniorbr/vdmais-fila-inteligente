@@ -16,20 +16,41 @@ environment/secrets manager, never in source code. Relevant variables for this r
 
 ## Steps
 
-### 1. Run validation
+### 1. Run validation gates
 
 Run all commands and check results (from the repo root):
 
 ```
 npm run lint
 npm run build
-npm test
+npm run sonar:coverage
 ```
 
 - `npm run build` runs `tsc -b` for the frontend and `nest build` for the backend.
-- If **any fails**, stop immediately. Show the error output and do NOT commit.
+- `npm run sonar:coverage` runs the full test suite for **both** workspaces with
+  coverage. Both enforce a 90% threshold (backend: `coverageThreshold.global` in
+  `apps/backend/package.json`; frontend: `thresholds` in `apps/frontend/vite.config.ts`),
+  so a non-zero exit means either a test failed **or** coverage dropped below 90%.
+- If **any** command fails, stop immediately. Show the output and do NOT commit.
+  If coverage regressed below 90%, add the missing tests before committing — do
+  not lower the thresholds.
 
-### 2. Analyze the working tree
+### 2. Check documentation and README parity
+
+Before staging, confirm the docs reflect the change. Inspect the diff and decide
+whether it alters any documented surface:
+
+- Public API / endpoints, request-response shapes, auth or roles → `docs/arquitetura-backend.md`
+- Frontend routes, flows, session/auth behavior → `docs/arquitetura-frontend.md`
+- Setup, scripts, commands, env vars, run/deploy steps → `README.md`, `docs/deployment-mvp.md`, `docs/stack-mvp.md`
+- Conventions or architecture captured in any `CLAUDE.md`
+
+If the change touches a documented surface and the matching docs are **not**
+updated in this working tree, STOP and update them first, then include the doc
+changes in the appropriate commit. If the change is purely internal (no
+documented surface affected), state "no docs impacted" and continue.
+
+### 3. Analyze the working tree
 
 ```
 git status
@@ -40,7 +61,7 @@ git diff --staged
 - If there are **no changes** (staged or unstaged), abort silently.
 - Identify every changed file, its nature (new, modified, deleted), and which area it belongs to.
 
-### 3. Decide commit strategy
+### 4. Decide commit strategy
 
 Group the changes by **logical unit of work**:
 
@@ -49,7 +70,7 @@ Group the changes by **logical unit of work**:
 
 **Splitting criteria:** different `type`, different functional area with no coupling, or a standalone config change mixed with a feature change. **Do NOT over-split.**
 
-### 4. Stage and commit
+### 5. Stage and commit
 
 For each logical unit:
 
@@ -57,14 +78,14 @@ For each logical unit:
 2. Construct the commit message following the **Commit Rules** below.
 3. Execute `git commit -m "..."`.
 
-### 5. Post-commit quality gates
+### 6. Post-commit quality gates
 
 Warn on failure but do NOT revert the commit.
 
-1. **Prisma schema drift:** if `apps/backend/prisma/schema.prisma` or `apps/backend/prisma/migrations/**` changed — confirm the migration was applied to the target database (`prisma migrate status` must show "up to date") and that the Prisma client is regenerated. See `.github/instructions/database-migrations.instructions.md` for the full protocol.
+1. **Prisma schema drift:** if `apps/backend/prisma/schema.prisma` or `apps/backend/prisma/migrations/**` changed — confirm the migration was applied to the target database (`prisma migrate status` must show "up to date") and that the Prisma client is regenerated. See `apps/backend/CLAUDE.md` for the full protocol.
 2. **Secrets scan:** grep the diff for `DATABASE_URL`, `JWT_SECRET`, `OBSERVABILITY_TOKEN`, `sb_secret`, `service_role`, `Bearer `, `rnd_`, and generic API-key patterns. If a real value is found, STOP and instruct the user to revert + rotate.
 
-### 6. Verify
+### 7. Verify
 
 ```
 git log --oneline -5
@@ -85,10 +106,10 @@ git log --oneline -5
 ✓ <hash> <message>
 ```
 
-If tests failed:
+If a validation gate fails (lint, build, tests, coverage < 90%, or stale docs/README):
 
 ```
-✗ tests failed — commit aborted
+✗ <gate> failed — commit aborted
 ```
 
 No greetings, no narration, no extra text.
