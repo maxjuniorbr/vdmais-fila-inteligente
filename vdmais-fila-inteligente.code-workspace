@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../temp"
+		},
+		{
+			"path": "../vdmais-fila-inteligente-ds"
 		}
 	],
 	"settings": {
