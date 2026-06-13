@@ -7,16 +7,20 @@ import { Alert } from '../components/Alert'
 import { Badge } from '../components/Badge'
 import { BarList } from '../components/BarList'
 import { BottomSheet } from '../components/BottomSheet'
+import { BrandMark } from '../components/BrandMark'
 import { Button } from '../components/Button'
 import { Choice } from '../components/Choice'
+import { CopyField } from '../components/CopyField'
 import { Drawer } from '../components/Drawer'
 import { EmptyState } from '../components/EmptyState'
 import { Input } from '../components/Input'
 import { MetricCard } from '../components/MetricCard'
 import { Modal } from '../components/Modal'
+import { SectionPanel } from '../components/SectionPanel'
 import { Select } from '../components/Select'
 import { Skeleton } from '../components/Skeleton'
 import { Spinner } from '../components/Spinner'
+import { StatusDot } from '../components/StatusDot'
 import { Stepper } from '../components/Stepper'
 import { Switch } from '../components/Switch'
 import { Table, type Column } from '../components/Table'
@@ -190,6 +194,39 @@ function PlaygroundInner() {
               </div>
             </Section>
 
+            <Section title="Marca e indicadores de estado">
+              <div style={styles.row}>
+                <BrandMark />
+                <span style={styles.brandWord}>VD+ Fila Inteligente</span>
+              </div>
+              <div style={{ ...styles.stack, marginTop: brand.spacing[16] }}>
+                <span style={styles.statusLine}>
+                  <StatusDot color={brand.success} /> Caixa ativo
+                </span>
+                <span style={styles.statusLine}>
+                  <StatusDot color={brand.warning} /> Chamando senha
+                </span>
+                <span style={styles.statusLine}>
+                  <StatusDot /> Aguardando início
+                </span>
+              </div>
+            </Section>
+
+            <Section title="Painel de seção (SectionPanel)">
+              <SectionPanel label="Senhas em espera" dotColor={brand.warning} count={6}>
+                <p style={styles.tabText}>Pessoas aguardando chamada no espaço selecionado.</p>
+              </SectionPanel>
+            </Section>
+
+            <Section title="Endereço copiável (CopyField)">
+              <CopyField
+                label="Link público da fila"
+                value="https://fila.vdmais.com/fila/er-osasco"
+                description="Compartilhe com a recepção do espaço."
+                helperText="O QR Code aponta para este mesmo endereço."
+              />
+            </Section>
+
             <Section title="Avisos persistentes (Alert)">
               <div style={styles.stack}>
                 <Alert tone="info">Conexão restabelecida com a base de dados.</Alert>
@@ -279,9 +316,11 @@ function PlaygroundInner() {
             <div style={styles.formGrid}>
               <Input
                 label="CEP"
-                defaultValue="12345-67"
+                defaultValue="13031-50"
+                inputMode="numeric"
+                maxLength={9}
                 aria-invalid
-                style={{ border: `1px solid ${brand.warning}`, background: brand.warningSoft }}
+                style={{ border: `1px solid ${brand.danger}`, background: brand.dangerSoft }}
               />
               <Select label="Estado" defaultValue="">
                 <option value="" disabled>
@@ -549,7 +588,7 @@ const styles: Record<string, CSSProperties> = {
   },
   fieldError: {
     margin: `${brand.spacing[4]}px 0 0`,
-    color: brand.warning,
+    color: brand.danger,
     fontSize: brand.typography.auxiliar.fontSize,
   },
   segmented: {
@@ -610,5 +649,17 @@ const styles: Record<string, CSSProperties> = {
     color: brand.inkSoft,
     fontSize: brand.typography.bodyLarge.fontSize,
     lineHeight: 1.5,
+  },
+  brandWord: {
+    fontSize: brand.typography.subtitle.fontSize,
+    fontWeight: 600,
+    color: brand.emphasis,
+  },
+  statusLine: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: `${brand.spacing[8]}px`,
+    fontSize: brand.typography.bodyLarge.fontSize,
+    color: brand.ink,
   },
 }
