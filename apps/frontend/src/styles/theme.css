@@ -351,19 +351,6 @@ button.gb-button:not(:disabled):active {
     align-items: stretch !important;
     flex-direction: column;
   }
-
-  .gb-home-session > a,
-  .gb-home-panel-note > a {
-    width: 100%;
-  }
-
-  .gb-home-session > div:last-child {
-    width: 100%;
-  }
-
-  .gb-home-session > div:last-child > a {
-    width: 100%;
-  }
 }
 
 /* ── Tabelas (Gestão) ────────────────────────────────────────── */
