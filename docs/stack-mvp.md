@@ -1,4 +1,4 @@
-# Stack técnica do MVP 0
+# Stack técnica do MVP
 
 ← [Voltar ao README](../README.md) · [Arquitetura Backend](./arquitetura-backend.md) · [Arquitetura Frontend](./arquitetura-frontend.md)
 
@@ -9,11 +9,11 @@
 
 ## Contexto
 
-Este registro define a stack mínima recomendada para o **MVP 0 — Fila Digital Presencial Operável**, considerando que a organização já utiliza **React** no front-end e **Node.js com NestJS** no BFF.
+Este registro define a stack mínima recomendada para o **MVP — Fila Digital Presencial Operável**, considerando que a organização já utiliza **React** no front-end e **Node.js com NestJS** no BFF.
 
 Premissa central:
 
-> Não abrir uma stack nova para o MVP 0. Usar a stack já dominada e adicionar apenas os componentes mínimos para fila em tempo real, persistência, autenticação simples e observabilidade básica.
+> Não abrir uma stack nova para o MVP. Usar a stack já dominada e adicionar apenas os componentes mínimos para fila em tempo real, persistência, autenticação simples e observabilidade básica.
 > 
 
 Este recorte considera explicitamente que **não haverá integração com o PDV** neste momento.
@@ -50,7 +50,7 @@ PostgreSQL gerenciado
 Logs e métricas básicas
 ```
 
-Redis não é obrigatório no MVP 0. Deve entrar apenas se houver múltiplas instâncias do backend, WebSocket distribuído, escala horizontal ou necessidade de pub/sub.
+Redis não é obrigatório no MVP. Deve entrar apenas se houver múltiplas instâncias do backend, WebSocket distribuído, escala horizontal ou necessidade de pub/sub.
 
 ---
 
@@ -144,7 +144,7 @@ Tecnologia recomendada:
 > Node.js + NestJS + TypeScript
 > 
 
-Para o MVP 0, o NestJS pode atuar como BFF e backend principal do domínio de fila, sem necessidade de separar microsserviços.
+Para o MVP, o NestJS pode atuar como BFF e backend principal do domínio de fila, sem necessidade de separar microsserviços.
 
 Responsabilidades mínimas:
 
@@ -267,7 +267,7 @@ Recomendação:
 
 ## 7. Autenticação
 
-Como o MVP 0 não terá integração com base oficial de REs nem com PDV, a autenticação pode ser própria do SaaS.
+Como o MVP não terá integração com base oficial de REs nem com PDV, a autenticação pode ser própria do SaaS.
 
 ### 7.1 Representante
 
@@ -429,7 +429,7 @@ Sem essa regra, duas operadoras podem chamar a mesma senha ou gerar inconsistên
 
 ---
 
-## 12. O que não colocar no MVP 0
+## 12. O que não colocar no MVP
 
 Não incluir agora:
 
@@ -458,7 +458,7 @@ Motivo:
 
 ## 13. Recomendação final
 
-Para o MVP 0, a stack mínima correta é:
+Para o MVP, a stack mínima correta é:
 
 > React + TypeScript no front, NestJS no backend/BFF, PostgreSQL como fonte transacional, WebSocket/Socket.IO para atualização em tempo real e autenticação própria simples para o MVP.
 > 
