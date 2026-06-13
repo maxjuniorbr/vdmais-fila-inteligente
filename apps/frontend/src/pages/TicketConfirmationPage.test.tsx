@@ -2,7 +2,13 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { StrictMode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { playCallAlert } from '../utils/callAlert'
 import { TicketConfirmationPage } from './TicketConfirmationPage'
+
+vi.mock('../utils/callAlert', () => ({
+  playCallAlert: vi.fn(),
+  unlockCallAlert: vi.fn(),
+}))
 
 function renderPage({ strict = false } = {}) {
   const tree = (
@@ -21,6 +27,9 @@ describe('TicketConfirmationPage', () => {
     sessionStorage.clear()
     sessionStorage.setItem('token', 'rep-token')
     sessionStorage.setItem('queue-entry:er-1', 'QR_CODE')
+    // Default: arriving from a deliberate entry, so the screen creates a ticket.
+    // Read-only (refresh) tests clear this flag to assert no ticket is created.
+    sessionStorage.setItem('queue-entry-pending:er-1', '1')
   })
 
   it('joins the queue and shows the ticket code and position', async () => {
@@ -109,6 +118,80 @@ describe('TicketConfirmationPage', () => {
       ([input, init]) => input.toString().endsWith('/api/tickets') && init?.method === 'POST',
     )
     expect(createCalls).toHaveLength(1)
+  })
+
+  function postCount(fetchMock: ReturnType<typeof vi.fn>): number {
+    return fetchMock.mock.calls.filter(
+      ([input, init]) =>
+        input.toString().endsWith('/api/tickets') && (init as RequestInit)?.method === 'POST',
+    ).length
+  }
+
+  it('reads the current status on refresh without creating a ticket', async () => {
+    sessionStorage.removeItem('queue-entry-pending:er-1')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (input.toString().includes('/api/tickets/my-status')) {
+        return new Response(
+          JSON.stringify({
+            id: 't-1',
+            code: 'A001',
+            queuePosition: 1,
+            currentPosition: 2,
+            state: 'WAITING',
+            erId: 'er-1',
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response(null, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    expect(await screen.findByText('A001')).toBeInTheDocument()
+    expect(screen.getByText('#2')).toBeInTheDocument()
+    expect(postCount(fetchMock)).toBe(0)
+  })
+
+  it('keeps the no-show state on refresh instead of re-entering the queue', async () => {
+    sessionStorage.removeItem('queue-entry-pending:er-1')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (input.toString().includes('/api/tickets/my-status')) {
+        return new Response(
+          JSON.stringify({
+            id: 't-1',
+            code: 'A001',
+            queuePosition: 1,
+            currentPosition: 0,
+            state: 'NO_SHOW',
+            erId: 'er-1',
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response(null, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    expect(await screen.findByText('Não comparecimento')).toBeInTheDocument()
+    expect(postCount(fetchMock)).toBe(0)
+  })
+
+  it('redirects to the entry screen on refresh when there is no ticket', async () => {
+    sessionStorage.removeItem('queue-entry-pending:er-1')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return new Response(null, { status: 404 })
+        }
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    expect(await screen.findByText('Tela de entrada')).toBeInTheDocument()
   })
 
   it('confirms leaving the queue through the modal and calls self-cancel', async () => {
@@ -764,6 +847,24 @@ describe('TicketConfirmationPage', () => {
         await vi.advanceTimersByTimeAsync(10000)
       })
       expect(screen.getByText('#1')).toBeInTheDocument()
+    })
+
+    it('plays the call alert when the ticket transitions to CALLING', async () => {
+      vi.mocked(playCallAlert).mockClear()
+      let state = 'WAITING'
+      await renderWaitingTicket(async (input) => {
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return statusResponse({ state })
+        }
+        return new Response(null, { status: 200 })
+      })
+      expect(playCallAlert).not.toHaveBeenCalled()
+
+      state = 'CALLING'
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000)
+      })
+      expect(playCallAlert).toHaveBeenCalled()
     })
 
     it('shows finished when polling reports a finished service', async () => {

@@ -112,6 +112,23 @@ export function saveQueueEntryChannel(erId: string, channel: QueueEntryChannel):
   sessionStorage.setItem(`queue-entry:${erId}`, channel)
 }
 
+// One-shot "the RE deliberately entered" intent, set by the entry flow and
+// consumed once by the ticket screen. It distinguishes a real entry (create a
+// ticket) from a mere refresh/reopen of the ticket screen (read-only), so a
+// reload never re-enqueues the RE.
+export function markQueueEntryPending(erId: string | undefined): void {
+  if (!erId) return
+  sessionStorage.setItem(`queue-entry-pending:${erId}`, '1')
+}
+
+export function consumeQueueEntryPending(erId: string | undefined): boolean {
+  if (!erId) return false
+  const key = `queue-entry-pending:${erId}`
+  const pending = sessionStorage.getItem(key) === '1'
+  if (pending) sessionStorage.removeItem(key)
+  return pending
+}
+
 export function getQueueEntryPath(erId: string | undefined): string {
   if (!erId) return '/'
   const source = getQueueEntryChannel(erId) === 'LINK' ? '?source=link' : ''
