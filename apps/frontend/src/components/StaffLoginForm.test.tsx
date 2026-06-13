@@ -126,4 +126,48 @@ describe('StaffLoginForm', () => {
       ).violations,
     ).toEqual([])
   })
+
+  it('accepts any valid staff role when no allowedRoles are given', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            access_token: 'token-1',
+            user: { id: 'staff-1', name: 'Gestora', role: 'MANAGER', erId: 'er-1' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    )
+    const onAuthenticated = vi.fn()
+    render(
+      <MemoryRouter>
+        <StaffLoginForm title="Acessar sua área de trabalho" onAuthenticated={onAuthenticated} />
+      </MemoryRouter>,
+    )
+
+    await fillAndSubmit()
+
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalled())
+    expect(onAuthenticated.mock.calls[0][0].role).toBe('MANAGER')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
+  it('hides the return link when showBackLink is false', () => {
+    render(
+      <MemoryRouter>
+        <StaffLoginForm
+          title="Acessar sua área de trabalho"
+          showBackLink={false}
+          onAuthenticated={vi.fn()}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(
+      screen.queryByRole('link', { name: 'Voltar ao portal da equipe' }),
+    ).not.toBeInTheDocument()
+  })
 })
