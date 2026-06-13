@@ -761,9 +761,11 @@ function DayDistribution({ metrics }: Readonly<{ metrics: Metrics }>) {
   ]
 
   const counterRows = unionKeys(metrics.serviceByCounter, metrics.pauseSecondsByCounter).map(
+    // The metrics keys are already display labels ("Caixa 1", "Caixa 2"); the
+    // backend owns the naming, so render the key as-is (no second "Caixa" prefix).
     (key) => ({
       id: key,
-      counter: `Caixa ${key}`,
+      counter: key,
       services: metrics.serviceByCounter[key] ?? 0,
       paused: formatDuration(metrics.pauseSecondsByCounter[key] ?? 0),
     }),
