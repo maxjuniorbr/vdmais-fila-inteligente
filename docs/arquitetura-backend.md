@@ -282,6 +282,7 @@ joinER.denied  { erId }             // falha de autenticação
 | `GET` | `/admin/ers/:erId` | ADMIN | Detalhes do ER |
 | `PATCH` | `/admin/ers/:erId` | ADMIN | Atualizar configurações do ER |
 | `POST` | `/admin/ers/:erId/counters` | ADMIN | Criar caixa |
+| `DELETE` | `/admin/ers/:erId/counters/:counterId` | ADMIN | Remover caixa (exclusão física; só sem histórico de atendimento e fora de uso) |
 | `POST` | `/admin/ers/:erId/staff` | ADMIN | Criar conta de equipe |
 | `POST` | `/admin/ers/:erId/panel-token` | ADMIN | Gerar token do painel (exibido uma vez, armazenado como hash) |
 | `DELETE` | `/admin/ers/:erId/panel-token` | ADMIN | Revogar token do painel |

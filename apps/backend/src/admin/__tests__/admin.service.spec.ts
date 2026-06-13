@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common'
-import { Prisma, Role } from '@prisma/client'
+import { CounterState, Prisma, Role } from '@prisma/client'
 import * as bcrypt from 'bcrypt'
 import { AuditLogService } from '../../audit-log/audit-log.service'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -12,7 +12,7 @@ const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>
 
 const prisma = {
   eR: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
-  counter: { create: jest.fn() },
+  counter: { create: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
   operator: { create: jest.fn() },
 }
 const auditLog = { log: jest.fn() }
@@ -139,6 +139,56 @@ describe('AdminService', () => {
     await expect(service.createCounter('er-1', { number: 1 }, user)).rejects.toThrow(
       ConflictException,
     )
+  })
+
+  it('deletes a closed counter with no service history and audits it', async () => {
+    prisma.counter.findFirst.mockResolvedValue({
+      id: 'c-1',
+      number: 2,
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+      _count: { tickets: 0 },
+    })
+    prisma.counter.delete.mockResolvedValue({ id: 'c-1' })
+
+    await service.deleteCounter('er-1', 'c-1', user)
+
+    expect(prisma.counter.delete).toHaveBeenCalledWith({ where: { id: 'c-1' } })
+    expect(auditLog.log).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'counter_deleted' }),
+    )
+  })
+
+  it('refuses to delete a counter with service history', async () => {
+    prisma.counter.findFirst.mockResolvedValue({
+      id: 'c-1',
+      number: 2,
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+      _count: { tickets: 4 },
+    })
+
+    await expect(service.deleteCounter('er-1', 'c-1', user)).rejects.toThrow(ConflictException)
+    expect(prisma.counter.delete).not.toHaveBeenCalled()
+  })
+
+  it('refuses to delete an open counter', async () => {
+    prisma.counter.findFirst.mockResolvedValue({
+      id: 'c-1',
+      number: 2,
+      state: CounterState.ACTIVE,
+      operatorId: 'op-1',
+      _count: { tickets: 0 },
+    })
+
+    await expect(service.deleteCounter('er-1', 'c-1', user)).rejects.toThrow(ConflictException)
+    expect(prisma.counter.delete).not.toHaveBeenCalled()
+  })
+
+  it('throws NotFound when the counter does not belong to the ER', async () => {
+    prisma.counter.findFirst.mockResolvedValue(null)
+
+    await expect(service.deleteCounter('er-1', 'missing', user)).rejects.toThrow(NotFoundException)
   })
 
   it('creates a staff account hashing the password', async () => {

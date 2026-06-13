@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { logoutStaffSession } from '../auth/session'
 import { useStaffSession } from '../auth/useStaffSession'
+import { ActionMenu } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { CopyField } from '../components/CopyField'
 import { Input } from '../components/Input'
+import { Modal } from '../components/Modal'
 import { Select } from '../components/Select'
 import { StaffLoginForm } from '../components/StaffLoginForm'
 import { useToast } from '../components/Toast'
@@ -32,6 +34,7 @@ interface Counter {
   id: string
   number: number
   state: string
+  _count?: { tickets: number }
 }
 
 interface Staff {
@@ -246,7 +249,10 @@ function ERDetailSection({
 }>) {
   const [er, setER] = useState<ERDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [counterToDelete, setCounterToDelete] = useState<Counter | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
+  const { showToast } = useToast()
 
   const load = useCallback(async () => {
     try {
@@ -270,6 +276,22 @@ function ERDetailSection({
     await load()
     await onChanged()
   }, [load, onChanged])
+
+  async function confirmDeleteCounter() {
+    if (!counterToDelete) return
+    setDeleting(true)
+    try {
+      await api.delete(`/admin/ers/${erId}/counters/${counterToDelete.id}`)
+      setError(null)
+      await refresh()
+      showToast('Caixa removido.', 'success')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao remover caixa')
+    } finally {
+      setDeleting(false)
+      setCounterToDelete(null)
+    }
+  }
 
   if (!er) return <p>{error ?? 'Carregando...'}</p>
 
@@ -402,20 +424,41 @@ function ERDetailSection({
             <EmptyNote>Nenhum caixa cadastrado.</EmptyNote>
           ) : (
             <ul style={styles.compactList}>
-              {er.counters.map((counter) => (
-                <li key={counter.id} style={styles.compactRow}>
-                  <strong>Caixa {counter.number}</strong>
-                  <Badge tone={counterStateTone(counter.state)}>
-                    {counterStateLabel(counter.state)}
-                  </Badge>
-                </li>
-              ))}
+              {er.counters.map((counter) => {
+                const hasHistory = (counter._count?.tickets ?? 0) > 0
+                const isOpen = counter.state !== 'UNAVAILABLE'
+                return (
+                  <li key={counter.id} style={styles.compactRow}>
+                    <strong>Caixa {counter.number}</strong>
+                    <span style={styles.counterRowActions}>
+                      <Badge tone={counterStateTone(counter.state)}>
+                        {counterStateLabel(counter.state)}
+                      </Badge>
+                      <ActionMenu
+                        label={`Ações do caixa ${counter.number}`}
+                        items={[
+                          {
+                            label: 'Remover caixa',
+                            tone: 'danger',
+                            disabled: hasHistory || isOpen,
+                            onClick: () => setCounterToDelete(counter),
+                          },
+                        ]}
+                      />
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           )}
 
           <div style={styles.formDivider}>
-            <h4 style={styles.formTitle}>Adicionar caixa</h4>
-            <CreateCounterForm erId={er.id} onCreated={refresh} onError={setError} />
+            <CreateCounterForm
+              erId={er.id}
+              existingNumbers={er.counters.map((counter) => counter.number)}
+              onCreated={refresh}
+              onError={setError}
+            />
           </div>
         </section>
 
@@ -450,6 +493,38 @@ function ERDetailSection({
           </div>
         </section>
       </div>
+
+      {counterToDelete && (
+        <Modal
+          title="Remover caixa?"
+          onClose={() => {
+            if (!deleting) setCounterToDelete(null)
+          }}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setCounterToDelete(null)}
+                disabled={deleting}
+              >
+                Voltar
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => void confirmDeleteCounter()}
+                disabled={deleting}
+              >
+                {deleting ? 'Removendo...' : 'Remover'}
+              </Button>
+            </>
+          }
+        >
+          <p>
+            O Caixa {counterToDelete.number} será removido permanentemente. Esta ação não pode ser
+            desfeita.
+          </p>
+        </Modal>
+      )}
     </section>
   )
 }
@@ -576,26 +651,32 @@ function EditERForm({
 
 function CreateCounterForm({
   erId,
+  existingNumbers,
   onCreated,
   onError,
 }: Readonly<{
   erId: string
+  existingNumbers: number[]
   onCreated: () => Promise<void>
   onError: (message: string | null) => void
 }>) {
-  const [number, setNumber] = useState('')
   const [loading, setLoading] = useState(false)
   const { showToast } = useToast()
+
+  // Counters are added one at a time, always taking the next free number — the
+  // smallest gap up to the highest used number, else the next in sequence.
+  const taken = new Set(existingNumbers)
+  let nextNumber = 1
+  while (taken.has(nextNumber)) nextNumber++
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault()
     setLoading(true)
     try {
-      await api.post(`/admin/ers/${erId}/counters`, { number: Number(number) })
-      setNumber('')
+      await api.post(`/admin/ers/${erId}/counters`, { number: nextNumber })
       onError(null)
       await onCreated()
-      showToast('Caixa adicionado.', 'success')
+      showToast(`Caixa ${nextNumber} adicionado.`, 'success')
     } catch (err: unknown) {
       onError(err instanceof Error ? err.message : 'Erro ao criar caixa')
     } finally {
@@ -605,19 +686,8 @@ function CreateCounterForm({
 
   return (
     <form onSubmit={submit} className="gb-inline-form">
-      <Input
-        style={{ flex: 1, minWidth: 160 }}
-        type="number"
-        aria-label="Número do caixa"
-        placeholder="Número do caixa"
-        value={number}
-        onChange={(event) => setNumber(event.target.value)}
-        min={1}
-        max={999}
-        required
-      />
-      <Button type="submit" disabled={loading}>
-        {loading ? 'Adicionando...' : 'Adicionar caixa'}
+      <Button type="submit" variant="secondary" disabled={loading}>
+        {loading ? 'Adicionando...' : `Adicionar caixa ${nextNumber}`}
       </Button>
     </form>
   )
@@ -964,6 +1034,11 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${brand.border}`,
     borderRadius: brand.radius.medium,
     color: brand.inkSoft,
+  },
+  counterRowActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: `${brand.spacing[12]}px`,
   },
   staffRow: {
     display: 'flex',

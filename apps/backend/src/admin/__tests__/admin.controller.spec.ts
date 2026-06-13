@@ -8,6 +8,7 @@ const service = {
   getER: jest.fn(),
   updateER: jest.fn(),
   createCounter: jest.fn(),
+  deleteCounter: jest.fn(),
   createStaff: jest.fn(),
   rotatePanelToken: jest.fn(),
   revokePanelToken: jest.fn(),
@@ -48,6 +49,11 @@ describe('AdminController', () => {
     const dto = { number: 2 }
     controller.createCounter('er-1', dto, req)
     expect(service.createCounter).toHaveBeenCalledWith('er-1', dto, req.user)
+  })
+
+  it('delegates deleteCounter', () => {
+    controller.deleteCounter('er-1', 'c-1', req)
+    expect(service.deleteCounter).toHaveBeenCalledWith('er-1', 'c-1', req.user)
   })
 
   it('delegates createStaff', () => {
