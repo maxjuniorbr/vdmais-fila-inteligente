@@ -8,6 +8,7 @@ import { LoginDto } from './dto/login.dto'
 import { StaffLoginDto } from './dto/staff-login.dto'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { AuthenticatedUser } from '../common/authenticated-user'
+import { normalizeReCode, onlyDigits } from '../common/representative-identifiers'
 import { QueueEntryTokenService } from './queue-entry-token.service'
 
 const BCRYPT_ROUNDS = 12
@@ -40,9 +41,9 @@ export class AuthService {
   ) {
     const normalized = {
       fullName: dto.fullName.trim().replace(/\s+/g, ' '),
-      cpf: dto.cpf.replace(/\D/g, ''),
-      phone: dto.phone.replace(/\D/g, ''),
-      reCode: dto.reCode.trim().toUpperCase(),
+      cpf: onlyDigits(dto.cpf),
+      phone: onlyDigits(dto.phone),
+      reCode: normalizeReCode(dto.reCode),
     }
 
     const existing = await this.prisma.representative.findFirst({
@@ -113,10 +114,9 @@ export class AuthService {
     }
 
     const credential = dto.credential.trim()
-    const normalizedCpf = credential.replace(/\D/g, '')
     const rep = await this.prisma.representative.findFirst({
       where: {
-        OR: [{ cpf: normalizedCpf }, { reCode: credential.toUpperCase() }],
+        OR: [{ cpf: onlyDigits(credential) }, { reCode: normalizeReCode(credential) }],
       },
     })
 

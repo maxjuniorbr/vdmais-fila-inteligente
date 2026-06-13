@@ -17,6 +17,7 @@ apps/backend/
 │   ├── common/         # Guards, decorators, utilitários compartilhados
 │   ├── counter/        # Ciclo de vida do caixa (abrir, pausar, fechar)
 │   ├── er/             # Espaço de Relacionamento — abertura/fechamento do dia
+│   ├── integration/    # Integração M2M (legado): início/fim de atendimento (OAuth2)
 │   ├── metrics/        # Métricas diárias de atendimento por ER
 │   ├── observability/  # Healthchecks e métricas Prometheus
 │   ├── operator/       # Perfil do operador logado
@@ -308,49 +309,48 @@ joinER.denied  { erId }             // falha de autenticação
 
 ---
 
-## Integração com sistemas corporativos (planejado)
+## Integração com sistemas corporativos (`integration/`)
 
-> **Esta seção descreve uma integração ainda não implementada.** O objetivo é registrar o modelo de integração previsto para que seja considerado nas etapas de aprovação de SI, LGPD e arquitetura corporativa.
+Permite que um sistema legado corporativo (atendimento/pedido) marque o início e o fim do atendimento da revendedora, eliminando a gestão manual da fila pela operadora.
 
-### Contexto
+**Modelo A (adotado):** a operadora **continua chamando** pelo app (`call-next` segue amarrando caixa+operadora); o legado apenas dispara início e fim.
 
-Atualmente, os operadores gerenciam o ciclo de vida das senhas manualmente pelo aplicativo. O objetivo da integração é eliminar essa gestão manual conectando o sistema de fila aos sistemas corporativos existentes (atendimento e pedidos).
+A senha é localizada por `reCode`/`cpf` (ambos `@unique`) e **pela senha onde a RE foi chamada** — estados `CALLING`/`IN_SERVICE`, em que ela está fisicamente num caixa. Uma senha `WAITING`/`PAUSED` em outro ER é ignorada (a RE pode visitar outro ER em outro dia, mas só é atendida num caixa por vez). O ER vem da própria senha; o legado não envia código de loja.
 
-### Gatilhos previstos
+### Endpoints — `/integration/v1`
 
-| Evento no sistema corporativo | Ação no sistema de fila |
-|---|---|
-| Início do atendimento de uma RE no sistema de atendimento | Marcar senha como **IN_SERVICE** (`POST /tickets/:id/start-service`) |
-| Faturamento ou encerramento do pedido da RE | Marcar senha como **FINISHED** (`POST /tickets/:id/finish-service`) |
+> Base separada da API de staff. Autenticação por **Bearer JWT (OAuth2 client_credentials)** validado como *resource server*; scope por endpoint. Documentação OpenAPI em `/docs/integration` (habilitada em dev ou via `INTEGRATION_DOCS_ENABLED`).
 
-### Fluxo de integração esperado
+| Método | Caminho | Scope | Descrição |
+|---|---|---|---|
+| `POST` | `/integration/v1/atendimentos/iniciar` | `tickets:start` | Localiza a senha chamada da RE e avança CALLING → IN_SERVICE |
+| `POST` | `/integration/v1/atendimentos/encerrar` | `tickets:finish` | Avança IN_SERVICE → FINISHED (RE sai da fila) |
 
-```
-Sistema corporativo detecta início de atendimento da RE (identificada por CPF ou código RE)
-  → Consulta ticket ativo da RE no sistema de fila
-  → Chama POST /tickets/:id/start-service
-  → Senha avança para IN_SERVICE; painel TV e telas de operação refletem imediatamente
+Corpo: `{ reCode? , cpf?, erId?, idempotencyKey? }` (exatamente um entre `reCode`/`cpf`; `erId` é opcional e restringe a ação a esse ER). **Idempotente:** repetir a ação sobre senha já no estado-alvo retorna `200 { idempotent: true }` — `encerrar` reconhece a senha `FINISHED` do dia para o reenvio do gatilho de faturamento.
 
-Sistema corporativo detecta faturamento/encerramento do pedido
-  → Identifica o ticket IN_SERVICE da RE
-  → Chama POST /tickets/:id/finish-service
-  → Senha avança para FINISHED; RE sai da fila automaticamente
-```
+**Erros (código no corpo):** `INVALID_IDENTIFIER` (400); `REPRESENTATIVE_NOT_FOUND`/`NO_ACTIVE_TICKET` (404); `INSUFFICIENT_SCOPE` (403); `TICKET_NOT_IN_SERVICE` (encerrar com senha apenas chamada) e `MULTIPLE_ACTIVE_TICKETS` (409, defensivo — RE em atendimento em mais de um ER).
 
-### Dependências para implementação
+### Autenticação — pronta para Apigee
 
-Para viabilizar essa integração, será necessário:
+O backend valida o token como resource server (**algoritmo fixado em RS256** via JWKS, com `issuer`/`audience` verificados), por uma Passport strategy **isolada** (`integration-jwt`, distinta da de staff). A migração para o **Apigee** é só configuração — apontar `INTEGRATION_JWKS_URI`/`ISSUER`/`AUDIENCE` para o Apigee. Em desenvolvimento, um **emissor de token local** (`POST /integration/oauth/token`, `client_credentials`) substitui o Apigee; ele é desligado fora de `development`/`test` e compara o segredo do cliente em tempo constante. A chave pública de dev **só é aceita** em `development`/`test` — em produção, sem JWKS configurado, a validação falha fechada (nenhum token é aceito).
 
-1. **Mecanismo de autenticação para sistemas externos** — os endpoints atuais exigem JWT de um operador autenticado. A integração corporativa precisará de uma das abordagens abaixo (a definir conforme políticas de SI):
-   - Conta de serviço com perfil `OPERATOR` dedicada por ER
-   - Novos endpoints de integração protegidos por API key ou token de serviço
-   - Autenticação via OAuth2/OIDC corporativo
+As ações são auditadas reutilizando os eventos `service_started`/`service_finished` com `metadata.source = 'integration'` (cliente e scopes), preservando o caixa/operadora que o `call-next` amarrou. **Sem migração de banco.**
 
-2. **Endpoint de lookup de ticket por RE** — localizar o ticket ativo de uma RE a partir do CPF ou `reCode`, sem expor dados desnecessários.
+### Local (dev) × Produção (corporativo)
 
-3. **Tratamento de estados inconsistentes** — definir comportamento quando o ticket não está no estado esperado no momento do gatilho (ex.: RE já cancelou a própria senha antes do faturamento).
+O código é o mesmo nos dois ambientes; **a transição para produção é só configuração**.
 
-4. **Adequação à LGPD e SI** — revisão dos dados trafegados entre sistemas, controle de acesso e registro de auditoria das chamadas da integração.
+| Aspecto | Local (dev) | Produção (corporativo) |
+|---|---|---|
+| Emissor do token | endpoint `POST /integration/oauth/token` (emissor de dev) | **Apigee** (OAuth2 client_credentials) |
+| Validação no backend | chave pública local (`INTEGRATION_DEV_PUBLIC_KEY`) | JWKS do Apigee (`INTEGRATION_JWKS_URI`) |
+| Emissor de dev | `INTEGRATION_DEV_TOKEN_ENABLED=true` | desligado e **bloqueado** fora de `development`/`test` |
+| Chave pública de dev | aceita | **ignorada**; sem JWKS, validação falha fechada |
+| Documentação Swagger | UI em `/docs/integration` | publicada no portal do Apigee (UI não exposta) |
+| Rate limit / quotas | throttler do backend (backstop) | Apigee na borda |
+| Rede | backend acessível localmente | backend **privado**; só o Apigee alcança (GCP↔AWS privado) |
+
+> **Pendências para o ambiente corporativo:** provisionar o Apigee (emissor + JWKS), conectividade privada GCP↔AWS, e a revisão de LGPD/SI dos dados trafegados.
 
 ---
 
