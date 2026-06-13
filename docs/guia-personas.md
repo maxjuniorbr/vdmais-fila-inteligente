@@ -260,5 +260,11 @@ caixas liberados (counters_reset_for_day)
 - **Uma senha ativa por RE por ER** — o sistema bloqueia duplicidade.
 - **Rechamar antes de marcar não comparecimento** — dá uma segunda chance à RE
   que está por perto mas não ouviu a primeira chamada.
-- **No plano gratuito de hospedagem**, o backend pode "dormir" após inatividade;
-  a primeira chamada do dia pode demorar alguns segundos para responder.
+
+---
+
+## Documentação relacionada
+
+- [README](../README.md) — setup local e visão geral
+- [MVP — escopo e validação](./mvp.md) — o que está dentro e fora do produto
+- [Arquitetura Backend](./arquitetura-backend.md) · [Arquitetura Frontend](./arquitetura-frontend.md) — referência técnica
