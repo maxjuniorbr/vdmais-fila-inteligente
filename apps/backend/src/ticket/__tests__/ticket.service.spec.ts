@@ -419,6 +419,172 @@ describe('TicketService', () => {
     expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.no_show', expect.any(Object))
   })
 
+  describe('integration M2M actions', () => {
+    const ctx = { client: 'legacy-erp', scopes: ['tickets:start'], idempotencyKey: 'idem-1' }
+
+    it('advanceToInService moves CALLING → IN_SERVICE without operator-ownership check', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.CALLING,
+        counterId: 'counter-1',
+        operatorId: 'op-9',
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.counter.update.mockResolvedValue({})
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.IN_SERVICE,
+        counter: { number: 1 },
+        serviceStartedAt: new Date(),
+      })
+
+      const result = await service.advanceToInService('ticket-1', ctx)
+
+      expect(result.idempotent).toBe(false)
+      expect(result.ticket.state).toBe(TicketState.IN_SERVICE)
+      expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+        where: { id: 'ticket-1', state: TicketState.CALLING },
+        data: expect.objectContaining({ state: TicketState.IN_SERVICE }),
+      })
+      expect(tx.auditEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          eventType: 'service_started',
+          operatorId: 'op-9',
+          metadata: expect.objectContaining({
+            source: 'integration',
+            client: 'legacy-erp',
+            scopes: ['tickets:start'],
+            idempotencyKey: 'idem-1',
+          }),
+        }),
+      })
+    })
+
+    it('advanceToInService is idempotent when already IN_SERVICE', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.IN_SERVICE,
+        counterId: 'counter-1',
+        operatorId: 'op-9',
+      })
+
+      const result = await service.advanceToInService('ticket-1', ctx)
+
+      expect(result.idempotent).toBe(true)
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('advanceToInService rejects a WAITING ticket as TICKET_NOT_CALLED', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
+      const err = await service.advanceToInService('ticket-1', ctx).catch((e) => e)
+      expect(err).toBeInstanceOf(ConflictException)
+      expect(err.getResponse()).toMatchObject({ code: 'TICKET_NOT_CALLED' })
+    })
+
+    it('advanceToInService rejects a closed ticket as TICKET_ALREADY_CLOSED', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.FINISHED })
+      const err = await service.advanceToInService('ticket-1', ctx).catch((e) => e)
+      expect(err.getResponse()).toMatchObject({ code: 'TICKET_ALREADY_CLOSED' })
+    })
+
+    it('advanceToInService rejects a CALLING ticket without counter (defensive)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.CALLING,
+        counterId: null,
+      })
+      const err = await service.advanceToInService('ticket-1', ctx).catch((e) => e)
+      expect(err.getResponse()).toMatchObject({ code: 'TICKET_NOT_CALLED' })
+    })
+
+    it('completeService moves IN_SERVICE → FINISHED', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.IN_SERVICE,
+        counterId: 'counter-1',
+        operatorId: 'op-9',
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.counter.update.mockResolvedValue({})
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.FINISHED,
+        serviceFinishedAt: new Date(),
+      })
+
+      const result = await service.completeService('ticket-1', { client: 'legacy', scopes: ['tickets:finish'] })
+
+      expect(result.idempotent).toBe(false)
+      expect(result.ticket.state).toBe(TicketState.FINISHED)
+      expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+        where: { id: 'ticket-1', state: TicketState.IN_SERVICE },
+        data: expect.objectContaining({ state: TicketState.FINISHED }),
+      })
+      expect(tx.counter.update).toHaveBeenCalledWith({
+        where: { id: 'counter-1' },
+        data: { state: CounterState.ACTIVE },
+      })
+    })
+
+    it('completeService is idempotent when already FINISHED', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.FINISHED })
+
+      const result = await service.completeService('ticket-1', {})
+
+      expect(result.idempotent).toBe(true)
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('completeService rejects a CALLING ticket as TICKET_NOT_IN_SERVICE', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.CALLING,
+        counterId: 'counter-1',
+      })
+      const err = await service.completeService('ticket-1', {}).catch((e) => e)
+      expect(err.getResponse()).toMatchObject({ code: 'TICKET_NOT_IN_SERVICE' })
+    })
+
+    it('completeService rejects a cancelled ticket as TICKET_ALREADY_CLOSED', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.CANCELLED })
+      const err = await service.completeService('ticket-1', {}).catch((e) => e)
+      expect(err.getResponse()).toMatchObject({ code: 'TICKET_ALREADY_CLOSED' })
+    })
+
+    it('advanceToInService is idempotent when a concurrent call wins the transition (race)', async () => {
+      prisma.ticket.findUnique
+        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.CALLING, counterId: 'counter-1', operatorId: 'op-9' })
+        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.IN_SERVICE, counterId: 'counter-1', operatorId: 'op-9' })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+
+      const result = await service.advanceToInService('ticket-1', ctx)
+
+      expect(result.idempotent).toBe(true)
+      expect(result.ticket.state).toBe(TicketState.IN_SERVICE)
+    })
+
+    it('advanceToInService rethrows when the race left a non-target state', async () => {
+      prisma.ticket.findUnique
+        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.CALLING, counterId: 'counter-1', operatorId: 'op-9' })
+        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.CANCELLED, counterId: 'counter-1' })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+
+      await expect(service.advanceToInService('ticket-1', ctx)).rejects.toThrow(BadRequestException)
+    })
+
+    it('completeService is idempotent when a concurrent call wins the finish (race)', async () => {
+      prisma.ticket.findUnique
+        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.IN_SERVICE, counterId: 'counter-1', operatorId: 'op-9' })
+        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.FINISHED, counterId: 'counter-1' })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+
+      const result = await service.completeService('ticket-1', {})
+
+      expect(result.idempotent).toBe(true)
+      expect(result.ticket.state).toBe(TicketState.FINISHED)
+    })
+  })
+
   it('cancels an active ticket and resets the counter', async () => {
     const cancelledTicket = {
       ...ticketBase,

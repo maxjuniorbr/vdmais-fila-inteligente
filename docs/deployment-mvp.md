@@ -32,6 +32,15 @@ Socket.IO compartilhado. Redis permanece fora deste escopo.
 Valores locais de `.env` não devem ser promovidos. Use um segredo JWT aleatório com pelo
 menos 32 bytes e rotacione-o conforme a política do ambiente.
 
+### Integração M2M (quando habilitada)
+
+Em produção, configure apenas a validação como *resource server* — apontando para o
+emissor corporativo (Apigee): `INTEGRATION_JWT_ISSUER`, `INTEGRATION_JWT_AUDIENCE` e
+`INTEGRATION_JWKS_URI`. As variáveis `INTEGRATION_DEV_*` e `INTEGRATION_DOCS_ENABLED`
+são **exclusivas de desenvolvimento** e não devem ser promovidas (o emissor de dev já
+fica bloqueado fora de `development`/`test`). Equivalências dev × produção em
+[`arquitetura-backend.md`](arquitetura-backend.md#local-dev--produção-corporativo).
+
 ## Publicação
 
 1. Execute lint, builds, testes unitários, e2e e `npm audit`.

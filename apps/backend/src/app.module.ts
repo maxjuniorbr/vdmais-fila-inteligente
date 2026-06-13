@@ -17,6 +17,7 @@ import { RepresentativesModule } from './representative/representatives.module'
 import { TelemetryModule } from './telemetry/telemetry.module'
 import { ObservabilityModule } from './observability/observability.module'
 import { AdminModule } from './admin/admin.module'
+import { IntegrationModule } from './integration/integration.module'
 import { ContextualThrottlerGuard } from './common/guards/contextual-throttler.guard'
 
 @Module({
@@ -38,6 +39,7 @@ import { ContextualThrottlerGuard } from './common/guards/contextual-throttler.g
     TelemetryModule,
     ObservabilityModule,
     AdminModule,
+    IntegrationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ContextualThrottlerGuard },
