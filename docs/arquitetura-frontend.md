@@ -24,7 +24,7 @@ apps/frontend/src/
 
 | Rota | Página | Perfil | Descrição |
 |---|---|---|---|
-| `/` | `HomePage` | Público | Seleção de acesso por perfil |
+| `/` | `HomePage` | Público | Login da equipe (porta de entrada); após autenticar, roteia por perfil — perfil de área única redireciona direto, ADMIN vê o menu de áreas |
 | `/fila/:erId` | `QueueEntryPage` | RE (público) | Entrada na fila via QR Code ou link |
 | `/fila/:erId/senha` | `TicketConfirmationPage` | RE | Confirmação de senha e posição na fila |
 | `/checkin` | `CheckinAttendantPage` | ATTENDANT | Check-in assistido — buscar/criar RE e gerar senha |
@@ -54,10 +54,15 @@ notifySessionExpired()            // dispara SESSION_EXPIRED_EVENT global
 ```
 
 ```typescript
-// Hook de proteção
+// Hook de proteção (páginas de área) — retorna boolean
 const valid = useStaffSession(['OPERATOR', 'MANAGER'])
 // Valida assinatura JWT, role e expiração
 // Escuta SESSION_EXPIRED_EVENT; redireciona ao login se falhar
+
+// Hook de perfil (telas que roteiam/renderizam por papel, ex.: HomePage)
+const [profile, setProfile] = useStaffProfile()
+// Retorna o StaffProfile (name/role/erId) ou null
+// Mesmo tratamento de 401: SESSION_EXPIRED_EVENT zera o perfil para null
 ```
 
 **Resposta 401 do backend:** o cliente HTTP central captura e dispara `SESSION_EXPIRED_EVENT` globalmente. Qualquer tela de staff que estiver ativa redireciona para `/` sem necessidade de lógica adicional por página.

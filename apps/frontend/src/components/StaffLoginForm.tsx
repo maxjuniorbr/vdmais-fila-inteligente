@@ -9,13 +9,15 @@ import { Input } from './Input'
 
 interface StaffLoginFormProps {
   title: string
-  allowedRoles: StaffRole[]
+  allowedRoles?: StaffRole[]
+  showBackLink?: boolean
   onAuthenticated: (profile: StaffProfile) => void
 }
 
 export function StaffLoginForm({
   title,
   allowedRoles,
+  showBackLink = true,
   onAuthenticated,
 }: Readonly<StaffLoginFormProps>) {
   const [email, setEmail] = useState('')
@@ -38,7 +40,7 @@ export function StaffLoginForm({
       if (!response.ok) throw new Error(data.message ?? 'Credenciais inválidas')
 
       const profile = data.user as StaffProfile
-      if (!allowedRoles.includes(profile.role)) {
+      if (allowedRoles && !allowedRoles.includes(profile.role)) {
         throw new Error('Seu perfil não possui acesso a esta área')
       }
 
@@ -80,23 +82,25 @@ export function StaffLoginForm({
         <Button type="submit" disabled={loading} style={{ width: '100%' }}>
           {loading ? 'Entrando...' : 'Entrar'}
         </Button>
-        <Link to="/" className="gb-action-link" style={styles.backLink}>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M19 12H5" />
-            <path d="m12 19-7-7 7-7" />
-          </svg>
-          Voltar ao portal da equipe
-        </Link>
+        {showBackLink && (
+          <Link to="/" className="gb-action-link" style={styles.backLink}>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M19 12H5" />
+              <path d="m12 19-7-7 7-7" />
+            </svg>
+            Voltar ao portal da equipe
+          </Link>
+        )}
       </form>
     </main>
   )

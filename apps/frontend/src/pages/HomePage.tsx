@@ -1,13 +1,9 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  getStaffSessionProfile,
-  logoutStaffSession,
-  type StaffProfile,
-  type StaffRole,
-} from '../auth/session'
+import { Link, Navigate } from 'react-router-dom'
+import { logoutStaffSession, type StaffRole } from '../auth/session'
+import { useStaffProfile } from '../auth/useStaffSession'
 import { BrandMark } from '../components/BrandMark'
 import { Button } from '../components/Button'
+import { StaffLoginForm } from '../components/StaffLoginForm'
 import { brand } from '../styles/brand'
 import { roleLabel } from '../utils/labels'
 
@@ -56,19 +52,31 @@ const ACCESS_AREAS: AccessArea[] = [
   },
 ]
 
-function destinationFor(role: StaffRole): AccessArea {
-  const destination = ACCESS_AREAS.find((area) => area.roles[0] === role)
-  if (!destination) throw new Error('Perfil sem área de acesso configurada')
-  return destination
-}
-
 export function HomePage() {
-  const [profile, setProfile] = useState<StaffProfile | null>(() => getStaffSessionProfile())
-  const currentArea = profile ? destinationFor(profile.role) : null
-  const availableAreas = profile
-    ? ACCESS_AREAS.filter((area) => area.roles.includes(profile.role))
-    : []
+  // The profile hook owns the session state and the 401 → login handling: a
+  // server-side SESSION_EXPIRED_EVENT (or an expired token) drops us back to login.
+  const [profile, setProfile] = useStaffProfile()
 
+  // Login is the entry point: an anonymous visitor authenticates here, then is
+  // routed to the area(s) their profile is allowed to access.
+  if (!profile) {
+    return (
+      <StaffLoginForm
+        title="Acessar sua área de trabalho"
+        showBackLink={false}
+        onAuthenticated={(authenticated) => setProfile(authenticated)}
+      />
+    )
+  }
+
+  const availableAreas = ACCESS_AREAS.filter((area) => area.roles.includes(profile.role))
+
+  // Single-area profiles (OPERATOR, ATTENDANT, MANAGER) go straight to their area.
+  if (availableAreas.length === 1) {
+    return <Navigate to={availableAreas[0].path} replace />
+  }
+
+  // Multi-area profiles (ADMIN) pick from a menu filtered to what they can access.
   async function logout() {
     await logoutStaffSession()
     setProfile(null)
@@ -84,16 +92,9 @@ export function HomePage() {
             <span style={styles.brandSubtitle}>Acessos internos</span>
           </div>
         </div>
-        {profile && (
-          <Button
-            variant="secondary"
-            size="sm"
-            type="button"
-            onClick={() => void logout()}
-          >
-            Encerrar sessão
-          </Button>
-        )}
+        <Button variant="secondary" size="sm" type="button" onClick={() => void logout()}>
+          Encerrar sessão
+        </Button>
       </header>
 
       <main style={styles.content}>
@@ -101,62 +102,38 @@ export function HomePage() {
           <span style={styles.eyebrow}>Portal da equipe</span>
           <h1 style={styles.title}>Acesse sua área de trabalho</h1>
           <p style={styles.introduction}>
-            Selecione a opção correspondente ao seu perfil. Cada área solicitará as credenciais
-            apropriadas antes de liberar o acesso.
+            Selecione a área que deseja abrir. Você tem acesso a mais de um módulo.
           </p>
         </section>
 
-        {profile && currentArea && (
-          <section className="gb-home-session" style={styles.sessionCard} aria-label="Sessão atual">
-            <div>
-              <span style={styles.sessionLabel}>Sessão reconhecida</span>
-              <strong style={styles.sessionName}>{profile.name}</strong>
-              <span style={styles.sessionRole}>{roleLabel(profile.role)}</span>
-            </div>
-            <div style={styles.sessionActions}>
-              {availableAreas.map((area) => (
-                <Link
-                  key={area.path}
-                  className="gb-home-primary-link"
-                  to={area.path}
-                  style={{
-                    ...styles.primaryLink,
-                    ...(area.path === currentArea.path ? null : styles.secondarySessionLink),
-                  }}
-                >
-                  {area.path === currentArea.path ? 'Continuar em' : 'Acessar'} {area.title}
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+        <section className="gb-home-session" style={styles.sessionCard} aria-label="Sessão atual">
+          <div>
+            <span style={styles.sessionLabel}>Sessão reconhecida</span>
+            <strong style={styles.sessionName}>{profile.name}</strong>
+            <span style={styles.sessionRole}>{roleLabel(profile.role)}</span>
+          </div>
+        </section>
 
         <nav aria-label="Áreas internas">
           <div className="gb-home-access-grid">
-            {ACCESS_AREAS.map((area) => {
-              const isAvailable = Boolean(profile && area.roles.includes(profile.role))
-              return (
-                <Link
-                  key={area.path}
-                  className="gb-home-access-card"
-                  to={area.path}
-                  style={{
-                    ...styles.accessCard,
-                    ...(isAvailable ? styles.accessCardCurrent : null),
-                  }}
-                >
-                  <div style={styles.cardTop}>
-                    <span style={styles.roleTag}>{area.audience}</span>
-                    {isAvailable && <span style={styles.currentTag}>Disponível</span>}
-                  </div>
-                  <div>
-                    <h2 style={styles.cardTitle}>{area.title}</h2>
-                    <p style={styles.cardDescription}>{area.description}</p>
-                  </div>
-                  <span style={styles.cardAction}>{area.action}</span>
-                </Link>
-              )
-            })}
+            {availableAreas.map((area) => (
+              <Link
+                key={area.path}
+                className="gb-home-access-card"
+                to={area.path}
+                style={{ ...styles.accessCard, ...styles.accessCardCurrent }}
+              >
+                <div style={styles.cardTop}>
+                  <span style={styles.roleTag}>{area.audience}</span>
+                  <span style={styles.currentTag}>Disponível</span>
+                </div>
+                <div>
+                  <h2 style={styles.cardTitle}>{area.title}</h2>
+                  <p style={styles.cardDescription}>{area.description}</p>
+                </div>
+                <span style={styles.cardAction}>{area.action}</span>
+              </Link>
+            ))}
           </div>
         </nav>
 
@@ -168,15 +145,6 @@ export function HomePage() {
               pela área de Administração.
             </p>
           </div>
-          {profile?.erId && (
-            <Link
-              className="gb-action-link"
-              to={`/painel/${profile.erId}`}
-              style={styles.panelLink}
-            >
-              Abrir painel deste ER
-            </Link>
-          )}
         </aside>
 
         <p style={styles.queueNote}>
@@ -255,8 +223,6 @@ const styles: Record<string, React.CSSProperties> = {
   sessionCard: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '1rem',
     marginBottom: `${brand.spacing[20]}px`,
     padding: `${brand.spacing[16]}px ${brand.spacing[20]}px`,
     border: `1px solid ${brand.border}`,
@@ -281,31 +247,6 @@ const styles: Record<string, React.CSSProperties> = {
     marginLeft: '0.5rem',
     color: brand.inkMuted,
     fontSize: '0.85rem',
-  },
-  primaryLink: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 42,
-    padding: '0.6rem 1rem',
-    borderRadius: brand.radius.pill,
-    background: brand.actionable,
-    color: brand.actionableContent,
-    fontSize: '0.88rem',
-    fontWeight: 700,
-    textDecoration: 'none',
-    whiteSpace: 'nowrap',
-  },
-  sessionActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '0.5rem',
-    flexWrap: 'wrap',
-  },
-  secondarySessionLink: {
-    border: `2px solid ${brand.actionable}`,
-    background: brand.surface,
-    color: brand.actionable,
   },
   accessCard: {
     display: 'grid',
@@ -364,8 +305,6 @@ const styles: Record<string, React.CSSProperties> = {
   panelNote: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '1rem',
     marginTop: `${brand.spacing[20]}px`,
     padding: `${brand.spacing[16]}px ${brand.spacing[20]}px`,
     border: `1px solid ${brand.border}`,
@@ -380,20 +319,6 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0.2rem 0 0',
     color: brand.inkMuted,
     fontSize: '0.82rem',
-  },
-  panelLink: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 38,
-    padding: '0.45rem 0.85rem',
-    border: `2px solid ${brand.actionable}`,
-    borderRadius: brand.radius.pill,
-    color: brand.actionable,
-    fontSize: '0.82rem',
-    fontWeight: 700,
-    textDecoration: 'none',
-    whiteSpace: 'nowrap',
   },
   queueNote: {
     margin: '1.5rem 0 0',
