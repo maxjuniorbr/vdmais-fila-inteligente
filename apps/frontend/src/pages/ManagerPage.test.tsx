@@ -158,6 +158,10 @@ describe('ManagerPage', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Por caixa' }))
     expect(screen.getByText('Pausa')).toBeInTheDocument()
+    // The backend already labels the counter ("Caixa 1"); the column must not
+    // prefix "Caixa" again ("Caixa Caixa 1").
+    expect(screen.getByText('Caixa 1')).toBeInTheDocument()
+    expect(screen.queryByText('Caixa Caixa 1')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Por operadora' }))
     expect(screen.getByText('Chamadas')).toBeInTheDocument()
@@ -641,8 +645,9 @@ describe('ManagerPage', () => {
       byChannel: { QR_CODE: 4 },
       cancelledByChannel: { LINK: 2 },
       noShowByChannel: { CHECKIN_ASSISTED: 1 },
-      serviceByCounter: { '1': 5 },
-      pauseSecondsByCounter: { '2': 30 },
+      // The backend keys these by display label ("Caixa N"), not by raw number.
+      serviceByCounter: { 'Caixa 1': 5 },
+      pauseSecondsByCounter: { 'Caixa 2': 30 },
       serviceByOperator: { Ana: 3 },
       callsByOperator: { Bruno: 4 },
     }
