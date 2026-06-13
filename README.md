@@ -30,7 +30,7 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - [MVP — escopo e validação](./docs/mvp.md)
 - [Stack técnica do MVP](./docs/stack-mvp.md) _(decisões e justificativas do MVP; não é prescrição para produção corporativa)_
 - [Deploy do MVP](./docs/deployment-mvp.md) _(infraestrutura de validação — Vercel + Render + Supabase; não é requisito)_
-- [Diretrizes de design e UX](./.github/instructions/frontend-design.instructions.md)
+- [Diretrizes de design e UX](./apps/frontend/CLAUDE.md)
 
 ---
 

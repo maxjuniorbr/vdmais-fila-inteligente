@@ -236,5 +236,5 @@ npm run build --workspace=apps/frontend
 
 - [README](../README.md) — setup local, comandos e infraestrutura necessária
 - [Arquitetura Backend](./arquitetura-backend.md)
-- [Diretrizes de design e UX](../.github/instructions/frontend-design.instructions.md)
+- [Diretrizes de design e UX](../apps/frontend/CLAUDE.md)
 - [Stack técnica do MVP](./stack-mvp.md)

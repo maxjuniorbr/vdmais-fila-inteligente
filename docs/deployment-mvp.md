@@ -59,7 +59,7 @@ ambiente de container único. Em produção corporativa, prefira banco gerenciad
 HTTPS.
 
 > Regras operacionais de migrations (paridade, pipeline e segurança) vivem em
-> [`.github/instructions/database-migrations.instructions.md`](../.github/instructions/database-migrations.instructions.md).
+> [`apps/backend/CLAUDE.md`](../apps/backend/CLAUDE.md).
 
 ## Ambientes (Preview e Produção)
 
