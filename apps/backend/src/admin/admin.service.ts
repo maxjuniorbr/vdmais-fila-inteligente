@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import * as bcrypt from 'bcrypt'
-import { EntryChannel, Prisma } from '@prisma/client'
+import { CounterState, EntryChannel, Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { PanelTokenService } from '../panel/panel-token.service'
@@ -50,7 +50,10 @@ export class AdminService {
     const er = await this.prisma.eR.findUnique({
       where: { id: erId },
       include: {
-        counters: { orderBy: { number: 'asc' } },
+        counters: {
+          orderBy: { number: 'asc' },
+          include: { _count: { select: { tickets: true } } },
+        },
         operators: { orderBy: { createdAt: 'asc' }, select: STAFF_SELECT },
       },
     })
@@ -131,6 +134,43 @@ export class AdminService {
       }
       throw error
     }
+  }
+
+  // Physical deletion, allowed only for a counter that is closed (UNAVAILABLE,
+  // no operator) and never served anyone. Two independent blockers:
+  //  - service history (any ticket): a permanent block, so the record survives;
+  //  - currently open (assigned/active/calling/in-service/paused): a temporary
+  //    block — close the counter first.
+  async deleteCounter(erId: string, counterId: string, user: AuthenticatedUser) {
+    await this._assertERExists(erId)
+    const counter = await this.prisma.counter.findFirst({
+      where: { id: counterId, erId },
+      include: { _count: { select: { tickets: true } } },
+    })
+    if (!counter) throw new NotFoundException('Caixa não encontrado')
+    if (counter._count.tickets > 0) {
+      throw new ConflictException('Não é possível remover um caixa com histórico de atendimento')
+    }
+    if (counter.state !== CounterState.UNAVAILABLE || counter.operatorId) {
+      throw new ConflictException('Feche o caixa antes de removê-lo')
+    }
+
+    try {
+      await this.prisma.counter.delete({ where: { id: counterId } })
+    } catch (error) {
+      // A ticket assigned between the check and the delete trips the FK constraint.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new ConflictException('Não é possível remover um caixa com histórico de atendimento')
+      }
+      throw error
+    }
+
+    await this.auditLog.log({
+      eventType: 'counter_deleted',
+      erId,
+      operatorId: user.userId,
+      metadata: { counterId, number: counter.number },
+    })
   }
 
   async createStaff(erId: string, dto: CreateStaffDto, user: AuthenticatedUser) {

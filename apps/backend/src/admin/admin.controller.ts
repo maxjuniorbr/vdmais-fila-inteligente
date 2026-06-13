@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common'
 import { AdminService } from './admin.service'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -46,6 +57,16 @@ export class AdminController {
     @Request() req: { user: AuthenticatedUser },
   ) {
     return this.adminService.createCounter(erId, dto, req.user)
+  }
+
+  @Delete('ers/:erId/counters/:counterId')
+  @HttpCode(204)
+  deleteCounter(
+    @Param('erId') erId: string,
+    @Param('counterId') counterId: string,
+    @Request() req: { user: AuthenticatedUser },
+  ) {
+    return this.adminService.deleteCounter(erId, counterId, req.user)
   }
 
   @Post('ers/:erId/staff')
