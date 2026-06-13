@@ -3,6 +3,7 @@ import { useLocation, useParams, useNavigate, useSearchParams } from 'react-rout
 import {
   clearSession,
   getQueueEntryToken,
+  markQueueEntryPending,
   saveQueueEntryChannel,
   saveQueueEntryToken,
 } from '../auth/session'
@@ -12,6 +13,7 @@ import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { layout } from '../styles/layout'
 import { brand } from '../styles/brand'
+import { unlockCallAlert } from '../utils/callAlert'
 
 type Mode = 'login' | 'register'
 const ACCESS_MODES: Mode[] = ['login', 'register']
@@ -135,11 +137,20 @@ export function QueueEntryPage() {
     }
   }
 
-  async function handleLogin(e: React.SyntheticEvent) {
+  // Shared submit prologue. Unlocks audio inside the user gesture so the call
+  // beep can play later (mobile blocks audio without a gesture). Returns false
+  // when the RE hasn't confirmed the ER yet.
+  function beginEntry(e: React.SyntheticEvent): boolean {
     e.preventDefault()
     setError(null)
-    if (!confirmEntry()) return
+    if (!confirmEntry()) return false
+    unlockCallAlert()
     setLoading(true)
+    return true
+  }
+
+  async function handleLogin(e: React.SyntheticEvent) {
+    if (!beginEntry(e)) return
     try {
       const entryContext = entryToken
         ? { entryToken, entryChannel: er?.entryChannel }
@@ -156,6 +167,8 @@ export function QueueEntryPage() {
       const { access_token } = await res.json()
       clearSession()
       sessionStorage.setItem('token', access_token)
+      // Deliberate entry: the ticket screen will create exactly one ticket.
+      markQueueEntryPending(erId)
       navigate(`/fila/${erId}/senha${sourceQuery}`, { replace: true })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao entrar')
@@ -165,10 +178,7 @@ export function QueueEntryPage() {
   }
 
   async function handleRegister(e: React.SyntheticEvent) {
-    e.preventDefault()
-    setError(null)
-    if (!confirmEntry()) return
-    setLoading(true)
+    if (!beginEntry(e)) return
     try {
       const entryContext = entryToken
         ? { entryToken, entryChannel: er?.entryChannel }
@@ -185,6 +195,8 @@ export function QueueEntryPage() {
       const { access_token } = await res.json()
       clearSession()
       sessionStorage.setItem('token', access_token)
+      // Deliberate entry: the ticket screen will create exactly one ticket.
+      markQueueEntryPending(erId)
       navigate(`/fila/${erId}/senha${sourceQuery}`, { replace: true })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao cadastrar')
