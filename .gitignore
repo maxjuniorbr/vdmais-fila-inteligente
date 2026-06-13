@@ -30,3 +30,6 @@ test-results/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local test credentials (plaintext — never version)
+/docs/credenciais-teste-local.md
