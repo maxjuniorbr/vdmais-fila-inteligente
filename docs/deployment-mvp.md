@@ -1,4 +1,4 @@
-# Deploy do MVP 0
+# Deploy do MVP
 
 ← [Voltar ao README](../README.md) · [Arquitetura Backend](./arquitetura-backend.md) · [Arquitetura Frontend](./arquitetura-frontend.md)
 
@@ -19,7 +19,7 @@
 - HTTPS terminado no load balancer/ingress; WebSocket deve aceitar upgrade.
 - Segredos injetados pelo secrets manager da plataforma.
 
-O backend do MVP 0 não deve escalar horizontalmente sem sticky sessions ou adaptador
+O backend do MVP não deve escalar horizontalmente sem sticky sessions ou adaptador
 Socket.IO compartilhado. Redis permanece fora deste escopo.
 
 ## Variáveis obrigatórias

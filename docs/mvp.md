@@ -1,4 +1,4 @@
-# MVP 0 — Escopo e validação
+# MVP — Escopo e validação
 
 ← [Voltar ao README](../README.md) · [Guia de personas](./guia-personas.md) · [Stack do MVP](./stack-mvp.md)
 
@@ -6,13 +6,13 @@
 
 O **MVP Full** continua sendo o alvo do produto e deve representar a visão completa discutida até aqui: fila virtual, previsibilidade, segmentação de jornadas, Pedido Expresso, regras avançadas, dados operacionais e evolução da gestão de fluxo dos ERs.
 
-O **MVP 0** é um recorte mínimo para validação inicial. Ele existe para testar a hipótese central e validar o SaaS em operação real com o menor escopo viável.
+O **MVP** é um recorte mínimo para validação inicial. Ele existe para testar a hipótese central e validar o SaaS em operação real com o menor escopo viável.
 
 Este MVP não pretende resolver todos os problemas da fila. Ele deve validar se uma fila digital presencial consegue substituir a fila física informal, organizar a chamada, dar visibilidade à operação e capturar dados mínimos confiáveis de espera e atendimento.
 
 ---
 
-## 1. Objetivo do MVP 0
+## 1. Objetivo do MVP
 
 Substituir a fila física informal por uma fila digital presencial, com entrada simples da representante, cadastro/autenticação mínima, chamada por TV/painel, operação pelos caixas e registro dos eventos essenciais.
 
@@ -23,9 +23,9 @@ Objetivo prático:
 
 ---
 
-## 2. O que o MVP 0 valida
+## 2. O que o MVP valida
 
-O MVP 0 deve validar:
+O MVP deve validar:
 
 - se a RE consegue entrar na fila digital dentro do ER;
 - se a operação consegue usar o sistema sem travar o atendimento;
@@ -41,7 +41,7 @@ O MVP 0 deve validar:
 
 ## 3. Escopo resumido
 
-Dentro do MVP 0:
+Dentro do MVP:
 
 - fila única presencial;
 - entrada por QR Code;
@@ -62,7 +62,7 @@ Dentro do MVP 0:
 - métricas básicas;
 - registro de eventos mínimos.
 
-Fora do MVP 0:
+Fora do MVP:
 
 - integração com base oficial de REs;
 - integração com PDV;
@@ -116,7 +116,7 @@ Recomendação operacional:
 
 ## 5. Cadastro e autenticação mínima
 
-Como o MVP 0 não terá integração com bases corporativas, o cadastro será criado ou validado dentro do próprio SaaS/app.
+Como o MVP não terá integração com bases corporativas, o cadastro será criado ou validado dentro do próprio SaaS/app.
 
 Campos obrigatórios:
 
@@ -135,7 +135,7 @@ Campos opcionais:
 - canal de entrada;
 - observação operacional para check-in assistido.
 
-Validações possíveis no MVP 0:
+Validações possíveis no MVP:
 
 - preenchimento obrigatório;
 - formato básico de CPF, data e telefone;
@@ -145,7 +145,7 @@ Validações possíveis no MVP 0:
 - existência de senha ativa no mesmo ER;
 - origem da entrada: QR Code, link ou check-in assistido.
 
-Validações fora do MVP 0:
+Validações fora do MVP:
 
 - status oficial da RE;
 - RE ativa, inativa ou bloqueada;
@@ -156,7 +156,7 @@ Validações fora do MVP 0:
 
 Formulação correta:
 
-> No MVP 0, a autenticação será baseada em cadastro mínimo no próprio SaaS/app, sem validação em tempo real contra a base oficial de representantes. O sistema controlará unicidade, login, senha ativa e rastreabilidade operacional, mas não garantirá elegibilidade comercial plena da RE.
+> No MVP, a autenticação será baseada em cadastro mínimo no próprio SaaS/app, sem validação em tempo real contra a base oficial de representantes. O sistema controlará unicidade, login, senha ativa e rastreabilidade operacional, mas não garantirá elegibilidade comercial plena da RE.
 > 
 
 ---
@@ -191,7 +191,7 @@ Mensagem sugerida:
 
 Risco:
 
-> Este canal pode permitir entrada fora do ER, já que o MVP 0 não possui confirmação de presença.
+> Este canal pode permitir entrada fora do ER, já que o MVP não possui confirmação de presença.
 > 
 
 Mitigações mínimas:
@@ -202,7 +202,7 @@ Mitigações mínimas:
 - registrar canal de entrada;
 - acompanhar no-show por canal.
 
-CAPTCHA não faz parte do MVP 0.
+CAPTCHA não faz parte do MVP.
 
 ### 6.3 Check-in assistido
 
@@ -374,7 +374,7 @@ pode **rechamar** antes de marcar não comparecimento.
 7. Caixa volta para **Ativo**.
 8. Operadora chama próximo.
 
-Regra (MVP 0):
+Regra (MVP):
 
 > O não comparecimento **não recoloca a senha na fila automaticamente**. A senha
 > fica como **Não compareceu** e só retorna se um perfil autorizado (gestora)
@@ -854,7 +854,7 @@ daily_queue_closed
 
 ## 16. Critérios de sucesso
 
-O MVP 0 será bem-sucedido se:
+O MVP será bem-sucedido se:
 
 1. A RE conseguir entrar na fila por QR Code, link ou check-in assistido.
 2. O sistema impedir múltiplas senhas ativas para a mesma RE no mesmo ER.
@@ -911,17 +911,17 @@ Mitigação:
 
 Mitigação:
 
-- comunicar internamente que o MVP 0 organiza e mede a fila, mas ainda não resolve causas estruturais de demora.
+- comunicar internamente que o MVP organiza e mede a fila, mas ainda não resolve causas estruturais de demora.
 
 ---
 
 ## 18. Síntese executiva
 
-O MVP 0 consiste em uma fila digital presencial para ERs, com entrada por QR Code, link ou check-in assistido, cadastro mínimo da representante, senha única por RE/ER, chamada por TV, operação por caixa logado, estados mínimos da senha, controle de chamada simultânea, cancelamento, não comparecimento, restauração manual excepcional e métricas básicas de espera e atendimento.
+O MVP consiste em uma fila digital presencial para ERs, com entrada por QR Code, link ou check-in assistido, cadastro mínimo da representante, senha única por RE/ER, chamada por TV, operação por caixa logado, estados mínimos da senha, controle de chamada simultânea, cancelamento, não comparecimento, restauração manual excepcional e métricas básicas de espera e atendimento.
 
 Ele serve para validar o núcleo operacional do SaaS antes de avançar para fila virtual completa, Pedido Expresso, ETA, integração com PDV e regras avançadas de jornada.
 
-A versão completa do MVP permanece como alvo de produto. O MVP 0 é o menor recorte para testar a hipótese em campo.
+A versão completa do MVP permanece como alvo de produto. O MVP é o menor recorte para testar a hipótese em campo.
 
 ---
 
