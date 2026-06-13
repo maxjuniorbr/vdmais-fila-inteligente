@@ -19,6 +19,14 @@ describe('PlaygroundPage', () => {
     expect(screen.getByText('Base atualizada com sucesso.')).toBeInTheDocument()
   })
 
+  it('shows the brand, status, section panel and copy field components', () => {
+    render(<PlaygroundPage />)
+    expect(screen.getByText('VD+ Fila Inteligente')).toBeInTheDocument()
+    expect(screen.getByText('Caixa ativo')).toBeInTheDocument()
+    expect(screen.getByText('Senhas em espera')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copiar Link público da fila' })).toBeInTheDocument()
+  })
+
   it('cycles through the data states', () => {
     render(<PlaygroundPage />)
     fireEvent.click(screen.getByRole('button', { name: '3. Estados' }))
