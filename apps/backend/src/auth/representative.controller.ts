@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { maskCpf, maskPhone } from '../common/pii-mask'
+import { normalizeReCode, onlyDigits } from '../common/representative-identifiers'
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { AuthenticatedUser } from '../common/authenticated-user'
@@ -38,12 +39,12 @@ export class RepresentativeController {
     if (!q || q.trim().length < 3) return []
 
     const term = q.trim()
-    const digits = term.replace(/\D/g, '')
+    const digits = onlyDigits(term)
 
     const representatives = await this.prisma.representative.findMany({
       where: {
         AND: [
-          { OR: [{ cpf: digits }, { phone: digits }, { reCode: term.toUpperCase() }] },
+          { OR: [{ cpf: digits }, { phone: digits }, { reCode: normalizeReCode(term) }] },
           { tickets: { some: { erId } } },
         ],
       },

@@ -238,6 +238,45 @@ Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X
 
 ---
 
+## API de integração (sistemas corporativos)
+
+Endpoints M2M para um sistema legado marcar **início** e **fim** do atendimento da revendedora (`POST /integration/v1/atendimentos/iniciar` e `/encerrar`), eliminando a gestão manual da fila. Autenticação OAuth2 (Bearer JWT RS256) com scopes `tickets:start`/`tickets:finish`, pronta para o Apigee. Contrato, erros e modelo de segurança em [`docs/arquitetura-backend.md`](docs/arquitetura-backend.md#integração-com-sistemas-corporativos-integration).
+
+**Documentação OpenAPI/Swagger:** com o backend rodando em `development`, acesse **http://localhost:3000/docs/integration**.
+
+**Testar localmente** (sem Apigee, usando o emissor de token de desenvolvimento):
+
+```bash
+# 1. Gere um par de chaves RS256 para o emissor de dev
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/int.key
+openssl pkey -in /tmp/int.key -pubout -out /tmp/int.pub
+
+# 2. Em apps/backend/.env, com NODE_ENV=development, preencha (PEM em uma linha com \n):
+#   INTEGRATION_JWT_ISSUER, INTEGRATION_JWT_AUDIENCE
+#   INTEGRATION_DEV_TOKEN_ENABLED=true, INTEGRATION_DEV_CLIENT_ID, INTEGRATION_DEV_CLIENT_SECRET
+#   INTEGRATION_DEV_ALLOWED_SCOPES="tickets:start tickets:finish"
+#   INTEGRATION_DEV_PRIVATE_KEY / INTEGRATION_DEV_PUBLIC_KEY  (conteúdo de /tmp/int.key e /tmp/int.pub)
+
+# 3. Obtenha um token e chame o endpoint (a RE precisa ter sido chamada num caixa):
+curl -s localhost:3000/integration/oauth/token -H 'content-type: application/json' \
+  -d '{"grant_type":"client_credentials","client_id":"legacy-erp","client_secret":"<seu-segredo>","scope":"tickets:start"}'
+
+curl -s localhost:3000/integration/v1/atendimentos/iniciar \
+  -H "authorization: Bearer <access_token>" -H 'content-type: application/json' \
+  -d '{"reCode":"RE0001"}'
+```
+
+**Em produção (corporativo)** o código não muda — só a configuração:
+
+- Tokens são emitidos pelo **Apigee** (não pelo emissor de dev, que fica desligado e bloqueado fora de `development`/`test`).
+- O backend valida pela **JWKS do Apigee** (`INTEGRATION_JWKS_URI`); a chave pública de dev é ignorada.
+- A documentação é publicada no **portal do Apigee** em vez da UI `/docs/integration`.
+- O backend fica em **rede privada**, alcançável apenas pelo Apigee.
+
+A tabela completa de equivalências dev × produção está em [`docs/arquitetura-backend.md`](docs/arquitetura-backend.md#local-dev--produção-corporativo).
+
+---
+
 ## Estrutura do projeto
 
 ```
@@ -251,6 +290,7 @@ vdmais-fila-inteligente/
 │   │   │   ├── ticket/    # Geração e ciclo de vida da senha
 │   │   │   ├── queue/     # Lógica de fila (call-next atômico)
 │   │   │   ├── counter/   # Caixas de atendimento
+│   │   │   ├── integration/ # API M2M para sistemas corporativos (OAuth2)
 │   │   │   ├── panel/     # WebSocket gateway + estado do painel (token de exibição por ER)
 │   │   │   ├── metrics/   # Métricas de atendimento
 │   │   │   ├── telemetry/ # Eventos de uso e jornada

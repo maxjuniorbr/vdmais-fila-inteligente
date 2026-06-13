@@ -15,12 +15,31 @@ import { PrismaService } from '../prisma/prisma.service'
 import { CreateTicketDto } from './dto/create-ticket.dto'
 import { CorrectionAction, CorrectTicketDto } from './dto/ticket-action.dto'
 
-const ACTIVE_STATES: TicketState[] = [
+export const ACTIVE_STATES: TicketState[] = [
   TicketState.WAITING,
   TicketState.CALLING,
   TicketState.IN_SERVICE,
   TicketState.PAUSED,
 ]
+
+export interface IntegrationActionContext {
+  client?: string
+  scopes?: string[]
+  idempotencyKey?: string
+}
+
+export interface IntegrationActionResult {
+  ticket: { id: string; code: string; erId: string; state: TicketState; serviceStartedAt: Date | null; serviceFinishedAt: Date | null }
+  idempotent: boolean
+}
+
+interface ServiceTransitionOptions {
+  source: 'operator' | 'integration'
+  restrictToOperatorId?: string
+  client?: string
+  scopes?: string[]
+  idempotencyKey?: string
+}
 
 @Injectable()
 export class TicketService {
@@ -443,60 +462,99 @@ export class TicketService {
     }
     const ticket = await this._getTicket(ticketId)
     this._assertAssignedOperator(ticket, user)
-    const now = new Date()
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.ticket.updateMany({
-        where: {
-          id: ticketId,
-          state: TicketState.CALLING,
-          operatorId: user.userId,
-        },
-        data: { state: TicketState.IN_SERVICE, serviceStartedAt: now },
-      })
-      if (result.count !== 1) {
-        throw new BadRequestException('A senha deve estar em chamada para iniciar o atendimento')
-      }
-
-      await tx.counter.update({
-        where: { id: ticket.counterId! },
-        data: { state: CounterState.IN_SERVICE },
-      })
-      await tx.auditEvent.create({
-        data: {
-          eventType: 'service_started',
-          erId: ticket.erId,
-          ticketId,
-          operatorId: user.userId,
-          metadata: { counterId: ticket.counterId },
-        },
-      })
-      return tx.ticket.findUniqueOrThrow({
-        where: { id: ticketId },
-        include: { counter: { select: { number: true } } },
-      })
+    return this._transitionToInService(ticket, {
+      source: 'operator',
+      restrictToOperatorId: user.userId,
     })
-
-    this.panelGateway.emitToER(ticket.erId, 'ticket.service_started', {
-      ticketId,
-      code: ticket.code,
-      counterNumber: updated.counter?.number ?? 0,
-    })
-    return updated
   }
 
   async finishService(ticketId: string, user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
       throw new ForbiddenException('Somente operadoras podem finalizar atendimentos')
     }
-    return this._completeOperatorTicket(ticketId, user, TicketState.FINISHED)
+    const ticket = await this._getTicket(ticketId)
+    this._assertAssignedOperator(ticket, user)
+    return this._transitionToFinished(ticket, {
+      source: 'operator',
+      restrictToOperatorId: user.userId,
+    })
   }
 
   async noShow(ticketId: string, user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
       throw new ForbiddenException('Somente operadoras podem registrar não comparecimento')
     }
-    return this._completeOperatorTicket(ticketId, user, TicketState.NO_SHOW)
+    return this._markNoShow(ticketId, user)
+  }
+
+  // Chamado pela integração: avança em nome do serviço, sem validar posse de
+  // operadora (diferente do fluxo da operadora). Idempotente se já IN_SERVICE.
+  async advanceToInService(
+    ticketId: string,
+    ctx: IntegrationActionContext,
+  ): Promise<IntegrationActionResult> {
+    const ticket = await this._getTicket(ticketId)
+    if (ticket.state === TicketState.IN_SERVICE) {
+      return { ticket, idempotent: true }
+    }
+    if (ticket.state === TicketState.WAITING || ticket.state === TicketState.PAUSED) {
+      throw new ConflictException({ code: 'TICKET_NOT_CALLED', message: 'A senha ainda não foi chamada' })
+    }
+    if (ticket.state !== TicketState.CALLING) {
+      throw new ConflictException({ code: 'TICKET_ALREADY_CLOSED', message: 'A senha já foi encerrada' })
+    }
+    try {
+      const updated = await this._transitionToInService(ticket, { source: 'integration', ...ctx })
+      return { ticket: updated, idempotent: false }
+    } catch (error) {
+      return this._idempotentOnRace(error, ticketId, TicketState.IN_SERVICE)
+    }
+  }
+
+  async completeService(
+    ticketId: string,
+    ctx: IntegrationActionContext,
+  ): Promise<IntegrationActionResult> {
+    const ticket = await this._getTicket(ticketId)
+    if (ticket.state === TicketState.FINISHED) {
+      return { ticket, idempotent: true }
+    }
+    if (
+      ticket.state === TicketState.WAITING ||
+      ticket.state === TicketState.CALLING ||
+      ticket.state === TicketState.PAUSED
+    ) {
+      throw new ConflictException({
+        code: 'TICKET_NOT_IN_SERVICE',
+        message: 'A senha não está em atendimento',
+      })
+    }
+    if (ticket.state !== TicketState.IN_SERVICE) {
+      throw new ConflictException({ code: 'TICKET_ALREADY_CLOSED', message: 'A senha já foi encerrada' })
+    }
+    try {
+      const updated = await this._transitionToFinished(ticket, { source: 'integration', ...ctx })
+      return { ticket: updated, idempotent: false }
+    } catch (error) {
+      return this._idempotentOnRace(error, ticketId, TicketState.FINISHED)
+    }
+  }
+
+  // Quando duas chamadas concorrentes disputam a transição, o updateMany atômico
+  // deixa uma vencer (count=1) e a outra falhar (count=0 → BadRequestException).
+  // Se a senha já está no estado-alvo, a perdedora retorna idempotente em vez de 400.
+  private async _idempotentOnRace(
+    error: unknown,
+    ticketId: string,
+    targetState: TicketState,
+  ): Promise<IntegrationActionResult> {
+    if (error instanceof BadRequestException) {
+      const fresh = await this._getTicket(ticketId)
+      if (fresh.state === targetState) {
+        return { ticket: fresh, idempotent: true }
+      }
+    }
+    throw error
   }
 
   async correct(ticketId: string, dto: CorrectTicketDto, user: AuthenticatedUser) {
@@ -819,31 +877,18 @@ export class TicketService {
     return { ...updated, currentPosition }
   }
 
-  private async _completeOperatorTicket(
-    ticketId: string,
-    user: AuthenticatedUser,
-    targetState: 'FINISHED' | 'NO_SHOW',
-  ) {
+  private async _markNoShow(ticketId: string, user: AuthenticatedUser) {
     const ticket = await this._getTicket(ticketId)
     this._assertAssignedOperator(ticket, user)
-    const requiredState =
-      targetState === TicketState.FINISHED ? TicketState.IN_SERVICE : TicketState.CALLING
     const now = new Date()
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.ticket.updateMany({
-        where: { id: ticketId, state: requiredState, operatorId: user.userId },
-        data:
-          targetState === TicketState.FINISHED
-            ? { state: targetState, serviceFinishedAt: now }
-            : { state: targetState, noShowAt: now },
+        where: { id: ticketId, state: TicketState.CALLING, operatorId: user.userId },
+        data: { state: TicketState.NO_SHOW, noShowAt: now },
       })
       if (result.count !== 1) {
-        throw new BadRequestException(
-          targetState === TicketState.FINISHED
-            ? 'A senha deve estar em atendimento para ser finalizada'
-            : 'A senha deve estar em chamada para registrar não comparecimento',
-        )
+        throw new BadRequestException('A senha deve estar em chamada para registrar não comparecimento')
       }
 
       await tx.counter.update({
@@ -852,8 +897,7 @@ export class TicketService {
       })
       await tx.auditEvent.create({
         data: {
-          eventType:
-            targetState === TicketState.FINISHED ? 'service_finished' : 'ticket_marked_no_show',
+          eventType: 'ticket_marked_no_show',
           erId: ticket.erId,
           ticketId,
           operatorId: user.userId,
@@ -863,12 +907,114 @@ export class TicketService {
       return tx.ticket.findUniqueOrThrow({ where: { id: ticketId } })
     })
 
-    this.panelGateway.emitToER(
-      ticket.erId,
-      targetState === TicketState.FINISHED ? 'ticket.service_finished' : 'ticket.no_show',
-      { ticketId, code: ticket.code },
-    )
+    this.panelGateway.emitToER(ticket.erId, 'ticket.no_show', { ticketId, code: ticket.code })
     return updated
+  }
+
+  private async _transitionToInService(
+    ticket: Awaited<ReturnType<TicketService['_getTicket']>>,
+    opts: ServiceTransitionOptions,
+  ) {
+    if (!ticket.counterId) {
+      throw new ConflictException({ code: 'TICKET_NOT_CALLED', message: 'A senha ainda não foi chamada' })
+    }
+    const counterId = ticket.counterId
+    const now = new Date()
+    const where: Prisma.TicketWhereInput = { id: ticket.id, state: TicketState.CALLING }
+    if (opts.restrictToOperatorId) where.operatorId = opts.restrictToOperatorId
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.ticket.updateMany({
+        where,
+        data: { state: TicketState.IN_SERVICE, serviceStartedAt: now },
+      })
+      if (result.count !== 1) {
+        throw new BadRequestException('A senha deve estar em chamada para iniciar o atendimento')
+      }
+
+      await tx.counter.update({
+        where: { id: counterId },
+        data: { state: CounterState.IN_SERVICE },
+      })
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'service_started',
+          erId: ticket.erId,
+          ticketId: ticket.id,
+          operatorId: ticket.operatorId,
+          metadata: this._serviceAuditMetadata(counterId, opts),
+        },
+      })
+      return tx.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: { counter: { select: { number: true } } },
+      })
+    })
+
+    this.panelGateway.emitToER(ticket.erId, 'ticket.service_started', {
+      ticketId: ticket.id,
+      code: ticket.code,
+      counterNumber: updated.counter?.number ?? 0,
+    })
+    return updated
+  }
+
+  private async _transitionToFinished(
+    ticket: Awaited<ReturnType<TicketService['_getTicket']>>,
+    opts: ServiceTransitionOptions,
+  ) {
+    if (!ticket.counterId) {
+      throw new ConflictException({ code: 'TICKET_NOT_IN_SERVICE', message: 'A senha não está em atendimento' })
+    }
+    const counterId = ticket.counterId
+    const now = new Date()
+    const where: Prisma.TicketWhereInput = { id: ticket.id, state: TicketState.IN_SERVICE }
+    if (opts.restrictToOperatorId) where.operatorId = opts.restrictToOperatorId
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.ticket.updateMany({
+        where,
+        data: { state: TicketState.FINISHED, serviceFinishedAt: now },
+      })
+      if (result.count !== 1) {
+        throw new BadRequestException('A senha deve estar em atendimento para ser finalizada')
+      }
+
+      await tx.counter.update({
+        where: { id: counterId },
+        data: { state: CounterState.ACTIVE },
+      })
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'service_finished',
+          erId: ticket.erId,
+          ticketId: ticket.id,
+          operatorId: ticket.operatorId,
+          metadata: this._serviceAuditMetadata(counterId, opts),
+        },
+      })
+      return tx.ticket.findUniqueOrThrow({ where: { id: ticket.id } })
+    })
+
+    this.panelGateway.emitToER(ticket.erId, 'ticket.service_finished', {
+      ticketId: ticket.id,
+      code: ticket.code,
+    })
+    return updated
+  }
+
+  private _serviceAuditMetadata(
+    counterId: string,
+    opts: ServiceTransitionOptions,
+  ): Prisma.InputJsonObject {
+    const metadata: Record<string, Prisma.InputJsonValue> = { counterId }
+    if (opts.source === 'integration') {
+      metadata.source = 'integration'
+      if (opts.client) metadata.client = opts.client
+      if (opts.scopes?.length) metadata.scopes = opts.scopes
+      if (opts.idempotencyKey) metadata.idempotencyKey = opts.idempotencyKey
+    }
+    return metadata
   }
 
   private _resolveTicketOwner(user: AuthenticatedUser, dto: CreateTicketDto) {
