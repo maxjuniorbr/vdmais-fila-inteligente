@@ -43,4 +43,50 @@ describe('Table', () => {
     render(<Table columns={columns} rows={rows} getRowKey={(row) => row.id} />)
     expect(screen.getByText('Ana')).toHaveAttribute('data-label', 'Nome')
   })
+
+  it('renders fallback cell values for every primitive and object type', () => {
+    interface MixedRow {
+      id: string
+      text: string
+      count: number
+      flag: boolean
+      big: bigint
+      meta: { label: string }
+      empty: null
+      sym: symbol
+    }
+    const mixedRows: MixedRow[] = [
+      {
+        id: '1',
+        text: 'hello',
+        count: 42,
+        flag: true,
+        big: 9007199254740993n,
+        meta: { label: 'tag' },
+        empty: null,
+        sym: Symbol('x'),
+      },
+    ]
+    const mixedColumns: Column<MixedRow>[] = [
+      { key: 'text', header: 'Texto' },
+      { key: 'count', header: 'Contagem' },
+      { key: 'flag', header: 'Flag' },
+      { key: 'big', header: 'Big' },
+      { key: 'meta', header: 'Meta' },
+      { key: 'empty', header: 'Vazio' },
+      { key: 'sym', header: 'Simbolo' },
+    ]
+    const { container } = render(
+      <Table columns={mixedColumns} rows={mixedRows} getRowKey={(row) => row.id} />,
+    )
+    expect(screen.getByText('hello')).toBeInTheDocument()
+    expect(screen.getByText('42')).toBeInTheDocument()
+    expect(screen.getByText('true')).toBeInTheDocument()
+    expect(screen.getByText('9007199254740993')).toBeInTheDocument()
+    expect(screen.getByText('{"label":"tag"}')).toBeInTheDocument()
+    const emptyCell = container.querySelector('td[data-label="Vazio"]')
+    expect(emptyCell).toHaveTextContent('')
+    const symbolCell = container.querySelector('td[data-label="Simbolo"]')
+    expect(symbolCell).toHaveTextContent('')
+  })
 })
