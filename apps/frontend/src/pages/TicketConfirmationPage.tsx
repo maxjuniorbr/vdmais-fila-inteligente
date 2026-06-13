@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Alert } from '../components/Alert'
-import { getQueueEntryChannel, getQueueEntryPath } from '../auth/session'
+import { consumeQueueEntryPending, getQueueEntryChannel, getQueueEntryPath } from '../auth/session'
 import { BrandMark } from '../components/BrandMark'
 import { Button } from '../components/Button'
 import { Modal } from '../components/Modal'
 import { brand } from '../styles/brand'
+import { playCallAlert, unlockCallAlert } from '../utils/callAlert'
 
 interface TicketInfo {
   id: string
@@ -125,7 +126,9 @@ function TicketStatus({
     return (
       <>
         <p style={styles.positionLabel}>Situação</p>
-        <p style={{ ...styles.position, color: brand.warning }}>Chamada! Dirija-se ao caixa</p>
+        <p className="gb-call-alert" style={{ ...styles.position, color: brand.warning }}>
+          Chamada! Dirija-se ao caixa
+        </p>
         <p style={styles.hint}>Sua senha foi chamada. Dirija-se ao caixa indicado no painel.</p>
       </>
     )
@@ -164,6 +167,37 @@ export function TicketConfirmationPage() {
   const [confirmingLeave, setConfirmingLeave] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const entryStartedRef = useRef(false)
+  const prevStateRef = useRef<string | null>(null)
+
+  const fetchMyStatus = useCallback(
+    (token: string) =>
+      fetch(`/api/tickets/my-status?erId=${erId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    [erId],
+  )
+
+  // Alert the RE the moment her ticket is called. We only fire on the transition
+  // into CALLING (not on initial load) so a page reload while already called
+  // does not blast the sound. Audio is unlocked at queue entry; this is a
+  // fallback unlock for any direct interaction with this screen.
+  useEffect(() => {
+    const unlock = () => unlockCallAlert()
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  useEffect(() => {
+    const state = ticket?.state ?? null
+    if (state === 'CALLING' && prevStateRef.current && prevStateRef.current !== 'CALLING') {
+      playCallAlert()
+    }
+    prevStateRef.current = state
+  }, [ticket?.state])
 
   useEffect(() => {
     if (!ticket) {
@@ -182,9 +216,7 @@ export function TicketConfirmationPage() {
     if (!token) return
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`/api/tickets/my-status?erId=${erId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const res = await fetchMyStatus(token)
         if (!res.ok) return
         const data = (await res.json()) as TicketInfo
         setTicket(data)
@@ -195,7 +227,7 @@ export function TicketConfirmationPage() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [ticket?.state, ticket?.id, erId])
+  }, [ticket?.state, ticket?.id, erId, fetchMyStatus])
 
   useEffect(() => {
     if (!ticket) return
@@ -214,44 +246,59 @@ export function TicketConfirmationPage() {
       navigate(getQueueEntryPath(erId), { replace: true })
       return
     }
-    const entryChannel = getQueueEntryChannel(erId)
-    if (!entryChannel) {
-      navigate(getQueueEntryPath(erId), { replace: true })
-      return
-    }
 
-    // A single page entry must create exactly one ticket. React StrictMode
-    // double-invokes effects on mount (and remounts can re-run this), so without
-    // this guard a second POST fires, gets correctly rejected as a duplicate,
-    // and inflates "Duplicidades bloqueadas" on every entry.
+    // StrictMode double-invokes effects on mount (and remounts re-run this);
+    // guard so the entry/read happens once.
     if (entryStartedRef.current) return
     entryStartedRef.current = true
 
-    fetch('/api/tickets', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        erId,
-        entryChannel,
-      }),
-    })
-      .then(async (res) => {
-        const data = await res.json()
-        if (!res.ok) {
-          if (res.status === 409) {
-            return fetchCurrentTicket(token)
-          }
-          throw new Error(data.message ?? 'Erro ao entrar na fila')
-        }
-        return data as TicketInfo
+    // A deliberate entry creates exactly one ticket. A refresh/reopen has no
+    // pending intent, so we only READ the current status — a reload must never
+    // re-enqueue the RE (e.g. recreating a ticket after a no-show).
+    const entering = consumeQueueEntryPending(erId)
+
+    if (entering) {
+      const entryChannel = getQueueEntryChannel(erId)
+      if (!entryChannel) {
+        navigate(getQueueEntryPath(erId), { replace: true })
+        return
+      }
+      fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ erId, entryChannel }),
       })
-      .then((data) => setTicket(data))
+        .then(async (res) => {
+          const data = await res.json()
+          if (!res.ok) {
+            if (res.status === 409) return fetchCurrentTicket(token)
+            throw new Error(data.message ?? 'Erro ao entrar na fila')
+          }
+          return data as TicketInfo
+        })
+        .then((data) => setTicket(data))
+        .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Erro inesperado'))
+        .finally(() => setLoading(false))
+      return
+    }
+
+    // Read-only path (refresh/reopen): show the real current status. With no
+    // ticket at all the RE shouldn't be here, so send her to the entry screen.
+    fetchMyStatus(token)
+      .then(async (res) => {
+        if (res.status === 404) {
+          navigate(getQueueEntryPath(erId), { replace: true })
+          return null
+        }
+        if (!res.ok) throw new Error('Não foi possível carregar sua senha')
+        return (await res.json()) as TicketInfo
+      })
+      .then((data) => {
+        if (data) setTicket(data)
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Erro inesperado'))
       .finally(() => setLoading(false))
-  }, [erId, navigate])
+  }, [erId, navigate, fetchMyStatus])
 
   const handlePauseExpired = useCallback(() => {
     setTicket((prev) => (prev?.state === 'PAUSED' ? { ...prev, state: 'CANCELLED' } : prev))
@@ -402,7 +449,7 @@ export function TicketConfirmationPage() {
           {ticket.code}
         </p>
 
-        <div aria-live="polite">
+        <div aria-live={ticket.state === 'CALLING' ? 'assertive' : 'polite'}>
           <TicketStatus
             state={ticket.state}
             isPaused={isPaused}

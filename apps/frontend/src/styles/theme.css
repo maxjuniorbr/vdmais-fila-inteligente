@@ -278,6 +278,27 @@ button.gb-button:not(:disabled):active {
   min-width: 0;
 }
 
+/* Atrai a atenção quando a senha da RE é chamada (acompanha o som/vibração). */
+@keyframes gb-call-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.gb-call-alert {
+  animation: gb-call-pulse 1s ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gb-call-alert {
+    animation: none;
+  }
+}
+
 .gb-admin-er-grid,
 .gb-admin-access-grid,
 .gb-admin-resource-grid,
