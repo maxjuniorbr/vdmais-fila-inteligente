@@ -882,7 +882,8 @@ describe('TicketService', () => {
   describe('selfCancel', () => {
     it('cancels a WAITING ticket owned by the representative', async () => {
       tx.ticket.findUnique.mockResolvedValue(ticketBase)
-      tx.ticket.update.mockResolvedValue({
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
         ...ticketBase,
         state: TicketState.CANCELLED,
         cancelReason: 'Desistência da representante',
@@ -891,8 +892,11 @@ describe('TicketService', () => {
 
       const result = await service.selfCancel('ticket-1', 'rep-1')
 
-      expect(tx.ticket.update).toHaveBeenCalledWith({
-        where: { id: 'ticket-1' },
+      // Locks the row and guards the state in the write to avoid clobbering a
+      // concurrent callNext (WAITING → CALLING).
+      expect(tx.$queryRaw).toHaveBeenCalled()
+      expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+        where: { id: 'ticket-1', state: { in: [TicketState.WAITING, TicketState.PAUSED] } },
         data: expect.objectContaining({
           state: TicketState.CANCELLED,
           cancelReason: 'Desistência da representante',
@@ -910,12 +914,21 @@ describe('TicketService', () => {
 
     it('cancels a PAUSED ticket owned by the representative', async () => {
       tx.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED })
-      tx.ticket.update.mockResolvedValue({
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
         ...ticketBase,
         state: TicketState.CANCELLED,
       })
 
       await expect(service.selfCancel('ticket-1', 'rep-1')).resolves.not.toThrow()
+    })
+
+    it('rejects when the row was already moved out of WAITING/PAUSED concurrently', async () => {
+      tx.ticket.findUnique.mockResolvedValue(ticketBase)
+      // The guarded updateMany matches nothing because callNext already advanced it.
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+
+      await expect(service.selfCancel('ticket-1', 'rep-1')).rejects.toThrow(BadRequestException)
     })
 
     it('rejects selfCancel if ticket belongs to another representative', async () => {
@@ -1083,6 +1096,11 @@ describe('TicketService', () => {
   })
 
   describe('getMyActiveTicket', () => {
+    it('requires an erId so the ER filter is never silently dropped', async () => {
+      await expect(service.getMyActiveTicket('rep-1', '')).rejects.toThrow(BadRequestException)
+      expect(prisma.ticket.findFirst).not.toHaveBeenCalled()
+    })
+
     it('returns the active waiting ticket with position and pause timeout', async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         ...ticketBase,
@@ -1177,6 +1195,11 @@ describe('TicketService', () => {
   })
 
   describe('getMyTicketStatus', () => {
+    it('requires an erId so the ER filter is never silently dropped', async () => {
+      await expect(service.getMyTicketStatus('rep-1', '')).rejects.toThrow(BadRequestException)
+      expect(prisma.ticket.findFirst).not.toHaveBeenCalled()
+    })
+
     it('returns a NO_SHOW ticket instead of throwing (so the RE sees the real state)', async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         ...ticketBase,

@@ -13,6 +13,7 @@ function makeClient(authToken?: string) {
     id: 'socket-1',
     join: jest.fn(),
     emit: jest.fn(),
+    disconnect: jest.fn(),
     handshake: { auth: { token: authToken } },
     data: {} as Record<string, unknown>,
   }
@@ -88,6 +89,8 @@ describe('PanelGateway', () => {
     )
     expect(client.join).not.toHaveBeenCalled()
     expect(client.emit).toHaveBeenCalledWith('joinER.denied', { erId: 'er-1234567890' })
+    // The socket must be dropped so it cannot linger retrying joinER.
+    expect(client.disconnect).toHaveBeenCalled()
   })
 
   it('ignores an invalid erId without checking authorization', async () => {
