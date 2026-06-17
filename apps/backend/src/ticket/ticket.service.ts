@@ -208,6 +208,15 @@ export class TicketService {
 
   async selfCancel(ticketId: string, representativeId: string) {
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Lock the row so a concurrent callNext (WAITING → CALLING) cannot be
+      // clobbered: without this, an unguarded update-by-id could overwrite a
+      // just-called ticket back to CANCELLED and strand its counter in CALLING.
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "tickets"
+        WHERE "id" = ${ticketId}
+        FOR UPDATE
+      `
       const ticket = await tx.ticket.findUnique({ where: { id: ticketId } })
       if (!ticket) throw new NotFoundException('Senha não encontrada')
       if (ticket.representativeId !== representativeId) {
@@ -219,14 +228,19 @@ export class TicketService {
         )
       }
 
-      const result = await tx.ticket.update({
-        where: { id: ticketId },
+      const result = await tx.ticket.updateMany({
+        where: { id: ticketId, state: { in: [TicketState.WAITING, TicketState.PAUSED] } },
         data: {
           state: TicketState.CANCELLED,
           cancelReason: 'Desistência da representante',
           cancelledAt: new Date(),
         },
       })
+      if (result.count !== 1) {
+        throw new BadRequestException(
+          'Somente senhas aguardando ou pausadas podem ser canceladas pela representante',
+        )
+      }
 
       await tx.auditEvent.create({
         data: {
@@ -237,7 +251,7 @@ export class TicketService {
           metadata: { reason: 'Desistência da representante', selfCancelled: true },
         },
       })
-      return result
+      return tx.ticket.findUniqueOrThrow({ where: { id: ticketId } })
     })
 
     this.panelGateway.emitToER(updated.erId, 'ticket.cancelled', {
@@ -639,6 +653,9 @@ export class TicketService {
   }
 
   async getMyActiveTicket(representativeId: string, erId: string) {
+    // A missing erId would make Prisma drop the filter (erId: undefined) and
+    // return a ticket from any ER. Require it explicitly.
+    if (!erId) throw new BadRequestException('erId é obrigatório')
     const ticket = await this.prisma.ticket.findFirst({
       where: { representativeId, erId, state: { in: ACTIVE_STATES } },
       include: REPRESENTATIVE_TICKET_INCLUDE,
@@ -670,6 +687,7 @@ export class TicketService {
   // guessing it from a 404 — so a no-show no longer reads as "concluded" and a
   // manager restore brings the live status back.
   async getMyTicketStatus(representativeId: string, erId: string) {
+    if (!erId) throw new BadRequestException('erId é obrigatório')
     const ticket = await this.prisma.ticket.findFirst({
       where: { representativeId, erId },
       orderBy: { createdAt: 'desc' },

@@ -19,6 +19,7 @@ export class IntegrationActionDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   erId?: string
 
   @ApiPropertyOptional({ description: 'Chave de idempotência para correlação de retries.' })
