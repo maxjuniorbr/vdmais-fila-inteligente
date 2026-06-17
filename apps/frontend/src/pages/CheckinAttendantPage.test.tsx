@@ -89,6 +89,53 @@ describe('CheckinAttendantPage', () => {
     expect(screen.getByLabelText('CPF, telefone ou código RE')).toHaveValue('')
   })
 
+  it('keeps the registration form open with its data when the ticket creation fails after registering', async () => {
+    authenticate()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString()
+        if (url.endsWith('/api/representatives') && init?.method === 'POST') {
+          return new Response(
+            JSON.stringify({
+              id: 're-9',
+              fullName: 'Bruna Lima',
+              cpf: '99988877766',
+              phone: '11988887777',
+              reCode: 'RE0099',
+            }),
+            { status: 201 },
+          )
+        }
+        if (url.includes('/api/tickets')) {
+          return new Response(JSON.stringify({ message: 'Senha já existe' }), { status: 409 })
+        }
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar nova RE' }))
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nome completo'), 'Bruna Lima')
+    await user.type(screen.getByLabelText('CPF'), '99988877766')
+    await user.type(screen.getByLabelText('Telefone'), '11988887777')
+    fireEvent.change(screen.getByLabelText('Data de nascimento'), {
+      target: { value: '1992-05-05' },
+    })
+    await user.type(screen.getByLabelText('Código RE'), 'RE0099')
+    await user.type(screen.getByLabelText('Senha inicial'), 'Teste@123')
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar e criar senha' }))
+
+    // The ticket failed, so the RE is registered but has no senha: the form must
+    // stay open with the typed data instead of silently clearing as if it worked.
+    expect(await screen.findByText('Senha já existe')).toBeInTheDocument()
+    expect(screen.queryByText('Check-in realizado')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Nome completo')).toHaveValue('Bruna Lima')
+    expect(screen.getByLabelText('Código RE')).toHaveValue('RE0099')
+  })
+
   it('surfaces an error when the search request fails', async () => {
     authenticate()
     vi.stubGlobal(

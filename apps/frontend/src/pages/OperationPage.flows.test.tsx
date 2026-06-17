@@ -74,6 +74,42 @@ describe('OperationPage flows', () => {
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/counters/c1/close'))
   })
 
+  it('keeps the close-counter modal open and the counter selected when closing fails', async () => {
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Eu' } }],
+    })
+    vi.mocked(api.post).mockRejectedValue(new Error('Há um atendimento em andamento'))
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Fechar caixa' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar caixa' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/counters/c1/close'))
+    // The close failed: the modal must stay open (showing the error) and the
+    // counter must remain selected instead of being silently deselected.
+    expect(await within(dialog).findByText('Há um atendimento em andamento')).toBeInTheDocument()
+    expect(screen.getByLabelText('Caixa de atendimento')).toHaveValue('c1')
+  })
+
+  it('keeps the pause reason when pausing the counter fails', async () => {
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Eu' } }],
+    })
+    vi.mocked(api.post).mockRejectedValue(new Error('Não foi possível pausar'))
+    renderPage()
+
+    const user = userEvent.setup()
+    await user.type(await screen.findByLabelText('Motivo da pausa'), 'almoço')
+    fireEvent.click(screen.getByRole('button', { name: 'Pausar' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/counters/c1/pause', { reason: 'almoço' }),
+    )
+    // The pause failed, so the typed reason must be preserved for a retry.
+    expect(screen.getByLabelText('Motivo da pausa')).toHaveValue('almoço')
+  })
+
   it('lets an operator assume an available counter', async () => {
     setOverview({
       counters: [{ id: 'c1', number: 1, state: 'UNAVAILABLE', operator: null }],

@@ -52,6 +52,19 @@ describe('Tabs', () => {
     expect(screen.getByRole('tab', { name: 'Aba C' })).toHaveFocus()
   })
 
+  it('falls back to a valid tab when the active one is removed from the set', () => {
+    const { rerender } = render(<Tabs tabs={tabs} ariaLabel="Exemplo" initialId="c" />)
+    expect(screen.getByText('Conteúdo C')).toBeVisible()
+
+    // Drop tab C (the active one). Previously no tab stayed selected and every
+    // panel rendered hidden, leaving the content blank with no way to recover.
+    rerender(<Tabs tabs={tabs.slice(0, 2)} ariaLabel="Exemplo" initialId="c" />)
+
+    expect(screen.getByRole('tab', { name: 'Aba A' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Conteúdo A')).toBeVisible()
+    expect(screen.queryByRole('tab', { name: 'Aba C' })).not.toBeInTheDocument()
+  })
+
   it('connects panel to tab via aria attributes', () => {
     render(<Tabs tabs={tabs} ariaLabel="Exemplo" />)
     const tab = screen.getByRole('tab', { name: 'Aba A' })
