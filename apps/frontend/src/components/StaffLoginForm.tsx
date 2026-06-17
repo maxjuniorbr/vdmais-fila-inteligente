@@ -36,10 +36,16 @@ export function StaffLoginForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
-      const data = await response.json()
+      // Guard the parse: gateway/proxy errors can return non-JSON bodies, and an
+      // unguarded res.json() would throw a SyntaxError that masks the real message.
+      const data = (await response.json().catch(() => ({}))) as {
+        message?: string
+        access_token: string
+        user: StaffProfile
+      }
       if (!response.ok) throw new Error(data.message ?? 'Credenciais inválidas')
 
-      const profile = data.user as StaffProfile
+      const profile = data.user
       if (allowedRoles && !allowedRoles.includes(profile.role)) {
         throw new Error('Seu perfil não possui acesso a esta área')
       }

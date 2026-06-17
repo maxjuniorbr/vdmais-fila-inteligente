@@ -50,6 +50,13 @@ function Countdown({
     return () => clearInterval(id)
   }, [])
 
+  // Re-arm the one-shot expiry latch whenever the deadline changes (e.g. a ticket
+  // re-called or re-paused while this instance stays mounted); otherwise onExpire
+  // would fire only for the very first deadline.
+  useEffect(() => {
+    firedRef.current = false
+  }, [startAt, timeoutSeconds])
+
   const deadline = new Date(startAt).getTime() + timeoutSeconds * 1000
   const totalMs = timeoutSeconds * 1000
   const remainingMs = Math.max(0, deadline - now)

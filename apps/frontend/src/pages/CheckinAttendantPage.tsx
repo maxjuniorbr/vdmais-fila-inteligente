@@ -64,7 +64,7 @@ export function CheckinAttendantPage() {
     }
   }
 
-  async function createTicket(representative: Representative) {
+  async function createTicket(representative: Representative): Promise<boolean> {
     setError(null)
     setLoading(true)
     try {
@@ -75,8 +75,10 @@ export function CheckinAttendantPage() {
       })
       setSelected(representative)
       setTicket(data)
+      return true
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro no check-in')
+      return false
     } finally {
       setLoading(false)
     }
@@ -88,9 +90,12 @@ export function CheckinAttendantPage() {
     setLoading(true)
     try {
       const representative = await api.post<Representative>('/representatives', registration)
-      await createTicket(representative)
-      setRegistration(emptyRegistration)
-      setShowRegistration(false)
+      // Só limpa e fecha o formulário se a senha foi realmente criada; createTicket
+      // engole o próprio erro, então sem este guard uma falha pareceria sucesso.
+      if (await createTicket(representative)) {
+        setRegistration(emptyRegistration)
+        setShowRegistration(false)
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro no cadastro')
       setLoading(false)
