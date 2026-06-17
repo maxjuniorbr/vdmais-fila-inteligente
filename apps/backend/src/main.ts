@@ -46,7 +46,12 @@ function setupIntegrationDocs(app: NestExpressApplication) {
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule)
-  app.set('trust proxy', true)
+  // Trust a FIXED number of proxy hops (the platform load balancer), not every
+  // hop. With `true`, Express derives req.ip from the left-most X-Forwarded-For
+  // entry, which the client sets — making the rate-limit key spoofable. A fixed
+  // hop count makes req.ip the address the trusted proxy actually saw.
+  const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10)
+  app.set('trust proxy', Number.isNaN(trustProxyHops) ? 1 : trustProxyHops)
   app.use(helmet())
   app.enableShutdownHooks()
 

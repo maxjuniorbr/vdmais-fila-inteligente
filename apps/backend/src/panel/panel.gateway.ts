@@ -52,6 +52,9 @@ export class PanelGateway implements OnGatewayDisconnect {
     })
     if (!authorized) {
       client.emit('joinER.denied', { erId })
+      // Drop the socket: an unauthenticated client must not linger retrying
+      // joinER (each retry is an unbounded DB-backed token check).
+      client.disconnect()
       return
     }
 

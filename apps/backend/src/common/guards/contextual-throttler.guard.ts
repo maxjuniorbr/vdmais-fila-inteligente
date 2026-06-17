@@ -3,17 +3,16 @@ import { ThrottlerGuard } from '@nestjs/throttler'
 
 interface ThrottledRequest {
   ip?: string
-  body?: {
-    erId?: unknown
-    entryChannel?: unknown
-  }
 }
 
+// Key the rate limit strictly by the proxy-resolved client IP. The request body
+// (erId/entryChannel) is attacker-controlled: mixing it into the key let a client
+// land in a fresh bucket on every attempt by varying those fields, defeating the
+// brute-force protection on /auth/login, /auth/register and /tickets.
+// `request.ip` (with a fixed `trust proxy` hop count in main.ts) is the trustworthy
+// client address — unlike the left-most X-Forwarded-For entry, which is spoofable.
 export function queueThrottleTracker(request: ThrottledRequest): string {
-  const erId = typeof request.body?.erId === 'string' ? request.body.erId : '-'
-  const entryChannel =
-    typeof request.body?.entryChannel === 'string' ? request.body.entryChannel : '-'
-  return `${request.ip ?? 'unknown'}:${erId}:${entryChannel}`
+  return request.ip ?? 'unknown'
 }
 
 @Injectable()

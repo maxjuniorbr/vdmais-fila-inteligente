@@ -75,7 +75,7 @@ export class IntegrationService {
       select: { id: true, erId: true },
     })
     if (atCounter.length > 0) {
-      return this._singleTicketId(atCounter)
+      return this._singleTicketId(atCounter, { strict: true })
     }
 
     if (action === 'finish') {
@@ -90,7 +90,10 @@ export class IntegrationService {
         select: { id: true, erId: true },
       })
       if (finishedToday.length > 0) {
-        return this._singleTicketId(finishedToday)
+        // Lenient: a RE may have several FINISHED tickets today (multiple queue
+        // entries); the list is ordered by serviceFinishedAt desc, so take the
+        // most recent for idempotency.
+        return this._singleTicketId(finishedToday, { strict: false })
       }
     }
 
@@ -128,12 +131,24 @@ export class IntegrationService {
     return representative.id
   }
 
-  private _singleTicketId(tickets: Array<{ id: string; erId: string }>): string {
+  private _singleTicketId(
+    tickets: Array<{ id: string; erId: string }>,
+    { strict }: { strict: boolean },
+  ): string {
     const distinctErs = new Set(tickets.map((ticket) => ticket.erId))
     if (distinctErs.size > 1) {
       throw new ConflictException({
         code: 'MULTIPLE_ACTIVE_TICKETS',
         message: 'Revendedora em atendimento em mais de um ER; informe erId para desambiguar',
+      })
+    }
+    // For the at-counter path, more than one active ticket in a single ER is an
+    // anomaly (a RE has at most one). Fail deterministically instead of silently
+    // acting on an arbitrary ticket.
+    if (strict && tickets.length > 1) {
+      throw new ConflictException({
+        code: 'MULTIPLE_ACTIVE_TICKETS',
+        message: 'Mais de uma senha ativa para esta revendedora; ação ambígua',
       })
     }
     return tickets[0].id

@@ -15,7 +15,7 @@ export class TicketController {
 
   @Post()
   @Roles('REPRESENTATIVE', 'ATTENDANT')
-  @Throttle({ default: { ttl: 60000, limit: 20 } })
+  @Throttle({ default: { ttl: 60000, limit: 40 } })
   create(@Body() dto: CreateTicketDto, @Request() req: { user: AuthenticatedUser }) {
     return this.ticketService.create(req.user, dto)
   }
