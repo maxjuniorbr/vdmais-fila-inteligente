@@ -1,4 +1,17 @@
-import { queueThrottleTracker } from './contextual-throttler.guard'
+import { ContextualThrottlerGuard, queueThrottleTracker } from './contextual-throttler.guard'
+
+describe('ContextualThrottlerGuard', () => {
+  it('keys throttling through the IP-only tracker override', async () => {
+    // getTracker does not use `this`; call it off the prototype to avoid building
+    // the full ThrottlerGuard dependency graph.
+    const getTracker = (
+      ContextualThrottlerGuard.prototype as unknown as {
+        getTracker(request: { ip?: string }): Promise<string>
+      }
+    ).getTracker
+    await expect(getTracker({ ip: '203.0.113.10' })).resolves.toBe('203.0.113.10')
+  })
+})
 
 describe('queueThrottleTracker', () => {
   it('keys the rate limit by the client IP only', () => {

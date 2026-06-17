@@ -1,30 +1,21 @@
 /**
- * Post-fix integration tests — Design System Conformidade
+ * Architectural conformance guards — Design System.
  *
- * Validates that after the fix:
- * 1. OperationPage uses `formatDuration` (not inline elapsed expression)
- * 2. ManagerPage has no local `formatSeconds` function
- * 3. PanelPage has no local `formatDuration` function
- * 4. index.html contains <link> for IBM Plex Sans
- * 5. Smoke tests: main pages/components render without runtime errors
+ * Enforces the CLAUDE.md rule that all duration formatting goes through the
+ * central utils/format helper (no inline duration math / no per-page copies) and
+ * that index.html loads the IBM Plex Sans font. Behavioral rendering is covered by
+ * the dedicated page/component test files.
  *
- * Validates: Requirements 2.6, 2.7, 3.1, 3.2
+ * Validates: Requirements 2.6, 2.7
  */
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
 import { seedStaffSession } from '../test/staffToken'
 import { OperationPage } from '../pages/OperationPage'
-import { PanelPage } from '../pages/PanelPage'
-import { ManagerPage } from '../pages/ManagerPage'
-import { HomePage } from '../pages/HomePage'
-import { QueueEntryPage } from '../pages/QueueEntryPage'
-import { Alert } from '../components/Alert'
-import { Button } from '../components/Button'
 
 vi.mock('../api/client', () => ({
   api: {
@@ -129,122 +120,5 @@ describe('Integration 2.6 — index.html: IBM Plex Sans font link present', () =
     expect(html).toContain('rel="preconnect"')
     expect(html).toContain('fonts.googleapis.com')
     expect(html).toContain('fonts.gstatic.com')
-  })
-})
-
-describe('Smoke tests 3.1, 3.2 — Main pages render without runtime errors', () => {
-  it('Alert renders without errors for all tones', () => {
-    expect(() => render(<Alert tone="error">Erro</Alert>)).not.toThrow()
-    expect(() => render(<Alert tone="warning">Aviso</Alert>)).not.toThrow()
-    expect(() => render(<Alert tone="success">Sucesso</Alert>)).not.toThrow()
-    expect(() => render(<Alert tone="info">Info</Alert>)).not.toThrow()
-  })
-
-  it('Button renders without errors for all variants and sizes', () => {
-    expect(() => render(<Button variant="primary" size="md">Primário</Button>)).not.toThrow()
-    expect(() => render(<Button variant="secondary" size="md">Secundário</Button>)).not.toThrow()
-    expect(() => render(<Button variant="danger" size="md">Perigo</Button>)).not.toThrow()
-    expect(() => render(<Button variant="primary" size="sm">Primário sm</Button>)).not.toThrow()
-  })
-
-  it('HomePage renders without runtime errors', () => {
-    expect(() =>
-      render(
-        <MemoryRouter>
-          <HomePage />
-        </MemoryRouter>,
-      ),
-    ).not.toThrow()
-  })
-
-  it('QueueEntryPage renders without runtime errors', () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = input instanceof Request ? input.url : input.toString()
-        if (url.includes('/api/public/ers/')) {
-          return new Response(
-            JSON.stringify({ id: 'er-smoke', name: 'ER Smoke', isDayOpen: true }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } },
-          )
-        }
-        return new Response(null, { status: 201 })
-      }),
-    )
-
-    expect(() =>
-      render(
-        <MemoryRouter initialEntries={['/fila/er-smoke']}>
-          <Routes>
-            <Route path="/fila/:erId" element={<QueueEntryPage />} />
-          </Routes>
-        </MemoryRouter>,
-      ),
-    ).not.toThrow()
-  })
-
-  it('PanelPage renders without runtime errors', () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            current: null,
-            calling: [],
-            inService: [],
-            waiting: [],
-            avgServiceSeconds: null,
-            avgWaitSeconds: null,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      ),
-    )
-
-    expect(() =>
-      render(
-        <MemoryRouter initialEntries={['/painel/er-smoke']}>
-          <Routes>
-            <Route path="/painel/:erId" element={<PanelPage />} />
-          </Routes>
-        </MemoryRouter>,
-      ),
-    ).not.toThrow()
-  })
-
-  it('OperationPage renders without runtime errors (authenticated state)', async () => {
-    seedStaffSession({ id: 'operator-1', name: 'Operadora Smoke', role: 'OPERATOR', erId: 'er-1' })
-
-    vi.mocked(api.get).mockResolvedValue({
-      waiting: [],
-      calling: [],
-      inService: [],
-      paused: [],
-      recent: [],
-      counters: [],
-    })
-
-    expect(() => render(<OperationPage />)).not.toThrow()
-  })
-
-  it('ManagerPage renders without runtime errors (authenticated state)', async () => {
-    seedStaffSession({ id: 'manager-1', name: 'Gestora Smoke', role: 'MANAGER', erId: 'er-1' })
-
-    vi.mocked(api.get).mockResolvedValue({
-      waiting: [],
-      calling: [],
-      inService: [],
-      paused: [],
-      recent: [],
-      counters: [],
-    })
-
-    expect(() =>
-      render(
-        <MemoryRouter>
-          <ManagerPage />
-        </MemoryRouter>,
-      ),
-    ).not.toThrow()
   })
 })

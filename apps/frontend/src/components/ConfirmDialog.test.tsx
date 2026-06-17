@@ -41,6 +41,17 @@ describe('ConfirmDialog', () => {
     opener.remove()
   })
 
+  it('lets Tab fall through when focus is not on a boundary element', () => {
+    render(<ConfirmDialog title="Cancelar senha" onConfirm={vi.fn()} onClose={vi.fn()} />)
+    const dialog = screen.getByRole('dialog')
+    const reason = screen.getByLabelText('Motivo obrigatório')
+
+    reason.focus()
+    // The textarea is neither the first nor the last focusable, so the trap does
+    // not preventDefault — the event stays uncancelled (fireEvent returns true).
+    expect(fireEvent.keyDown(dialog, { key: 'Tab' })).toBe(true)
+  })
+
   it('has no detectable axe violations', async () => {
     render(<ConfirmDialog title="Restaurar senha" onConfirm={vi.fn()} onClose={vi.fn()} />)
 

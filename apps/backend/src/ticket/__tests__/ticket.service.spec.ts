@@ -1093,6 +1093,99 @@ describe('TicketService', () => {
         service.correct('ticket-1', { action: CorrectionAction.FINISH, reason: 'x' }, manager),
       ).rejects.toThrow(ConflictException)
     })
+
+    it('rejects create when the ER day is closed', async () => {
+      tx.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: false, dayOpenedAt: null })
+
+      await expect(
+        service.create(representative, { erId: 'er-1', entryChannel: EntryChannel.QR_CODE }),
+      ).rejects.toThrow('A operação do ER está encerrada hoje')
+    })
+
+    it('rejects create from a role that cannot create tickets', async () => {
+      await expect(
+        service.create(operator, { erId: 'er-1', entryChannel: EntryChannel.QR_CODE }),
+      ).rejects.toThrow('Este perfil não pode criar senhas')
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('rejects an attendant creating a ticket in another ER', async () => {
+      await expect(
+        service.create(
+          { ...attendant, erId: 'er-2' },
+          { erId: 'er-1', entryChannel: EntryChannel.CHECKIN_ASSISTED, representativeId: 'rep-2' },
+        ),
+      ).rejects.toThrow('Não é possível criar uma senha em outro ER')
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('maps a concurrent unique-constraint violation to a duplicate conflict', async () => {
+      const conflict = Object.assign(new Error('unique'), {
+        code: 'P2002',
+        clientVersion: '5',
+        name: 'PrismaClientKnownRequestError',
+      })
+      Object.setPrototypeOf(conflict, Prisma.PrismaClientKnownRequestError.prototype)
+      tx.ticket.create.mockRejectedValue(conflict)
+      // The recovery path uses the array form of $transaction; honor both shapes.
+      prisma.$transaction.mockImplementation((arg: unknown) =>
+        typeof arg === 'function'
+          ? (arg as (client: typeof tx) => Promise<unknown>)(tx)
+          : Promise.all(arg as Promise<unknown>[]),
+      )
+
+      await expect(
+        service.create(representative, { erId: 'er-1', entryChannel: EntryChannel.QR_CODE }),
+      ).rejects.toThrow('A representante já possui uma senha ativa neste ER')
+    })
+
+    it('rejects pause when a concurrent transition wins the CAS (count 0)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue(ticketBase)
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+
+      await expect(service.pauseTicket('ticket-1', 'rep-1')).rejects.toThrow(
+        'Não foi possível pausar a senha',
+      )
+    })
+
+    it('rejects resume when a concurrent transition wins the CAS (count 0)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+
+      await expect(service.resumeTicket('ticket-1', 'rep-1')).rejects.toThrow(
+        'Não foi possível retomar a senha',
+      )
+    })
+
+    it('rejects noShow when the ticket is no longer in CALLING (CAS count 0)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.IN_SERVICE,
+        counterId: 'counter-1',
+        operatorId: 'op-1',
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+
+      await expect(service.noShow('ticket-1', operator)).rejects.toThrow(
+        'A senha deve estar em chamada para registrar não comparecimento',
+      )
+    })
+
+    it('rejects restore from a non-manager', async () => {
+      await expect(service.restore('ticket-1', 'voltou', operator)).rejects.toThrow(
+        'Somente gestoras podem restaurar senhas',
+      )
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('rejects restore when the ER day is closed', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.NO_SHOW })
+      tx.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: false })
+
+      await expect(service.restore('ticket-1', 'voltou', manager)).rejects.toThrow(
+        'A operação do ER está encerrada hoje',
+      )
+    })
   })
 
   describe('getMyActiveTicket', () => {

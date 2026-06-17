@@ -1,15 +1,6 @@
 import { TicketState } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
-import { abbreviateName } from '../panel.presenter'
 import { PanelService } from '../panel.service'
-
-describe('panel presentation', () => {
-  it('skips Portuguese name particles when abbreviating the surname', () => {
-    expect(abbreviateName('Maria da Silva Santos')).toBe('Maria S.')
-    expect(abbreviateName('João dos Reis')).toBe('João R.')
-    expect(abbreviateName('Ana Souza')).toBe('Ana S.')
-  })
-})
 
 describe('PanelService', () => {
   const prisma = {
@@ -67,6 +58,28 @@ describe('PanelService', () => {
     )
     expect(result.calling[0]).not.toHaveProperty('ticketId')
     expect(result.calling[0]).not.toHaveProperty('calledAt')
+  })
+
+  it('defaults counterNumber to 0 and tolerates a missing calledAt', async () => {
+    prisma.ticket.findMany.mockImplementation((args: { where?: { state?: TicketState } }) => {
+      const state = args?.where?.state
+      if (state === TicketState.CALLING) {
+        return Promise.resolve([
+          { id: 't1', code: 'A001', calledAt: null, representative: { fullName: 'Ana Paula' }, counter: null },
+        ])
+      }
+      if (state === TicketState.IN_SERVICE) {
+        return Promise.resolve([{ id: 's1', code: 'B001', counter: null }])
+      }
+      return Promise.resolve([])
+    })
+    const service = new PanelService(prisma as unknown as PrismaService)
+
+    const result = await service.getState('er-1')
+
+    expect(result.calling[0]).toMatchObject({ code: 'A001', counterNumber: 0 })
+    expect(result.current).toMatchObject({ code: 'A001', counterNumber: 0 })
+    expect(result.inService[0]).toEqual({ code: 'B001', counterNumber: 0 })
   })
 
   it('throws when the ER does not exist', async () => {

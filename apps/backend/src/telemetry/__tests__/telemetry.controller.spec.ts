@@ -17,18 +17,24 @@ describe('TelemetryController', () => {
     controller = new TelemetryController(service as unknown as TelemetryService)
   })
 
-  it('records a ticket display', () => {
-    controller.ticketDisplayed('t-1', req)
+  it('records a ticket display and returns the service result', () => {
+    const sentinel = Promise.resolve(undefined)
+    service.recordTicketDisplayed.mockReturnValue(sentinel)
+    expect(controller.ticketDisplayed('t-1', req)).toBe(sentinel)
     expect(service.recordTicketDisplayed).toHaveBeenCalledWith('t-1', req.user)
   })
 
-  it('records a logout', () => {
-    controller.logout(req)
+  it('records a logout and returns the service result', () => {
+    const sentinel = Promise.resolve(undefined)
+    service.recordLogout.mockReturnValue(sentinel)
+    expect(controller.logout(req)).toBe(sentinel)
     expect(service.recordLogout).toHaveBeenCalledWith(req.user)
   })
 
-  it('records a manual check-in start', () => {
-    controller.manualCheckinStarted(req)
+  it('records a manual check-in start and returns the service result', () => {
+    const sentinel = Promise.resolve(undefined)
+    service.recordManualCheckinStarted.mockReturnValue(sentinel)
+    expect(controller.manualCheckinStarted(req)).toBe(sentinel)
     expect(service.recordManualCheckinStarted).toHaveBeenCalledWith(req.user)
   })
 })
