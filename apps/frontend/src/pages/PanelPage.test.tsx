@@ -231,12 +231,13 @@ describe('PanelPage', () => {
       renderPanel(fixture(1))
       await screen.findByText('A001')
 
-      const before = screen.getByText(/\d{2}h\d{2}/).textContent
+      // The clock renders HHhMM:SS, so a 1s tick must change the displayed text.
+      const before = screen.getByText(/\d{2}h\d{2}:\d{2}/).textContent
       act(() => {
         vi.advanceTimersByTime(1000)
       })
-      expect(screen.getByText(/\d{2}h\d{2}/)).toBeInTheDocument()
-      expect(typeof before).toBe('string')
+      const after = screen.getByText(/\d{2}h\d{2}:\d{2}/).textContent
+      expect(after).not.toBe(before)
     } finally {
       vi.useRealTimers()
     }

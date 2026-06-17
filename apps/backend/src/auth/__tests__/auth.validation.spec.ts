@@ -59,14 +59,30 @@ describe('RegisterDto validation', () => {
         birthDate: '2999-01-01',
       }),
     )
+    const nonString = await validate(
+      plainToInstance(RegisterDto, {
+        ...validRegistration,
+        birthDate: 20000101,
+      }),
+    )
     expect(invalid.some((error) => error.property === 'birthDate')).toBe(true)
     expect(future.some((error) => error.property === 'birthDate')).toBe(true)
+    expect(nonString.some((error) => error.property === 'birthDate')).toBe(true)
   })
 
   it('requires an eight-character password', async () => {
     const dto = plainToInstance(RegisterDto, {
       ...validRegistration,
       password: '1234567',
+    })
+    const errors = await validate(dto)
+    expect(errors.some((error) => error.property === 'password')).toBe(true)
+  })
+
+  it('rejects a password longer than 128 characters', async () => {
+    const dto = plainToInstance(RegisterDto, {
+      ...validRegistration,
+      password: 'a'.repeat(129),
     })
     const errors = await validate(dto)
     expect(errors.some((error) => error.property === 'password')).toBe(true)

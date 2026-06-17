@@ -27,22 +27,30 @@ describe('ObservabilityService', () => {
     })
 
     const output = service.renderPrometheus()
-    expect(output).toContain('fila_http_requests_total')
-    expect(output).toContain('route="PanelController.getState"')
-    expect(output).toContain('fila_http_request_duration_seconds_total')
-    expect(output).toContain('fila_http_requests_in_flight 0')
+    const label = '{method="GET",route="PanelController.getState",status="200"}'
+    // Assert the summed values, not just the presence of the metric name: two
+    // requests → count 2, durations 0.5 + 1.5 → 2.
+    expect(output).toContain(`fila_http_requests_total${label} 2`)
+    expect(output).toContain(`fila_http_request_duration_seconds_total${label} 2`)
   })
 
-  it('escapes special characters in labels', () => {
+  it('reports the live in-flight count between start and finish', () => {
+    service.requestStarted()
+    service.requestStarted()
+    service.requestFinished({ method: 'GET', route: 'x', status: 200, durationSeconds: 0.1 })
+    expect(service.renderPrometheus()).toContain('fila_http_requests_in_flight 1')
+  })
+
+  it('escapes quotes, backslashes and newlines in labels', () => {
     service.requestStarted()
     service.requestFinished({
       method: 'GET',
-      route: 'route"with\\quotes',
+      route: 'a"b\\c\nd',
       status: 500,
       durationSeconds: 0.1,
     })
     const output = service.renderPrometheus()
-    expect(output).toContain(String.raw`\"`)
+    expect(output).toContain(String.raw`route="a\"b\\c\nd"`)
   })
 
   it('never lets in-flight requests go below zero', () => {

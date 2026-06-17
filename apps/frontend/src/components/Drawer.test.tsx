@@ -25,4 +25,15 @@ describe('Drawer', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(3)
   })
+
+  it('ignores keys other than Escape', () => {
+    const onClose = vi.fn()
+    render(
+      <Drawer title="Menu" onClose={onClose}>
+        conteúdo
+      </Drawer>,
+    )
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })

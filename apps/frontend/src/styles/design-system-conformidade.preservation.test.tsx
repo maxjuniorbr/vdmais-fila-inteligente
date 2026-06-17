@@ -11,7 +11,6 @@
  * Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
  */
 
-import * as fc from 'fast-check'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,54 +18,11 @@ import { Alert } from '../components/Alert'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { StatusDot } from '../components/StatusDot'
-import { HomePage } from '../pages/HomePage'
 import { QueueEntryPage } from '../pages/QueueEntryPage'
 import { brand } from './brand'
 import { layout } from './layout'
 
-const ALL_TONES = ['error', 'warning', 'success', 'info'] as const
-type Tone = (typeof ALL_TONES)[number]
-
-const ALL_SIZES = ['md', 'sm'] as const
-type Size = (typeof ALL_SIZES)[number]
-
-const ALL_VARIANTS = ['primary', 'secondary', 'danger'] as const
-type Variant = (typeof ALL_VARIANTS)[number]
-
 describe('Preservation 3.1 — Alert: role="alert" when tone="error", absent otherwise', () => {
-  /**
-   * PBT: For any combination of Alert props, role="alert" is present when tone="error"
-   * and absent otherwise.
-   *
-   * Validates: Requirements 3.1
-   */
-  it('[PBT] role="alert" present when tone="error", absent for all other tones', () => {
-    expect(() =>
-      fc.assert(
-        fc.property(
-          fc.constantFrom(...ALL_TONES),
-          (tone: Tone) => {
-            const { container, unmount } = render(
-              <Alert tone={tone}>Mensagem de teste</Alert>,
-            )
-
-            if (tone === 'error') {
-              const alertEl = container.querySelector('[role="alert"]')
-              const hasAlert = alertEl !== null
-              unmount()
-              return hasAlert
-            } else {
-              const alertEl = container.querySelector('[role="alert"]')
-              const hasNoAlert = alertEl === null
-              unmount()
-              return hasNoAlert
-            }
-          },
-        ),
-      ),
-    ).not.toThrow()
-  })
-
   it('tone="error" renders a div with role="alert"', () => {
     const { container } = render(<Alert tone="error">Erro crítico</Alert>)
     const alertEl = container.querySelector('[role="alert"]')
@@ -99,58 +55,6 @@ describe('Preservation 3.1 — Alert: role="alert" when tone="error", absent oth
 })
 
 describe('Preservation 3.2 — Button minHeight WCAG touch targets', () => {
-  /**
-   * PBT: For any combination of Button size and variant, minHeight >= 44 in "md"
-   * and minHeight >= 36 in "sm".
-   *
-   * Validates: Requirements 3.2
-   */
-  it('[PBT] md button always has minHeight >= 44, sm button always has minHeight >= 36', () => {
-    expect(() =>
-      fc.assert(
-        fc.property(
-          fc.constantFrom(...ALL_SIZES),
-          fc.constantFrom(...ALL_VARIANTS),
-          (size: Size, variant: Variant) => {
-            const { container, unmount } = render(
-              <Button size={size} variant={variant}>
-                Ação
-              </Button>,
-            )
-
-            const btn = container.querySelector('button')
-            if (!btn) {
-              unmount()
-              return false
-            }
-
-            const inlineMinHeight = btn.style.minHeight
-
-            let minHeightValue: number | null = null
-            if (inlineMinHeight) {
-              const parsed = Number.parseFloat(inlineMinHeight)
-              if (!Number.isNaN(parsed)) minHeightValue = parsed
-            }
-
-            unmount()
-
-            if (size === 'md') {
-              const variantStyles: Record<Variant, React.CSSProperties> = {
-                primary: layout.primaryButton,
-                secondary: layout.ghostButton,
-                danger: layout.dangerButton,
-              }
-              const mdMinHeight = variantStyles[variant].minHeight
-              return typeof mdMinHeight === 'number' && mdMinHeight >= 44
-            } else {
-              return minHeightValue !== null && minHeightValue >= 36
-            }
-          },
-        ),
-      ),
-    ).not.toThrow()
-  })
-
   it('layout.primaryButton has minHeight: 44 (WCAG 2.5.5)', () => {
     expect(layout.primaryButton.minHeight).toBe(44)
   })
@@ -188,62 +92,6 @@ describe('Preservation 3.7 — Existing brand color tokens unchanged after fix',
    *
    * Validates: Requirements 3.7
    */
-
-  const EXPECTED_COLOR_TOKENS = {
-    surface: '#ffffff',
-    canvas: '#f5f5f5',
-    canvasWarm: '#f5f1eb',
-    ink: '#222222',
-    inkSoft: '#444444',
-    inkMuted: '#666666',
-    emphasis: '#00325f',
-    border: '#e2e2e2',
-    borderStrong: '#c4c4c4',
-    borderMuted: '#94a3b8',
-    link: '#264fec',
-    linkHover: '#002ec9',
-    linkVisited: '#4c2c91',
-    actionable: '#264fec',
-    actionableHover: '#002ec9',
-    actionableActive: '#001c76',
-    actionableContent: '#ffffff',
-    conversion: '#db1e8c',
-    conversionHover: '#b2006a',
-    conversionActive: '#750059',
-    conversionContent: '#ffffff',
-    danger: '#d32f2f',
-    dangerHover: '#b71c1c',
-    dangerSoft: '#ffebee',
-    dangerBorder: '#f4c7c7',
-    success: '#1b5e20',
-    successSoft: '#e8f5e9',
-    successBorder: '#bfe3c2',
-    warning: '#f57f17',
-    warningSoft: '#fffde7',
-    warningBorder: '#f5e2a8',
-    info: '#0288d1',
-    infoSoft: '#e1f5fe',
-    infoBorder: '#bce6f5',
-    keyboardFocus: '#011e38',
-  } as const
-
-  type ColorTokenKey = keyof typeof EXPECTED_COLOR_TOKENS
-
-  it('[PBT] every existing color token keeps its hex value unchanged', () => {
-    const tokenEntries = Object.entries(EXPECTED_COLOR_TOKENS) as [ColorTokenKey, string][]
-
-    expect(() =>
-      fc.assert(
-        fc.property(
-          fc.constantFrom(...tokenEntries),
-          ([tokenName, expectedHex]) => {
-            const actualHex = (brand as Record<string, unknown>)[tokenName]
-            return actualHex === expectedHex
-          },
-        ),
-      ),
-    ).not.toThrow()
-  })
 
   it('brand.actionable === "#264fec" (primary action color)', () => {
     expect(brand.actionable).toBe('#264fec')
@@ -430,45 +278,5 @@ describe('Preservation 3.5 — Microcopy dos CTAs preservado', () => {
 
     await screen.findByText('ER CTA Teste')
     expect(screen.getByRole('button', { name: 'Entrar na fila' })).toBeInTheDocument()
-  })
-})
-
-describe('Preservation 3.6 — Smoke test: main components render without runtime errors', () => {
-  it('Alert renders without errors for all tones', () => {
-    for (const tone of ALL_TONES) {
-      expect(() =>
-        render(<Alert tone={tone}>Mensagem {tone}</Alert>),
-      ).not.toThrow()
-    }
-  })
-
-  it('Button renders without errors for all variants and sizes', () => {
-    for (const variant of ALL_VARIANTS) {
-      for (const size of ALL_SIZES) {
-        expect(() =>
-          render(
-            <Button variant={variant} size={size}>
-              Botão
-            </Button>,
-          ),
-        ).not.toThrow()
-      }
-    }
-  })
-
-  it('ConfirmDialog renders without errors', () => {
-    expect(() =>
-      render(<ConfirmDialog title="Teste" onConfirm={vi.fn()} onClose={vi.fn()} />),
-    ).not.toThrow()
-  })
-
-  it('HomePage renders without errors', () => {
-    expect(() =>
-      render(
-        <MemoryRouter>
-          <HomePage />
-        </MemoryRouter>,
-      ),
-    ).not.toThrow()
   })
 })

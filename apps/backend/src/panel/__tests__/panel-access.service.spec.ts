@@ -43,6 +43,19 @@ describe('PanelAccessService', () => {
     })
   })
 
+  it('falls back to the sub claim when userId is absent', async () => {
+    jwt.verify.mockReturnValue({ sub: 'op-7', role: Role.OPERATOR, erId: 'er-1' })
+    prisma.operator.findUnique.mockResolvedValue({ sessionVersion: 0 })
+
+    await expect(
+      build().authorize({ erId: 'er-1', clientType: 'dashboard', staffToken: 'jwt' }),
+    ).resolves.toBe(true)
+    expect(prisma.operator.findUnique).toHaveBeenCalledWith({
+      where: { id: 'op-7' },
+      select: { sessionVersion: true },
+    })
+  })
+
   it('rejects a staff token bound to a different ER', async () => {
     jwt.verify.mockReturnValue({ userId: 'op-1', role: Role.OPERATOR, erId: 'er-2', sv: 0 })
 

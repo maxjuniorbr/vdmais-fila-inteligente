@@ -49,4 +49,22 @@ describe('Modal', () => {
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('closes the dialog and restores focus to the opener on unmount', () => {
+    const opener = document.createElement('button')
+    document.body.appendChild(opener)
+    opener.focus()
+
+    const { unmount } = render(
+      <Modal title="X" onClose={vi.fn()}>
+        c
+      </Modal>,
+    )
+    expect(screen.getByRole('dialog')).toHaveAttribute('open')
+
+    unmount()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(opener)
+    opener.remove()
+  })
 })

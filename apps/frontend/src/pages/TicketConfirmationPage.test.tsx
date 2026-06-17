@@ -230,6 +230,47 @@ describe('TicketConfirmationPage', () => {
     )
   })
 
+  it('closes the leave dialog on cancel without self-cancelling', async () => {
+    stubJoinWith({
+      id: 't-1',
+      code: 'A001',
+      queuePosition: 1,
+      currentPosition: 1,
+      state: 'WAITING',
+      erId: 'er-1',
+    })
+    renderPage()
+    await screen.findByText('A001')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sair da fila' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    // Reopen and dismiss through the modal's own onClose (cancel event).
+    fireEvent.click(screen.getByRole('button', { name: 'Sair da fila' }))
+    const reopened = await screen.findByRole('dialog')
+    fireEvent(reopened, new Event('cancel', { cancelable: true }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('marks the ticket NO_SHOW when the call countdown expires', async () => {
+    stubJoinWith({
+      id: 't-1',
+      code: 'B010',
+      queuePosition: 0,
+      currentPosition: 0,
+      state: 'CALLING',
+      erId: 'er-1',
+      calledAt: new Date('2020-01-01T00:00:00Z').toISOString(),
+      callTimeoutSeconds: 600,
+    })
+    renderPage()
+    // The deadline is long past, so the call countdown's onExpire fires on mount
+    // and transitions the ticket to NO_SHOW.
+    expect(await screen.findByText('Não comparecimento')).toBeInTheDocument()
+  })
+
   it('redirects to the entry screen when there is no token', async () => {
     sessionStorage.removeItem('token')
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))

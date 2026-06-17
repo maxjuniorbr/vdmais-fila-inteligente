@@ -17,16 +17,17 @@ const prisma = {
 }
 const auditLog = { log: jest.fn() }
 const panelTokens = { rotate: jest.fn(), revoke: jest.fn() }
-const queueEntryTokens = {
-  issue: jest.fn((erId, entryChannel) => ({
-    token: `${erId}-${entryChannel}`,
-    expiresAt: '2026-07-12T12:00:00.000Z',
-  })),
-}
+// The implementation is (re)set in beforeEach after resetAllMocks.
+const queueEntryTokens = { issue: jest.fn() }
 const user = { userId: 'admin-1', role: Role.ADMIN, erId: undefined }
 
 const uniqueViolation = new Prisma.PrismaClientKnownRequestError('dup', {
   code: 'P2002',
+  clientVersion: '6.19.3',
+})
+
+const fkViolation = new Prisma.PrismaClientKnownRequestError('fk', {
+  code: 'P2003',
   clientVersion: '6.19.3',
 })
 
@@ -141,6 +142,12 @@ describe('AdminService', () => {
     )
   })
 
+  it('rethrows a non-conflict error when creating a counter', async () => {
+    const boom = new Error('db down')
+    prisma.counter.create.mockRejectedValue(boom)
+    await expect(service.createCounter('er-1', { number: 1 }, user)).rejects.toBe(boom)
+  })
+
   it('deletes a closed counter with no service history and audits it', async () => {
     prisma.counter.findFirst.mockResolvedValue({
       id: 'c-1',
@@ -170,6 +177,33 @@ describe('AdminService', () => {
 
     await expect(service.deleteCounter('er-1', 'c-1', user)).rejects.toThrow(ConflictException)
     expect(prisma.counter.delete).not.toHaveBeenCalled()
+  })
+
+  it('maps a FK violation during delete (history added mid-flight) to a conflict', async () => {
+    prisma.counter.findFirst.mockResolvedValue({
+      id: 'c-1',
+      number: 2,
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+      _count: { tickets: 0 },
+    })
+    prisma.counter.delete.mockRejectedValue(fkViolation)
+
+    await expect(service.deleteCounter('er-1', 'c-1', user)).rejects.toThrow(ConflictException)
+  })
+
+  it('rethrows a non-FK error when deleting a counter', async () => {
+    prisma.counter.findFirst.mockResolvedValue({
+      id: 'c-1',
+      number: 2,
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+      _count: { tickets: 0 },
+    })
+    const boom = new Error('db down')
+    prisma.counter.delete.mockRejectedValue(boom)
+
+    await expect(service.deleteCounter('er-1', 'c-1', user)).rejects.toBe(boom)
   })
 
   it('refuses to delete an open counter', async () => {
@@ -218,6 +252,18 @@ describe('AdminService', () => {
         user,
       ),
     ).rejects.toThrow(ConflictException)
+  })
+
+  it('rethrows a non-conflict error when creating staff', async () => {
+    const boom = new Error('db down')
+    prisma.operator.create.mockRejectedValue(boom)
+    await expect(
+      service.createStaff(
+        'er-1',
+        { name: 'X', email: 'x@x.com', password: 'segredo123', role: Role.OPERATOR },
+        user,
+      ),
+    ).rejects.toBe(boom)
   })
 
   it('rejects operations on a missing ER', async () => {

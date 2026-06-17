@@ -173,7 +173,10 @@ describe('OperationPage coverage', () => {
     render(<OperationPage />)
 
     await screen.findByText('A003')
-    expect(screen.getByText(/0s/)).toBeInTheDocument()
+    // No calledAt/serviceStartedAt → elapsed pins to exactly "0m 0s" (the loose
+    // /0s/ matcher also accepted e.g. "1m 0s", so it never proved this branch).
+    expect(screen.getByText(/·\s*0m 0s/)).toBeInTheDocument()
+    expect(screen.queryByText(/·\s*\d*[1-9]\d*m/)).not.toBeInTheDocument()
   })
 
   it('renders side-panel fallbacks for tickets without representative or counter', async () => {

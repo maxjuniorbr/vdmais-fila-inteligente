@@ -55,6 +55,17 @@ describe('api client', () => {
     await expect(api.patch<void>('/values/value-1')).resolves.toBeUndefined()
   })
 
+  it('issues a DELETE request through the client', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(api.delete<void>('/values/value-1')).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/values/value-1',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+  })
+
   it('clears an invalid session and exposes the API error message', async () => {
     vi.stubGlobal(
       'fetch',
