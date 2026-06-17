@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common'
 import { lastValueFrom, of, throwError } from 'rxjs'
 import { ObservabilityService } from '../observability.service'
 import { RequestLoggingInterceptor } from '../request-logging.interceptor'
@@ -41,6 +42,38 @@ describe('RequestLoggingInterceptor', () => {
     expect(observability.requestFinished).toHaveBeenCalledWith(
       expect.objectContaining({ route: 'PanelController.getState', status: 200 }),
     )
+  })
+
+  it('logs a structured request line with an allowlist of fields and no extra PII', async () => {
+    const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined)
+    try {
+      const next = { handle: () => of('ok') }
+      await lastValueFrom(interceptor.intercept(httpContext(), next as never))
+
+      expect(logSpy).toHaveBeenCalledTimes(1)
+      const payload = JSON.parse(logSpy.mock.calls[0][0] as string)
+      expect(payload).toMatchObject({
+        type: 'http_request',
+        method: 'GET',
+        route: 'PanelController.getState',
+        status: 200,
+        userId: 'u-1',
+        ip: '127.0.0.1',
+      })
+      expect(typeof payload.durationMs).toBe('number')
+      // Only this allowlist may ever be logged — never request bodies, CPF, etc.
+      expect(Object.keys(payload).sort((a, b) => a.localeCompare(b))).toEqual([
+        'durationMs',
+        'ip',
+        'method',
+        'route',
+        'status',
+        'type',
+        'userId',
+      ])
+    } finally {
+      logSpy.mockRestore()
+    }
   })
 
   it('records a failed request with its status', async () => {

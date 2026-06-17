@@ -13,12 +13,14 @@ describe('DevTokenController', () => {
 
   it('delegates token issuance', () => {
     devToken.issue.mockReturnValue({ access_token: 't' })
-    const result = controller.issue({
-      grant_type: 'client_credentials',
+    const body = {
+      grant_type: 'client_credentials' as const,
       client_id: 'a',
       client_secret: 'b',
-    })
+    }
+    const result = controller.issue(body)
     expect(result).toEqual({ access_token: 't' })
+    expect(devToken.issue).toHaveBeenCalledWith(body)
   })
 
   it('serves the JWKS when enabled', () => {

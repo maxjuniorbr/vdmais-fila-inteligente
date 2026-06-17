@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { CopyField } from './CopyField'
@@ -55,6 +55,29 @@ describe('CopyField', () => {
       expect(screen.getByText('Endereço copiado para a área de transferência.')).toBeInTheDocument(),
     )
     expect(writeText).toHaveBeenCalledWith('https://exemplo.com')
+  })
+
+  it('clears the pending reset timer on re-copy and returns to idle after 3s', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      stubClipboard(vi.fn().mockResolvedValue(undefined))
+      render(<CopyField label="Link" value="https://exemplo.com" />)
+      const button = screen.getByRole('button', { name: 'Copiar Link' })
+
+      fireEvent.click(button)
+      await screen.findByText('Endereço copiado para a área de transferência.')
+      // Re-copy while the 3s reset is still pending → exercises the clearTimeout branch.
+      fireEvent.click(button)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+      expect(
+        screen.queryByText('Endereço copiado para a área de transferência.'),
+      ).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows an error message when copying fails', async () => {

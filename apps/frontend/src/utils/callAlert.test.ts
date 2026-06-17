@@ -48,6 +48,20 @@ describe('callAlert', () => {
     expect(osc.stop).toHaveBeenCalledTimes(2)
   })
 
+  it('beeps without resuming an already-running context and tolerates a missing navigator', async () => {
+    vi.stubGlobal('navigator', undefined)
+    const { ctx, osc } = fakeAudio('running')
+    vi.stubGlobal('AudioContext', function FakeAudioContext() {
+      return ctx
+    })
+    vi.resetModules()
+    const { playCallAlert } = await import('./callAlert')
+
+    expect(() => playCallAlert()).not.toThrow()
+    expect(ctx.resume).not.toHaveBeenCalled()
+    expect(osc.start).toHaveBeenCalledTimes(2)
+  })
+
   it('stays silent without throwing when the AudioContext cannot be created', async () => {
     const vibrate = vi.fn()
     vi.stubGlobal('navigator', { vibrate })
