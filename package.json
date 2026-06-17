@@ -24,6 +24,11 @@
     "sonar:scan": "docker compose -f compose.sonar.yml run --rm sonar-scanner",
     "sonar": "npm run sonar:coverage && npm run sonar:scan"
   },
+  "overrides": {
+    "form-data": "4.0.6",
+    "ws": "8.21.0",
+    "multer": "2.2.0"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.61.0",
