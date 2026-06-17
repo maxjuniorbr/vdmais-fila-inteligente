@@ -15,6 +15,7 @@
 | [DT-4](#dt-4--bcrypt-trunca-a-senha-em-72-bytes) | bcrypt trunca a senha em 72 bytes | Baixa | Não |
 | [DT-5](#dt-5--dupla-contabilidade-de-migrations-e-deploy-manual) | Dupla contabilidade de migrations e deploy manual | Média | Não |
 | [DT-6](#dt-6--major-do-prisma-adiado) | Major do Prisma adiado | Baixa | Não |
+| [DT-7](#dt-7--overrides-de-dependências-para-patches-de-segurança) | Overrides de dependências para patches de segurança | Baixa | Não |
 
 ---
 
@@ -114,3 +115,22 @@ deliberadamente** o próximo major ([README → CI e segurança](../README.md#in
 
 **Encaminhamento.** Planejar a subida do major em janela dedicada, revisando o changelog
 de breaking changes e rodando a suíte completa (unit + e2e) antes de promover.
+
+---
+
+## DT-7 — Overrides de dependências para patches de segurança
+
+**Contexto.** Algumas dependências de runtime ainda fixam transitivos vulneráveis não
+corrigidos upstream: `@nestjs/platform-express` fixa o `multer` (DoS) e a stack do
+Socket.IO arrasta o `ws` (DoS). Como `npm audit --audit-level=high` é gate de CI
+([README → CI e segurança](../README.md#integração-contínua-e-segurança)), o `package.json`
+raiz usa `overrides` para forçar versões corrigidas (`multer`, `ws`, `form-data`) sem
+subir o major do NestJS — que `npm audit fix --force` faria, rebaixando-o.
+
+**Impacto.** Os overrides são uma trava manual: o Dependabot não os atualiza sozinho e
+podem mascarar incompatibilidades se um pacote pai passar a exigir uma faixa diferente.
+Risco baixo — patches dentro do mesmo major, validados por unit + e2e.
+
+**Encaminhamento.** Remover cada override quando o pacote pai subir para uma versão que já
+traga o transitivo corrigido; revisar na rotina do Dependabot. Relacionado a
+[DT-6](#dt-6--major-do-prisma-adiado) (gestão de dependências).
