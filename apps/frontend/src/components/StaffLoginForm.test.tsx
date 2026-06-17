@@ -111,6 +111,27 @@ describe('StaffLoginForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Erro ao autenticar')
   })
 
+  it('shows a sensible error when the server returns a non-JSON error body', async () => {
+    // A gateway/proxy 502 often returns HTML, not JSON. Parsing it unguarded would
+    // throw a SyntaxError; the form must still surface a clean error message.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('<html>Bad Gateway</html>', {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+      ),
+    )
+    renderForm()
+
+    await fillAndSubmit()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Credenciais inválidas')
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeEnabled()
+    expect(sessionStorage.getItem('token')).toBeNull()
+  })
+
   it('offers a return path and has no detectable axe violations', async () => {
     renderForm()
 
