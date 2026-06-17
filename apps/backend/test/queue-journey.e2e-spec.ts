@@ -52,6 +52,12 @@ describe('Full queue journey and concurrency (e2e)', () => {
         exceptionFactory: validationExceptionFactory,
       }),
     )
+    // Mirror main.ts so X-Forwarded-For drives req.ip; lets the rate-limit test
+    // isolate its flood on a dedicated client IP instead of the shared socket IP.
+    ;(app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set(
+      'trust proxy',
+      1,
+    )
     await app.init()
 
     prisma = app.get(PrismaService)
@@ -538,10 +544,15 @@ describe('Full queue journey and concurrency (e2e)', () => {
       entryChannel: EntryChannel.QR_CODE,
     })
 
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    // Dedicated client IP so this flood neither inherits nor pollutes the shared
+    // per-IP throttle bucket used by the other ticket-creation tests.
+    const clientIp = '198.51.100.7'
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
       const response = await request(app.getHttpServer())
         .post('/tickets')
         .set('Authorization', `Bearer ${token}`)
+        .set('X-Forwarded-For', clientIp)
         .send({ erId: rateLimitErId, entryChannel: EntryChannel.QR_CODE })
       expect(response.status).not.toBe(429)
     }
@@ -549,6 +560,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
     await request(app.getHttpServer())
       .post('/tickets')
       .set('Authorization', `Bearer ${token}`)
+      .set('X-Forwarded-For', clientIp)
       .send({ erId: rateLimitErId, entryChannel: EntryChannel.QR_CODE })
       .expect(429)
   })
