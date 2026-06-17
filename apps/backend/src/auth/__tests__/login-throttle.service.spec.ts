@@ -1,0 +1,49 @@
+import { HttpException } from '@nestjs/common'
+import { LoginThrottleService } from '../login-throttle.service'
+
+const WINDOW_MS = 15 * 60 * 1000
+const MAX_FAILURES = 10
+
+describe('LoginThrottleService', () => {
+  let service: LoginThrottleService
+
+  beforeEach(() => {
+    service = new LoginThrottleService()
+  })
+
+  it('allows attempts up to the threshold', () => {
+    for (let i = 0; i < MAX_FAILURES; i += 1) {
+      expect(() => service.assertNotLocked('k')).not.toThrow()
+      service.registerFailure('k')
+    }
+  })
+
+  it('locks once the threshold is reached', () => {
+    for (let i = 0; i < MAX_FAILURES; i += 1) service.registerFailure('k')
+    expect(() => service.assertNotLocked('k')).toThrow(HttpException)
+  })
+
+  it('clears a key so attempts start over', () => {
+    for (let i = 0; i < MAX_FAILURES; i += 1) service.registerFailure('k')
+    service.clear('k')
+    expect(() => service.assertNotLocked('k')).not.toThrow()
+  })
+
+  it('resets automatically after the window passes', () => {
+    jest.useFakeTimers()
+    try {
+      for (let i = 0; i < MAX_FAILURES; i += 1) service.registerFailure('k')
+      expect(() => service.assertNotLocked('k')).toThrow(HttpException)
+      jest.advanceTimersByTime(WINDOW_MS + 1)
+      expect(() => service.assertNotLocked('k')).not.toThrow()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('tracks each key independently', () => {
+    for (let i = 0; i < MAX_FAILURES; i += 1) service.registerFailure('a')
+    expect(() => service.assertNotLocked('a')).toThrow(HttpException)
+    expect(() => service.assertNotLocked('b')).not.toThrow()
+  })
+})

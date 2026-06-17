@@ -131,8 +131,22 @@ describe('ERService', () => {
     await expect(service.getForStaff('er-1', manager)).resolves.toEqual({
       id: 'er-1',
       isDayOpen: true,
+      hasPanelToken: false,
     })
     expect(prisma.eR.findUnique).toHaveBeenCalledWith({ where: { id: 'er-1' } })
+  })
+
+  it('never leaks the panel token hash to staff, only whether one exists', async () => {
+    prisma.eR.findUnique.mockResolvedValue({
+      id: 'er-1',
+      isDayOpen: true,
+      panelTokenHash: 'super-secret-hash',
+    })
+
+    const result = await service.getForStaff('er-1', manager)
+
+    expect(result).not.toHaveProperty('panelTokenHash')
+    expect(result).toMatchObject({ hasPanelToken: true })
   })
 
   it('throws when an ER is not found by id', async () => {
@@ -154,6 +168,7 @@ describe('ERService', () => {
     await expect(service.getForStaff('er-2', admin)).resolves.toEqual({
       id: 'er-2',
       isDayOpen: true,
+      hasPanelToken: false,
     })
   })
 
