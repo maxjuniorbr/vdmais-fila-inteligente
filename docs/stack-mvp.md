@@ -293,10 +293,12 @@ O acesso público começa por uma URL assinada emitida na administração:
   `x-entry-token` e nos DTOs de login/cadastro;
 - o JWT da representante replica `erId` e `entryChannel`; a criação da senha
   rejeita troca de ER ou canal;
-- autenticação e criação de senha usam quotas contextuais por IP, ER e canal.
+- autenticação e criação de senha são limitadas por IP (anti-enxurrada grosseiro,
+  tolerante a IP compartilhado de Wi-Fi/4G), e o login tem uma trava adicional por
+  credencial — a defesa real contra brute-force, imune a NAT e rotação de IP.
 
-Não há CAPTCHA no MVP. O token assinado, a expiração e as quotas são as barreiras
-de automação adotadas nesta fase.
+Não há CAPTCHA no MVP. O token assinado, a expiração e os limites de taxa são as
+barreiras de automação adotadas nesta fase.
 
 ### 7.2 Operação
 
