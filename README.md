@@ -30,6 +30,7 @@ Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de vare
 - [MVP — escopo e validação](./docs/mvp.md)
 - [Stack técnica do MVP](./docs/stack-mvp.md) _(decisões e justificativas do MVP; não é prescrição para produção corporativa)_
 - [Deploy do MVP](./docs/deployment-mvp.md) _(infraestrutura de validação — Vercel + Render + Supabase; não é requisito)_
+- [Débitos técnicos](./docs/debitos-tecnicos.md) — pendências conhecidas a endurecer antes da operação corporativa em escala
 - [Diretrizes de design e UX](./apps/frontend/CLAUDE.md)
 
 ---
@@ -117,10 +118,14 @@ JWT_EXPIRES_IN="8h"
 PORT=3000
 FRONTEND_URL="http://localhost:5173"
 OBSERVABILITY_TOKEN="replace-with-a-random-monitoring-token"
+# Nº de proxies confiáveis à frente do backend (load balancer). Default 1.
+# Define de qual posição do X-Forwarded-For o req.ip é extraído — base do rate-limit.
+TRUST_PROXY_HOPS=1
 ```
 
 > **Importante:** fora de `development` e `test`, o backend rejeita a inicialização se `JWT_SECRET` for um valor fraco ou tiver menos de 32 caracteres. Em produção, use um segredo aleatório forte — por exemplo `openssl rand -base64 48`.
 > O `OBSERVABILITY_TOKEN` é obrigatório para expor `/observability/metrics`; sem ele o endpoint retorna 401.
+> `TRUST_PROXY_HOPS` deve refletir quantos proxies confiáveis ficam à frente do backend (Render = 1; CDN + LB = 2). Um valor errado torna o IP do rate-limit incorreto ou falsificável.
 
 ### 3. Subir o banco de dados
 
@@ -246,7 +251,7 @@ O CI (GitHub Actions) roda a cada push e pull request para `master`:
 - **Secret scan** (`secret-scan.yml`): gitleaks varre commits em busca de segredos. Placeholders de exemplo e segredos de teste ficam na allowlist do `.gitleaks.toml`.
 - **Dependabot** (`dependabot.yml`): atualizações semanais de dependências npm e GitHub Actions. Atualizações de rotina (minor/patch) vêm agrupadas; majors vêm isolados para revisão. `prisma` e `@prisma/client` sobem em lockstep, e o major do Prisma é deliberadamente adiado (migração planejada).
 
-Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS) configurados no nginx do `compose.prod.yml`; esses cabeçalhos devem ser replicados no proxy reverso ou CDN utilizado em produção. QR Codes e links da fila carregam tokens assinados no fragmento da URL; o backend valida ER, canal e expiração antes de autenticar a RE, com quotas por IP/ER/canal. Dados pessoais sensíveis (CPF e telefone) são mascarados nas respostas de cadastro assistido. Chamadas autenticadas das telas de staff passam pelo client central, que encerra a sessão e retorna ao login quando o backend responde `401`. Detalhes em [`docs/stack-mvp.md`](docs/stack-mvp.md).
+Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS) configurados no nginx do `compose.prod.yml`; esses cabeçalhos devem ser replicados no proxy reverso ou CDN utilizado em produção. QR Codes e links da fila carregam tokens assinados no fragmento da URL; o backend valida ER, canal e expiração antes de autenticar a RE. A proteção contra brute-force de autenticação combina um limite grosseiro por IP (tolerante a IP compartilhado de Wi-Fi do ER e CGNAT de 4G/5G) com uma trava por credencial — esta última imune a NAT e a rotação de IP. Dados pessoais sensíveis (CPF e telefone) são mascarados nas respostas de cadastro assistido. Chamadas autenticadas das telas de staff passam pelo client central, que encerra a sessão e retorna ao login quando o backend responde `401`. Detalhes em [`docs/stack-mvp.md`](docs/stack-mvp.md).
 
 ---
 
