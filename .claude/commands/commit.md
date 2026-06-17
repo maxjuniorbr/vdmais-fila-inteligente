@@ -37,17 +37,36 @@ npm run sonar:coverage
 
 ### 2. Check stale docs
 
-Before staging, inspect the diff and decide whether it alters any documented surface:
+Before staging, inspect the diff and decide whether it alters any **documented surface**.
+The complete documentation set is listed below — for each changed area, open the mapped
+file(s) and confirm they still match reality. Review every file; do not assume a doc is
+irrelevant without checking what it covers.
 
-- Public API / endpoints, request-response shapes, auth or roles → `docs/arquitetura-backend.md`
-- Frontend routes, flows, session/auth behavior → `docs/arquitetura-frontend.md`
-- Setup, scripts, commands, env vars, run/deploy steps → `README.md`, `docs/deployment-mvp.md`, `docs/stack-mvp.md`
-- Conventions or architecture captured in any `CLAUDE.md`
+**Docs (`docs/`):**
 
-If the change touches a documented surface and the matching docs are **not** updated in
-this working tree, STOP and update them first, then include the doc changes in the
-appropriate commit. If the change is purely internal (no documented surface affected),
-state "no docs impacted" and continue.
+- `docs/arquitetura-backend.md` — backend public API / endpoints, request-response shapes, auth & roles, throttle / rate-limit, WebSocket events, security model.
+- `docs/arquitetura-frontend.md` — frontend routes, screen flows, session/auth behavior, real-time/state wiring.
+- `docs/stack-mvp.md` — technology choices and their rationale (frameworks, libraries, protocols, infra).
+- `docs/deployment-mvp.md` — deploy/release steps, environment variables, infra topology, proxy/trust settings.
+- `docs/debitos-tecnicos.md` — living technical-debt register; update it whenever a debt is **created, paid off, or re-evaluated** (e.g. new dependency overrides, deferred upgrades, in-memory state, manual deploy steps).
+- `docs/credenciais-teste-local.md` — local test credentials / seed data.
+- `docs/mvp.md` — product scope and MVP feature spec.
+- `docs/guia-personas.md` — user personas and product narrative.
+
+**Root:**
+
+- `README.md` — setup, install, scripts/commands, env vars, run/deploy steps, CI & security gates, project structure.
+
+**Claude guides (`CLAUDE.md`):**
+
+- `CLAUDE.md` (root) — monorepo overview, top-level commands, commit rules, available MCPs.
+- `apps/backend/CLAUDE.md` — Prisma schema/migrations protocol, DB environment parity, hosting notes.
+- `apps/frontend/CLAUDE.md` — design system & tokens, UX/accessibility conventions, auth/session helpers, PII display rules, tone of voice.
+
+If the change touches any surface above and the matching doc is **not** updated in this
+working tree, STOP and update it first, then include the doc change in the appropriate
+commit. If the change is purely internal (no documented surface affected), state "no docs
+impacted" and continue.
 
 ### 3. Analyze the working tree
 
