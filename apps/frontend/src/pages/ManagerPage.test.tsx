@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -147,6 +147,48 @@ describe('ManagerPage', () => {
     renderManager()
     expect(await screen.findByText('Atendimentos prolongados')).toBeInTheDocument()
     expect(screen.getAllByText('Bia Lima').length).toBeGreaterThan(0)
+  })
+
+  it('keeps the elapsed service time live between the 15s refreshes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const liveOverview = {
+        ...overview,
+        waiting: [],
+        recent: [],
+        inService: [
+          {
+            id: 's9',
+            code: 'A009',
+            state: 'IN_SERVICE',
+            entryChannel: 'LINK',
+            createdAt: new Date(Date.now() - 50 * 60_000).toISOString(),
+            serviceStartedAt: new Date(Date.now() - 40 * 60_000).toISOString(),
+            representative: { fullName: 'Caio Souza' },
+            counter: { number: 1 },
+          },
+        ],
+      }
+      vi.mocked(api.get).mockImplementation((path: string) => {
+        if (path.includes('/overview')) return Promise.resolve(liveOverview)
+        if (path.includes('/daily')) return Promise.resolve(metrics)
+        if (path.startsWith('/ers/')) return Promise.resolve(er)
+        return Promise.resolve([])
+      })
+
+      renderManager()
+      expect(await screen.findByText('40m 0s')).toBeInTheDocument()
+
+      // Without the per-second tick this would stay frozen at 40m 0s until the
+      // next 15s refresh; advancing only 3s must already move the display.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+      expect(screen.getByText('40m 3s')).toBeInTheDocument()
+    } finally {
+      vi.runOnlyPendingTimers()
+      vi.useRealTimers()
+    }
   })
 
   it('switches the day distribution tabs', async () => {
