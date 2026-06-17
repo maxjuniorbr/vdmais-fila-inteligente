@@ -50,6 +50,12 @@ describe('ObservabilityController', () => {
     expect(() => controller.metrics(undefined, response as never)).toThrow(UnauthorizedException)
   })
 
+  it('rejects metrics when the Authorization header is missing but a token is configured', () => {
+    process.env.OBSERVABILITY_TOKEN = 'secret'
+    const response = makeResponse()
+    expect(() => controller.metrics(undefined, response as never)).toThrow(UnauthorizedException)
+  })
+
   it('rejects metrics with an invalid token', () => {
     process.env.OBSERVABILITY_TOKEN = 'secret'
     const response = makeResponse()

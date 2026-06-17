@@ -3,10 +3,10 @@ import { JwtService } from '@nestjs/jwt'
 import { EntryChannel } from '@prisma/client'
 import { QueueEntryTokenService } from '../queue-entry-token.service'
 
-function createService() {
+function createService(secret = 'queue-entry-test-secret') {
   const config = {
     get: (key: string) => {
-      if (key === 'JWT_SECRET') return 'queue-entry-test-secret'
+      if (key === 'JWT_SECRET') return secret
       if (key === 'NODE_ENV') return 'test'
       return undefined
     },
@@ -39,6 +39,18 @@ describe('QueueEntryTokenService', () => {
       'Acesso à fila inválido ou expirado',
     )
     expect(() => service.verify(token, 'er-1', EntryChannel.LINK)).toThrow(
+      'Acesso à fila inválido ou expirado',
+    )
+  })
+
+  it('rejects a token signed under a different JWT secret', () => {
+    const issuer = createService('secret-a')
+    const { token } = issuer.issue('er-1', EntryChannel.QR_CODE)
+    // A different JWT_SECRET must derive a different signing key, so the token
+    // fails verification — guards against a constant/derivation-less secret.
+    const verifier = createService('secret-b')
+
+    expect(() => verifier.verify(token, 'er-1', EntryChannel.QR_CODE)).toThrow(
       'Acesso à fila inválido ou expirado',
     )
   })

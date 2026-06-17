@@ -73,6 +73,7 @@
       "!**/*.module.ts",
       "!**/dto/**",
       "!main.ts",
+      "!prisma/prisma.service.ts",
       "!**/*.spec.ts"
     ],
     "coverageDirectory": "../coverage",

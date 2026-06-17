@@ -35,6 +35,10 @@ describe('AuditLogService', () => {
     prisma.auditEvent.create.mockResolvedValue({ id: 'a-1' })
     const result = await service.logIfERExists({ eventType: 'x', erId: 'er-1' })
     expect(result).toEqual({ id: 'a-1' })
+    // Prove the event was actually persisted (not just the mock return surfaced).
+    expect(prisma.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: 'x', erId: 'er-1' }),
+    })
   })
 
   it('skips logging when the ER is missing', async () => {

@@ -10,6 +10,12 @@ vi.mock('../api/client', () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }))
 
+const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }))
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return { ...actual, useNavigate: () => navigateSpy }
+})
+
 function authenticate() {
   seedStaffSession({ id: 'admin-1', name: 'Admin', role: 'ADMIN' })
 }
@@ -487,9 +493,13 @@ describe('AdminPage — navigation, auth and form errors', () => {
 
     renderPage()
     await screen.findByText('Cadastrar ER')
-    expect(screen.getByRole('button', { name: 'Voltar ao início' })).toBeInTheDocument()
+
+    navigateSpy.mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Voltar ao início' }))
+    expect(navigateSpy).toHaveBeenCalledWith('/')
+
     fireEvent.click(screen.getByRole('button', { name: 'Gestão da fila' }))
+    expect(navigateSpy).toHaveBeenCalledWith('/gestao')
   })
 
   it('surfaces an error when creating an ER fails', async () => {

@@ -46,4 +46,23 @@ describe('LoginThrottleService', () => {
     expect(() => service.assertNotLocked('a')).toThrow(HttpException)
     expect(() => service.assertNotLocked('b')).not.toThrow()
   })
+
+  it('prunes expired entries once the tracked-key threshold is crossed', () => {
+    jest.useFakeTimers()
+    try {
+      // Pruning only bounds memory (no public signal), so assert the internal map
+      // shrinks. PRUNE_THRESHOLD is 10_000: fill past it within one window...
+      const internal = service as unknown as { attempts: Map<string, unknown> }
+      for (let i = 0; i < 10_000; i += 1) service.registerFailure(`k${i}`)
+      expect(internal.attempts.size).toBe(10_000)
+
+      // ...let the window lapse so every entry is expired, then a fresh failure
+      // triggers the sweep before inserting the new key.
+      jest.advanceTimersByTime(WINDOW_MS + 1)
+      service.registerFailure('fresh')
+      expect(internal.attempts.size).toBe(1)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
 })

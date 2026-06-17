@@ -37,4 +37,22 @@ describe('validationExceptionFactory', () => {
       statusCode: 400,
     })
   })
+
+  it('recurses into nested child errors', () => {
+    const errors = [
+      {
+        property: 'address',
+        children: [
+          {
+            property: 'zip',
+            constraints: { isNotEmpty: 'zip should not be empty' },
+          },
+        ],
+      },
+    ] as ValidationError[]
+
+    expect(validationExceptionFactory(errors).getResponse()).toMatchObject({
+      message: ['zip é obrigatório'],
+    })
+  })
 })

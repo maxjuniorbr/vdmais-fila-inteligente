@@ -28,4 +28,15 @@ describe('BottomSheet', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(2)
   })
+
+  it('ignores keys other than Escape', () => {
+    const onClose = vi.fn()
+    render(
+      <BottomSheet title="Opções" onClose={onClose}>
+        conteúdo
+      </BottomSheet>,
+    )
+    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })

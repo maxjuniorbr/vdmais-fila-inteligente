@@ -114,4 +114,30 @@ describe('PanelGateway', () => {
     gateway.handleDisconnect(client as never)
     expect(auditLog.logIfERExists).not.toHaveBeenCalled()
   })
+
+  it('swallows audit logging failures when emitting to an ER', async () => {
+    auditLog.log.mockRejectedValueOnce(new Error('audit down'))
+    expect(() => gateway.emitToER('er-1', 'ticket.called', { code: 'A001' })).not.toThrow()
+    await new Promise((resolve) => setImmediate(resolve))
+  })
+
+  it('swallows audit failures when a panel client joins', async () => {
+    access.authorize.mockResolvedValue(true)
+    auditLog.logIfERExists.mockRejectedValueOnce(new Error('audit down'))
+    const client = makeClient()
+    await gateway.handleJoinER(
+      { erId: 'er-1234567890', clientType: 'panel', token: 't' },
+      client as never,
+    )
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(client.join).toHaveBeenCalledWith('er:er-1234567890')
+  })
+
+  it('swallows audit failures on a panel disconnect', async () => {
+    auditLog.logIfERExists.mockRejectedValueOnce(new Error('audit down'))
+    const client = makeClient()
+    client.data.panelER = 'er-1234567890'
+    gateway.handleDisconnect(client as never)
+    await new Promise((resolve) => setImmediate(resolve))
+  })
 })
