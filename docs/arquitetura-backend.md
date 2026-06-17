@@ -124,15 +124,15 @@ Tokens de entrada na fila (QR Code / link) trafegam no header `x-entry-token` e 
 
 > Base URL: `http://<host>:3000`
 >
-> Throttle global: 300 requisições / 60 s por IP. Endpoints críticos têm limites adicionais (indicados abaixo).
+> Throttle global: 300 requisições / 60 s por IP. Endpoints críticos têm limites adicionais (indicados abaixo). A chave do throttle é **apenas o IP** resolvido via `trust proxy` (`TRUST_PROXY_HOPS`); o login adiciona uma trava por credencial (ver [Segurança](#segurança)).
 
 ### Autenticação — `auth/`
 
 | Método | Caminho | Auth | Throttle | Descrição |
 |---|---|---|---|---|
-| `POST` | `/auth/register` | Público | 5/min | Cadastro de RE |
-| `POST` | `/auth/login` | Público | 10/min | Login de RE |
-| `POST` | `/auth/staff-login` | Público | 10/min | Login da equipe |
+| `POST` | `/auth/register` | Público | 20/min por IP | Cadastro de RE |
+| `POST` | `/auth/login` | Público | 40/min por IP + trava por credencial | Login de RE |
+| `POST` | `/auth/staff-login` | Público | 20/min por IP + trava por credencial | Login da equipe |
 | `POST` | `/representatives` | ATTENDANT, MANAGER | — | Criar RE manualmente |
 | `GET` | `/representatives/search?q=` | ATTENDANT, MANAGER | — | Buscar REs por nome/CPF/código |
 
@@ -191,7 +191,7 @@ Endpoints centrais para operação e integração.
 
 | Método | Caminho | Auth | Throttle | Descrição |
 |---|---|---|---|---|
-| `POST` | `/tickets` | REPRESENTATIVE, ATTENDANT | 20/min | Criar senha na fila |
+| `POST` | `/tickets` | REPRESENTATIVE, ATTENDANT | 40/min por IP | Criar senha na fila |
 | `GET` | `/tickets/my-active?erId=` | REPRESENTATIVE | — | Senha ativa da RE |
 | `GET` | `/tickets/my-status?erId=` | REPRESENTATIVE | — | Senha mais recente da RE em qualquer estado (polling da tela da RE: reflete não-comparecimento, cancelamento e restauração) |
 | `POST` | `/tickets/:id/start-service` | OPERATOR | — | Iniciar atendimento (CALLING → IN_SERVICE) |
@@ -301,12 +301,14 @@ joinER.denied  { erId }             // falha de autenticação
 
 ## Segurança
 
-- **Rate limiting:** ThrottlerModule — 300 req/60s globais; limites por endpoint nos endpoints críticos
+- **Rate limiting (por IP):** ThrottlerModule — 300 req/60s globais; limites por endpoint nos críticos. A chave é **apenas o IP**, nunca campos do corpo (que o cliente controla) — caso contrário variar `erId`/`entryChannel` criaria baldes novos e burlaria o limite. Camada grosseira de anti-enxurrada, tolerante a IP compartilhado (Wi-Fi do ER, CGNAT de 4G/5G).
+- **`trust proxy` fixo:** `TRUST_PROXY_HOPS` (default 1) define quantos proxies confiáveis ficam à frente; o `req.ip` (base do throttle) vem da posição correta do `X-Forwarded-For`, não do valor falsificável que o cliente envia.
+- **Trava de brute-force por credencial:** [`LoginThrottleService`](../apps/backend/src/auth/login-throttle.service.ts) conta falhas por conta alvo (CPF/RE code no login; e-mail no staff-login), janela de 15 min, máx. 10 → `429`. Imune a NAT e a rotação de IP; normaliza o identificador (sem driblar por formatação) e bloqueia antes de tocar o banco. _Em memória, por instância — ver [DT-1](./debitos-tecnicos.md#dt-1--estado-de-rate-limit-e-trava-de-brute-force-em-memória)._
+- **Anti-enumeração por timing:** o caminho "conta inexistente" roda uma comparação bcrypt dummy, igualando o tempo de resposta ao da senha errada.
 - **JWT forte:** rejeita inicialização se `JWT_SECRET` < 32 caracteres fora de `development`/`test`
 - **Session versioning:** `sessionVersion` no token; rotacionado em logout ou revogação; validado pelo `JwtStrategy` a cada chamada
-- **PII:** CPF e telefone mascarados nas respostas (`***.***.344-**`)
+- **PII:** CPF e telefone mascarados nas respostas (`***.***.344-**`), com fallback total para valores malformados; o `panelTokenHash` nunca sai em respostas de staff (`GET /ers/:id` expõe só `hasPanelToken`)
 - **Tokens de entrada:** assinados com chave separada, carregam `erId`, `entryChannel` e expiração
-- **Throttle de entrada na fila:** quotas por IP/ER/canal em criação de senha
 - **CORS:** apenas a origem declarada em `FRONTEND_URL` é aceita
 
 ---
@@ -330,7 +332,7 @@ A senha é localizada por `reCode`/`cpf` (ambos `@unique`) e **pela senha onde a
 
 Corpo: `{ reCode? , cpf?, erId?, idempotencyKey? }` (exatamente um entre `reCode`/`cpf`; `erId` é opcional e restringe a ação a esse ER). **Idempotente:** repetir a ação sobre senha já no estado-alvo retorna `200 { idempotent: true }` — `encerrar` reconhece a senha `FINISHED` do dia para o reenvio do gatilho de faturamento.
 
-**Erros (código no corpo):** `INVALID_IDENTIFIER` (400); `REPRESENTATIVE_NOT_FOUND`/`NO_ACTIVE_TICKET` (404); `INSUFFICIENT_SCOPE` (403); `TICKET_NOT_IN_SERVICE` (encerrar com senha apenas chamada) e `MULTIPLE_ACTIVE_TICKETS` (409, defensivo — RE em atendimento em mais de um ER).
+**Erros (código no corpo):** `INVALID_IDENTIFIER` (400); `REPRESENTATIVE_NOT_FOUND`/`NO_ACTIVE_TICKET` (404); `INSUFFICIENT_SCOPE` (403); `TICKET_NOT_IN_SERVICE` (encerrar com senha apenas chamada) e `MULTIPLE_ACTIVE_TICKETS` (409, defensivo — RE em atendimento em mais de um ER, ou mais de uma senha ativa no mesmo ER: ação ambígua resolvida de forma determinística, sem escolher uma senha arbitrária).
 
 ### Autenticação — pronta para Apigee
 

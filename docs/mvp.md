@@ -198,7 +198,7 @@ Mitigações mínimas:
 
 - orientar uso somente no ER ou chegando para atendimento;
 - exigir token assinado vinculado ao ER/canal e com expiração;
-- aplicar quotas de autenticação e criação de senha por IP/ER/canal;
+- limitar autenticação e criação de senha por IP, com trava por credencial no login;
 - registrar canal de entrada;
 - acompanhar no-show por canal.
 
