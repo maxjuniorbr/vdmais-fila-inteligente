@@ -19,6 +19,13 @@ export function Tabs({ tabs, initialId, ariaLabel }: Readonly<TabsProps>) {
   const baseId = useId()
   const refs = useRef<Record<string, HTMLButtonElement | null>>({})
 
+  // Fall back when the selected tab no longer exists in `tabs` (removed/reordered):
+  // otherwise no tab is selected and every panel renders hidden (blank content).
+  // The fallback validates initialId too, since it may also not be in `tabs`.
+  const activeId = tabs.some((tab) => tab.id === active)
+    ? active
+    : (tabs.find((tab) => tab.id === initialId)?.id ?? tabs[0]?.id)
+
   function select(id: string, moveFocus = false) {
     setActive(id)
     if (moveFocus) refs.current[id]?.focus()
@@ -41,7 +48,7 @@ export function Tabs({ tabs, initialId, ariaLabel }: Readonly<TabsProps>) {
     <div>
       <div role="tablist" aria-label={ariaLabel} style={styles.list}>
         {tabs.map((tab) => {
-          const selected = tab.id === active
+          const selected = tab.id === activeId
           return (
             <button
               key={tab.id}
@@ -69,11 +76,11 @@ export function Tabs({ tabs, initialId, ariaLabel }: Readonly<TabsProps>) {
           id={`${baseId}-panel-${tab.id}`}
           role="tabpanel"
           aria-labelledby={`${baseId}-tab-${tab.id}`}
-          hidden={tab.id !== active}
+          hidden={tab.id !== activeId}
           tabIndex={0}
           style={styles.panel}
         >
-          {tab.id === active && tab.content}
+          {tab.id === activeId && tab.content}
         </div>
       ))}
     </div>
