@@ -140,7 +140,7 @@ export function PanelPage() {
       setDayOpen(state.isDayOpen ?? true)
       setCurrent(state.current)
       setCalling(state.calling ?? [])
-      setInService(state.inService)
+      setInService(state.inService ?? [])
       setWaiting(state.waiting ?? [])
       setAvgServiceSeconds(state.avgServiceSeconds ?? null)
       setAvgWaitSeconds(state.avgWaitSeconds ?? null)

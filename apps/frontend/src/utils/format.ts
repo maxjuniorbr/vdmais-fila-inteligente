@@ -20,7 +20,11 @@ export function formatTimeWithSeconds(isoString: string): string {
 }
 
 export function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
+  // Clock skew between client and server can make a freshly-started elapsed time
+  // momentarily negative; clamp to zero (and floor fractions) so the display never
+  // shows "-1m -30s" or a fractional second count.
+  const total = Math.max(0, Math.floor(seconds))
+  const m = Math.floor(total / 60)
+  const s = total % 60
   return `${m}m ${s}s`
 }
