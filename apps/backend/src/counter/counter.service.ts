@@ -113,10 +113,16 @@ export class CounterService {
       throw new BadRequestException('O caixa deve estar ativo para ser pausado')
     }
     const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.counter.update({
-        where: { id: counterId },
+      // Compare-and-swap inside the transaction: the state read above is outside
+      // it, so guard the write against a concurrent transition (e.g. callNext
+      // moving the counter to CALLING) instead of forcing the state blindly.
+      const changed = await tx.counter.updateMany({
+        where: { id: counterId, operatorId: user.userId, state: CounterState.ACTIVE },
         data: { state: CounterState.PAUSED },
       })
+      if (changed.count !== 1) {
+        throw new BadRequestException('O caixa deve estar ativo para ser pausado')
+      }
       await tx.auditEvent.create({
         data: {
           eventType: 'counter_paused',
@@ -125,7 +131,7 @@ export class CounterService {
           metadata: { counterId, counterNumber: counter.number, reason },
         },
       })
-      return result
+      return tx.counter.findUniqueOrThrow({ where: { id: counterId } })
     })
 
     this.panelGateway.emitToER(counter.erId, 'counter.paused', {
@@ -147,10 +153,13 @@ export class CounterService {
       throw new BadRequestException('O caixa deve estar pausado para ser retomado')
     }
     const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.counter.update({
-        where: { id: counterId },
+      const changed = await tx.counter.updateMany({
+        where: { id: counterId, operatorId: user.userId, state: CounterState.PAUSED },
         data: { state: CounterState.ACTIVE },
       })
+      if (changed.count !== 1) {
+        throw new BadRequestException('O caixa deve estar pausado para ser retomado')
+      }
       await tx.auditEvent.create({
         data: {
           eventType: 'counter_resumed',
@@ -159,7 +168,7 @@ export class CounterService {
           metadata: { counterId, counterNumber: counter.number },
         },
       })
-      return result
+      return tx.counter.findUniqueOrThrow({ where: { id: counterId } })
     })
 
     this.panelGateway.emitToER(counter.erId, 'counter.resumed', {
@@ -243,9 +252,8 @@ export class CounterService {
     if (counter.operatorId !== user.userId) {
       throw new BadRequestException('O caixa pertence a outra operadora')
     }
-    if (
-      ![CounterState.ACTIVE, CounterState.PAUSED].includes(counter.state as 'ACTIVE' | 'PAUSED')
-    ) {
+    const closeableStates: CounterState[] = [CounterState.ACTIVE, CounterState.PAUSED]
+    if (!closeableStates.includes(counter.state)) {
       throw new BadRequestException('O caixa não pode ser fechado com uma senha em aberto')
     }
 
@@ -261,10 +269,15 @@ export class CounterService {
         throw new BadRequestException('O caixa não pode ser fechado com uma senha em aberto')
       }
 
-      const result = await tx.counter.update({
-        where: { id: counterId },
+      // Compare-and-swap: only close while still ACTIVE/PAUSED and owned, so a
+      // concurrent call (counter → CALLING) cannot be silently overwritten.
+      const changed = await tx.counter.updateMany({
+        where: { id: counterId, operatorId: user.userId, state: { in: closeableStates } },
         data: { state: CounterState.UNAVAILABLE, operatorId: null },
       })
+      if (changed.count !== 1) {
+        throw new BadRequestException('O caixa não pode ser fechado com uma senha em aberto')
+      }
       await tx.auditEvent.create({
         data: {
           eventType: 'counter_closed',
@@ -273,7 +286,7 @@ export class CounterService {
           metadata: { counterId, counterNumber: counter.number },
         },
       })
-      return result
+      return tx.counter.findUniqueOrThrow({ where: { id: counterId } })
     })
 
     this.panelGateway.emitToER(counter.erId, 'counter.closed', {

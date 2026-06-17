@@ -10,8 +10,22 @@ import { AuditLogService } from '../audit-log/audit-log.service'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { normalizeReCode, onlyDigits } from '../common/representative-identifiers'
 import { QueueEntryTokenService } from './queue-entry-token.service'
+import { LoginThrottleService } from './login-throttle.service'
 
 const BCRYPT_ROUNDS = 12
+
+// Compared against on the "account not found" path so a missing account costs the
+// same time as a wrong password — without it, the timing gap (no bcrypt run when
+// the lookup misses) leaks which CPFs/e-mails are registered.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('vdmais-timing-equalizer', BCRYPT_ROUNDS)
+
+// Key the per-credential brute-force lock by the targeted account, normalized so
+// formatting variants (e.g. "111.222.333-44" vs "11122233344") can't dodge it.
+// An 11-digit value is treated as a CPF; anything else as a RE code.
+function representativeLoginKey(credential: string): string {
+  const digits = onlyDigits(credential)
+  return digits.length === 11 ? `re-cpf:${digits}` : `re-code:${normalizeReCode(credential)}`
+}
 
 @Injectable()
 export class AuthService {
@@ -20,6 +34,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly auditLog: AuditLogService,
     private readonly queueEntryTokens: QueueEntryTokenService,
+    private readonly loginThrottle: LoginThrottleService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -114,6 +129,9 @@ export class AuthService {
     }
 
     const credential = dto.credential.trim()
+    const throttleKey = representativeLoginKey(credential)
+    this.loginThrottle.assertNotLocked(throttleKey)
+
     const rep = await this.prisma.representative.findFirst({
       where: {
         OR: [{ cpf: onlyDigits(credential) }, { reCode: normalizeReCode(credential) }],
@@ -122,15 +140,20 @@ export class AuthService {
 
     // Use same error message regardless of which field is wrong (security)
     if (!rep) {
+      await bcrypt.compare(dto.password, DUMMY_PASSWORD_HASH)
+      this.loginThrottle.registerFailure(throttleKey)
       await this._recordAuthenticationFailure(dto.erId, 'representative')
       throw new UnauthorizedException('Credenciais inválidas')
     }
 
     const valid = await bcrypt.compare(dto.password, rep.passwordHash)
     if (!valid) {
+      this.loginThrottle.registerFailure(throttleKey)
       await this._recordAuthenticationFailure(dto.erId, 'representative', rep.id)
       throw new UnauthorizedException('Credenciais inválidas')
     }
+
+    this.loginThrottle.clear(throttleKey)
 
     if (dto.erId) {
       await this.auditLog.logIfERExists({
@@ -151,13 +174,20 @@ export class AuthService {
   }
 
   async staffLogin(dto: StaffLoginDto) {
-    const operator = await this.prisma.operator.findUnique({
-      where: { email: dto.email.trim().toLowerCase() },
-    })
-    if (!operator) throw new UnauthorizedException('Credenciais inválidas')
+    const email = dto.email.trim().toLowerCase()
+    const throttleKey = `staff:${email}`
+    this.loginThrottle.assertNotLocked(throttleKey)
+
+    const operator = await this.prisma.operator.findUnique({ where: { email } })
+    if (!operator) {
+      await bcrypt.compare(dto.password, DUMMY_PASSWORD_HASH)
+      this.loginThrottle.registerFailure(throttleKey)
+      throw new UnauthorizedException('Credenciais inválidas')
+    }
 
     const valid = await bcrypt.compare(dto.password, operator.passwordHash)
     if (!valid) {
+      this.loginThrottle.registerFailure(throttleKey)
       if (operator.erId) {
         await this.auditLog.log({
           eventType: 'authentication_failed',
@@ -168,6 +198,8 @@ export class AuthService {
       }
       throw new UnauthorizedException('Credenciais inválidas')
     }
+
+    this.loginThrottle.clear(throttleKey)
 
     if (operator.erId) {
       await this.auditLog.log({
