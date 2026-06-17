@@ -19,8 +19,11 @@
 - HTTPS terminado no load balancer/ingress; WebSocket deve aceitar upgrade.
 - Segredos injetados pelo secrets manager da plataforma.
 
-O backend do MVP não deve escalar horizontalmente sem sticky sessions ou adaptador
-Socket.IO compartilhado. Redis permanece fora deste escopo.
+O backend do MVP roda em **instância única** e não deve escalar horizontalmente sem
+sticky sessions ou adaptador Socket.IO compartilhado. Além do WebSocket, o rate-limit
+e a trava de brute-force também guardam estado em memória por processo. Esses dois
+pontos estão registrados em [Débitos técnicos → DT-1 e DT-2](./debitos-tecnicos.md);
+Redis permanece fora do escopo do MVP e é o caminho para ambos ao escalar.
 
 ## Variáveis obrigatórias
 
@@ -31,6 +34,13 @@ Socket.IO compartilhado. Redis permanece fora deste escopo.
 
 Valores locais de `.env` não devem ser promovidos. Use um segredo JWT aleatório com pelo
 menos 32 bytes e rotacione-o conforme a política do ambiente.
+
+### Variáveis opcionais
+
+- `TRUST_PROXY_HOPS` (default `1`) — número de proxies confiáveis à frente do backend.
+  Define de qual posição do `X-Forwarded-For` o `req.ip` (base do rate-limit) é extraído.
+  Render = `1`; CDN + load balancer = `2`. Um valor maior que o real torna o IP
+  **falsificável** (burla o rate-limit); menor agrupa clientes distintos no mesmo balde.
 
 ### Integração M2M (quando habilitada)
 
@@ -83,8 +93,9 @@ HTTPS.
   redistribua o link.
 - Links antigos sem `#entry=` deixam de funcionar. Regere os QR Codes existentes
   na implantação desta versão.
-- O backend limita autenticação e criação de senha por IP, ER e canal. CAPTCHA
-  permanece fora do escopo do MVP.
+- O backend limita autenticação e criação de senha por IP, com uma trava adicional
+  por credencial no login (imune a NAT/rotação de IP). CAPTCHA permanece fora do
+  escopo do MVP.
 
 Quando uma entrega não altera schema nem migrations, não há migration a aplicar no banco.
 
