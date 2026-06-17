@@ -48,7 +48,6 @@ export class PanelService {
         where: {
           erId,
           calledAt: { gte: start, lt: end },
-          createdAt: { not: undefined },
         },
         select: { createdAt: true, calledAt: true, pausedSeconds: true },
       }),

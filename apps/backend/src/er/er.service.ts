@@ -27,7 +27,10 @@ export class ERService {
   async findById(erId: string) {
     const er = await this.prisma.eR.findUnique({ where: { id: erId } })
     if (!er) throw new NotFoundException('ER não encontrado')
-    return er
+    // Never expose the panel token hash to staff responses; surface only whether
+    // a token exists, mirroring the admin path.
+    const { panelTokenHash, ...rest } = er
+    return { ...rest, hasPanelToken: Boolean(panelTokenHash) }
   }
 
   async getPublic(erId: string) {
