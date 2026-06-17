@@ -6,6 +6,7 @@ import { AuditLogService } from '../../audit-log/audit-log.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuthService } from '../auth.service'
 import { QueueEntryTokenService } from '../queue-entry-token.service'
+import { LoginThrottleService } from '../login-throttle.service'
 
 jest.mock('bcrypt')
 
@@ -44,6 +45,7 @@ describe('AuthService', () => {
       jwt as unknown as JwtService,
       auditLog as unknown as AuditLogService,
       queueEntryTokens as unknown as QueueEntryTokenService,
+      new LoginThrottleService(),
     )
     mockedBcrypt.hash.mockResolvedValue('hashed' as never)
     mockedBcrypt.compare.mockResolvedValue(true as never)
@@ -280,6 +282,9 @@ describe('AuthService', () => {
       expect(auditLog.logIfERExists).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'authentication_failed' }),
       )
+      // Runs a bcrypt comparison even when the account is missing, so timing does
+      // not reveal whether the credential exists.
+      expect(mockedBcrypt.compare).toHaveBeenCalled()
     })
 
     it('rejects a wrong password', async () => {
@@ -301,6 +306,78 @@ describe('AuthService', () => {
         service.login({ credential: 'RE0001', password: 'Teste@123', erId: 'er-1' }),
       ).rejects.toThrow('Acesso à fila inválido ou expirado')
       expect(prisma.representative.findFirst).not.toHaveBeenCalled()
+    })
+
+    it('locks the credential after repeated failures, before touching the database', async () => {
+      prisma.representative.findFirst.mockResolvedValue(null)
+      const attempt = () =>
+        service.login({
+          credential: '12345678901',
+          password: 'wrong',
+          erId: 'er-1',
+          entryToken: 'entry-token',
+          entryChannel: EntryChannel.QR_CODE,
+        })
+
+      // The first 10 failures pass through as ordinary 401s.
+      for (let i = 0; i < 10; i += 1) {
+        await expect(attempt()).rejects.toThrow(UnauthorizedException)
+      }
+
+      // The 11th is blocked with a 429 without even querying the database — the
+      // lock is keyed by the credential, so it holds regardless of source IP.
+      prisma.representative.findFirst.mockClear()
+      await expect(attempt()).rejects.toThrow('Muitas tentativas')
+      expect(prisma.representative.findFirst).not.toHaveBeenCalled()
+    })
+
+    it('ignores credential formatting so the lock cannot be dodged', async () => {
+      prisma.representative.findFirst.mockResolvedValue(null)
+      const fail = (credential: string) =>
+        service.login({
+          credential,
+          password: 'wrong',
+          erId: 'er-1',
+          entryToken: 'entry-token',
+          entryChannel: EntryChannel.QR_CODE,
+        })
+
+      // Same CPF, alternating formatting, must accumulate on a single bucket.
+      for (let i = 0; i < 10; i += 1) {
+        const credential = i % 2 === 0 ? '111.222.333-44' : '11122233344'
+        await expect(fail(credential)).rejects.toThrow(UnauthorizedException)
+      }
+      await expect(fail('111.222.333-44')).rejects.toThrow('Muitas tentativas')
+    })
+
+    it('clears the lock after a successful login', async () => {
+      prisma.representative.findFirst.mockResolvedValue(null)
+      const fail = () =>
+        service.login({
+          credential: '12345678901',
+          password: 'wrong',
+          erId: 'er-1',
+          entryToken: 'entry-token',
+          entryChannel: EntryChannel.QR_CODE,
+        })
+      for (let i = 0; i < 9; i += 1) {
+        await expect(fail()).rejects.toThrow(UnauthorizedException)
+      }
+
+      prisma.representative.findFirst.mockResolvedValue({ id: 're-1', passwordHash: 'hashed' })
+      mockedBcrypt.compare.mockResolvedValue(true as never)
+      await service.login({
+        credential: '12345678901',
+        password: 'Teste@123',
+        erId: 'er-1',
+        entryToken: 'entry-token',
+        entryChannel: EntryChannel.QR_CODE,
+      })
+
+      // The successful login reset the counter, so failures start over from zero.
+      prisma.representative.findFirst.mockResolvedValue(null)
+      mockedBcrypt.compare.mockResolvedValue(false as never)
+      await expect(fail()).rejects.toThrow(UnauthorizedException)
     })
   })
 
@@ -328,6 +405,8 @@ describe('AuthService', () => {
       await expect(
         service.staffLogin({ email: 'no@x.com', password: 'x' }),
       ).rejects.toThrow(UnauthorizedException)
+      // Equalize timing: a missing operator still runs a bcrypt comparison.
+      expect(mockedBcrypt.compare).toHaveBeenCalled()
     })
 
     it('signs an operator without an ER and skips the login audit', async () => {
@@ -380,6 +459,19 @@ describe('AuthService', () => {
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'authentication_failed' }),
       )
+    })
+
+    it('locks an operator email after repeated failures, before touching the database', async () => {
+      prisma.operator.findUnique.mockResolvedValue(null)
+      const attempt = () => service.staffLogin({ email: 'op@x.com', password: 'wrong' })
+
+      for (let i = 0; i < 10; i += 1) {
+        await expect(attempt()).rejects.toThrow(UnauthorizedException)
+      }
+
+      prisma.operator.findUnique.mockClear()
+      await expect(attempt()).rejects.toThrow('Muitas tentativas')
+      expect(prisma.operator.findUnique).not.toHaveBeenCalled()
     })
   })
 })

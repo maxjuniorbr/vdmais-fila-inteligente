@@ -79,6 +79,17 @@ describe('IntegrationService', () => {
     expect(err.getResponse()).toMatchObject({ code: 'MULTIPLE_ACTIVE_TICKETS' })
   })
 
+  it('rejects when more than one active ticket exists in the same ER (no arbitrary pick)', async () => {
+    prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
+    prisma.ticket.findMany.mockResolvedValue([
+      { id: 't1', erId: 'er-1' },
+      { id: 't2', erId: 'er-1' },
+    ])
+    const err = await service.startService({ reCode: 'RE1' }, principal).catch((e) => e)
+    expect(err).toBeInstanceOf(ConflictException)
+    expect(err.getResponse()).toMatchObject({ code: 'MULTIPLE_ACTIVE_TICKETS' })
+  })
+
   it('starts the service: resolves the ticket and delegates with the integration context', async () => {
     prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
     prisma.ticket.findMany.mockResolvedValue([{ id: 'ticket-9', erId: 'er-1' }])

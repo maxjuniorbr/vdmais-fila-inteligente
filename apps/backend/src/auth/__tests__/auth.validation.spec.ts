@@ -8,6 +8,7 @@ import { EntryChannel } from '@prisma/client'
 import { AuthService } from '../auth.service'
 import { RegisterDto } from '../dto/register.dto'
 import { QueueEntryTokenService } from '../queue-entry-token.service'
+import { LoginThrottleService } from '../login-throttle.service'
 
 const validRegistration = {
   fullName: 'Maria da Silva',
@@ -87,6 +88,7 @@ describe('AuthService uniqueness', () => {
     jwt as unknown as JwtService,
     auditLog as unknown as AuditLogService,
     queueEntryTokens as unknown as QueueEntryTokenService,
+    new LoginThrottleService(),
   )
 
   beforeEach(() => jest.clearAllMocks())
