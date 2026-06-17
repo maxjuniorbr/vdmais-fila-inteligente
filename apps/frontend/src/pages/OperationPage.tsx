@@ -129,25 +129,31 @@ export function OperationPage() {
       return
     }
     const reference = currentTicket.serviceStartedAt ?? currentTicket.calledAt
-    if (!reference) return
+    if (!reference) {
+      setElapsed(0)
+      return
+    }
 
     const start = new Date(reference).getTime()
-    const interval = setInterval(
-      () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000))),
-      1000,
-    )
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)))
+    // Update immediately so a ticket that has been running for a while doesn't
+    // flash "0m 0s" for the first second before the interval ticks.
+    tick()
+    const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [currentTicket])
 
-  async function act(action: () => Promise<unknown>, successMessage?: string) {
+  async function act(action: () => Promise<unknown>, successMessage?: string): Promise<boolean> {
     setError(null)
     setLoading(true)
     try {
       await action()
       await refreshOverview()
       if (successMessage) showToast(successMessage, 'success')
+      return true
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro na operação')
+      return false
     } finally {
       setLoading(false)
     }
@@ -258,7 +264,9 @@ export function OperationPage() {
                           act(
                             () => api.post(`/counters/${counterId}/pause`, { reason: pauseReason }),
                             'Caixa pausado.',
-                          ).then(() => setPauseReason(''))
+                          ).then((ok) => {
+                            if (ok) setPauseReason('')
+                          })
                         }
                         disabled={loading || !pauseReason.trim()}
                       >
@@ -469,9 +477,11 @@ export function OperationPage() {
                 variant="danger"
                 disabled={loading}
                 onClick={() =>
-                  act(() => api.post(`/counters/${counterId}/close`), 'Caixa fechado.').then(() => {
-                    selectCounter('')
-                    setConfirmingClose(false)
+                  act(() => api.post(`/counters/${counterId}/close`), 'Caixa fechado.').then((ok) => {
+                    if (ok) {
+                      selectCounter('')
+                      setConfirmingClose(false)
+                    }
                   })
                 }
               >

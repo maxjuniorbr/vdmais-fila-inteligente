@@ -161,7 +161,7 @@ export function QueueEntryPage() {
         body: JSON.stringify({ ...loginForm, erId, ...entryContext }),
       })
       if (!res.ok) {
-        const data = await res.json()
+        const data = (await res.json().catch(() => ({}))) as { message?: string }
         throw new Error(data.message ?? 'Credenciais inválidas')
       }
       const { access_token } = await res.json()
@@ -189,7 +189,7 @@ export function QueueEntryPage() {
         body: JSON.stringify({ ...registerForm, erId, ...entryContext }),
       })
       if (!res.ok) {
-        const data = await res.json()
+        const data = (await res.json().catch(() => ({}))) as { message?: string }
         throw new Error(data.message ?? 'Erro ao cadastrar')
       }
       const { access_token } = await res.json()

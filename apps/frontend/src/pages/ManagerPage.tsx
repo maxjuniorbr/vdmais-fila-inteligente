@@ -277,6 +277,16 @@ export function ManagerPage() {
     }
   }, [refresh, socket])
 
+  // Tick once per second so elapsed durations and the prolonged-service threshold
+  // (both derived from Date.now() at render time) stay live between the 15s
+  // refreshes — otherwise times look frozen and the 30-min alert lags up to 15s.
+  const [, setClockTick] = useState(0)
+  useEffect(() => {
+    if (!authenticated || !erId) return
+    const id = setInterval(() => setClockTick((tick) => tick + 1), 1000)
+    return () => clearInterval(id)
+  }, [authenticated, erId])
+
   const activeTickets = useMemo(
     () => [
       ...(overview?.waiting ?? []),
