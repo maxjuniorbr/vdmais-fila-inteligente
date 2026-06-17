@@ -176,12 +176,13 @@ describe('CounterService', () => {
       state: CounterState.ACTIVE,
       operatorId: 'op-1',
     })
-    tx.counter.update.mockResolvedValue({ ...counterBase, state: CounterState.PAUSED })
+    tx.counter.updateMany.mockResolvedValue({ count: 1 })
+    tx.counter.findUniqueOrThrow.mockResolvedValue({ ...counterBase, state: CounterState.PAUSED })
 
     const result = await service.pauseCounter('counter-1', operator, 'Intervalo')
 
-    expect(tx.counter.update).toHaveBeenCalledWith({
-      where: { id: 'counter-1' },
+    expect(tx.counter.updateMany).toHaveBeenCalledWith({
+      where: { id: 'counter-1', operatorId: 'op-1', state: CounterState.ACTIVE },
       data: { state: CounterState.PAUSED },
     })
     expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'counter.paused', expect.any(Object))
@@ -214,12 +215,13 @@ describe('CounterService', () => {
       state: CounterState.PAUSED,
       operatorId: 'op-1',
     })
-    tx.counter.update.mockResolvedValue({ ...counterBase, state: CounterState.ACTIVE })
+    tx.counter.updateMany.mockResolvedValue({ count: 1 })
+    tx.counter.findUniqueOrThrow.mockResolvedValue({ ...counterBase, state: CounterState.ACTIVE })
 
     const result = await service.resumeCounter('counter-1', operator)
 
-    expect(tx.counter.update).toHaveBeenCalledWith({
-      where: { id: 'counter-1' },
+    expect(tx.counter.updateMany).toHaveBeenCalledWith({
+      where: { id: 'counter-1', operatorId: 'op-1', state: CounterState.PAUSED },
       data: { state: CounterState.ACTIVE },
     })
     expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'counter.resumed', expect.any(Object))
@@ -253,12 +255,21 @@ describe('CounterService', () => {
       operatorId: 'op-1',
     })
     tx.ticket.findFirst.mockResolvedValue(null)
-    tx.counter.update.mockResolvedValue({ ...counterBase, state: CounterState.UNAVAILABLE, operatorId: null })
+    tx.counter.updateMany.mockResolvedValue({ count: 1 })
+    tx.counter.findUniqueOrThrow.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.UNAVAILABLE,
+      operatorId: null,
+    })
 
     const result = await service.closeCounter('counter-1', operator)
 
-    expect(tx.counter.update).toHaveBeenCalledWith({
-      where: { id: 'counter-1' },
+    expect(tx.counter.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'counter-1',
+        operatorId: 'op-1',
+        state: { in: [CounterState.ACTIVE, CounterState.PAUSED] },
+      },
       data: { state: CounterState.UNAVAILABLE, operatorId: null },
     })
     expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'counter.closed', expect.any(Object))
