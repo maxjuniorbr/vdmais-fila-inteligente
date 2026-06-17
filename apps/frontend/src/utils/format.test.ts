@@ -23,8 +23,10 @@ describe('format utilities — property-based tests', () => {
 
   it('Property 2 — formatDuration nunca produz valores negativos e segue padrão Xm Ys', () => {
     const pattern = /^\d+m \d+s$/
+    // O intervalo inclui valores negativos de propósito: clock skew pode produzir
+    // um elapsed negativo, e a função precisa absorver isso sem emitir "-1m -30s".
     fc.assert(
-      fc.property(fc.integer({ min: 0, max: 86400 }), (seconds) => {
+      fc.property(fc.integer({ min: -86400, max: 86400 }), (seconds) => {
         const result = formatDuration(seconds)
         expect(result).toMatch(pattern)
         const [mPart, sPart] = result.split(' ')
@@ -35,6 +37,12 @@ describe('format utilities — property-based tests', () => {
       }),
       { numRuns: 500 }
     )
+  })
+
+  it('Property 2b — formatDuration zera entradas negativas e fracionárias', () => {
+    expect(formatDuration(-30)).toBe('0m 0s')
+    expect(formatDuration(-1)).toBe('0m 0s')
+    expect(formatDuration(90.7)).toBe('1m 30s')
   })
 
   it('Property 3 — formatTime sempre retorna HHhMM para qualquer data válida', () => {

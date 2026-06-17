@@ -180,6 +180,21 @@ describe('PanelPage', () => {
     expect(screen.queryByText('Aguardando próxima chamada')).not.toBeInTheDocument()
   })
 
+  it('does not crash when the state payload omits inService', async () => {
+    const state = {
+      isDayOpen: true,
+      current: { code: 'A001', displayName: 'Pessoa 1', counterNumber: 1 },
+      calling: [{ code: 'A001', displayName: 'Pessoa 1', counterNumber: 1 }],
+      waiting: [],
+      avgServiceSeconds: null,
+      avgWaitSeconds: null,
+    } as unknown as PanelFixture
+    renderPanel(state)
+
+    expect(await screen.findByText('A001')).toBeInTheDocument()
+    expect(screen.getByText('EM ATENDIMENTO')).toBeInTheDocument()
+  })
+
   it('keeps the panel available when polling fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
 
