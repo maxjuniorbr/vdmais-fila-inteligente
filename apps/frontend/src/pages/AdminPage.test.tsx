@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
 import { seedStaffSession } from '../test/staffToken'
@@ -20,10 +20,16 @@ function authenticate() {
   seedStaffSession({ id: 'admin-1', name: 'Admin', role: 'ADMIN' })
 }
 
+// The page no longer renders a login form: logout, an expired session, or a
+// direct visit without a session redirect to the central login at '/'. The stub
+// route lets the test observe that redirect.
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <AdminPage />
+    <MemoryRouter initialEntries={['/admin']}>
+      <Routes>
+        <Route path="/" element={<div>central-login</div>} />
+        <Route path="/admin" element={<AdminPage />} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -34,11 +40,11 @@ describe('AdminPage', () => {
     vi.mocked(api.post).mockReset()
   })
 
-  it('shows the staff login form when not authenticated', () => {
+  it('redirects to the central login when not authenticated', () => {
     vi.mocked(api.get).mockResolvedValue([])
     renderPage()
-    expect(screen.getByRole('heading', { name: 'Administração' })).toBeInTheDocument()
-    expect(screen.getByLabelText('E-mail')).toBeInTheDocument()
+    expect(screen.getByText('central-login')).toBeInTheDocument()
+    expect(screen.queryByText('Cadastrar ER')).not.toBeInTheDocument()
   })
 
   it('lists the ERs returned by the API', async () => {
@@ -451,31 +457,7 @@ describe('AdminPage — navigation, auth and form errors', () => {
     vi.mocked(api.post).mockReset()
   })
 
-  it('logs in through the staff form and renders the dashboard', async () => {
-    vi.mocked(api.get).mockResolvedValue([])
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            access_token: 'tok',
-            user: { id: 'admin-1', name: 'Admin', role: 'ADMIN' },
-          }),
-          { status: 200 },
-        ),
-      ),
-    )
-
-    renderPage()
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('E-mail'), 'admin@x.com')
-    await user.type(screen.getByLabelText('Senha'), 'segredo123')
-    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-
-    expect(await screen.findByText('Cadastrar ER')).toBeInTheDocument()
-  })
-
-  it('logs out and returns to the login form', async () => {
+  it('logs out and redirects to the central login', async () => {
     authenticate()
     vi.mocked(api.get).mockResolvedValue([])
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
@@ -484,7 +466,7 @@ describe('AdminPage — navigation, auth and form errors', () => {
     await screen.findByText('Cadastrar ER')
     fireEvent.click(screen.getByRole('button', { name: /sair/i }))
 
-    expect(await screen.findByLabelText('E-mail')).toBeInTheDocument()
+    expect(await screen.findByText('central-login')).toBeInTheDocument()
   })
 
   it('navigates to the home and queue management routes', async () => {

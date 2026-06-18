@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { logoutStaffSession, getSessionERId } from '../auth/session'
 import { useStaffSession } from '../auth/useStaffSession'
@@ -6,7 +7,6 @@ import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
-import { StaffLoginForm } from '../components/StaffLoginForm'
 import { layout } from '../styles/layout'
 import { brand } from '../styles/brand'
 
@@ -36,7 +36,7 @@ const emptyRegistration = {
 
 export function CheckinAttendantPage() {
   const [authenticated, setAuthenticated] = useStaffSession(['ATTENDANT'])
-  const [erId, setErId] = useState(() => getSessionERId())
+  const [erId] = useState(() => getSessionERId())
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Representative[]>([])
   const [registration, setRegistration] = useState(emptyRegistration)
@@ -110,17 +110,11 @@ export function CheckinAttendantPage() {
     setError(null)
   }
 
+  // Logout, an expired session, or a direct visit without a session all funnel
+  // back to the central login (HomePage), the single entry point that routes
+  // each role to its area. No per-page login form.
   if (!authenticated) {
-    return (
-      <StaffLoginForm
-        title="Check-in assistido"
-        allowedRoles={['ATTENDANT']}
-        onAuthenticated={(profile) => {
-          setErId(profile.erId ?? '')
-          setAuthenticated(true)
-        }}
-      />
-    )
+    return <Navigate to="/" replace />
   }
 
   if (ticket) {

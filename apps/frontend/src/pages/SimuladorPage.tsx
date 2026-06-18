@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { Navigate } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
 import { Alert } from '../components/Alert'
 import { Badge } from '../components/Badge'
@@ -8,7 +9,6 @@ import { Select } from '../components/Select'
 import { Spinner } from '../components/Spinner'
 import { Table, type Column } from '../components/Table'
 import { ToastProvider, useToast } from '../components/Toast'
-import { StaffLoginForm } from '../components/StaffLoginForm'
 import { useStaffSession } from '../auth/useStaffSession'
 import { logoutStaffSession } from '../auth/session'
 import { api } from '../api/client'
@@ -488,14 +488,11 @@ function SimuladorInner({ onLogout }: Readonly<{ onLogout: () => void }>) {
 function SimuladorGate() {
   const [authenticated, setAuthenticated] = useStaffSession(['ADMIN'])
 
+  // Logout, an expired session, or a direct visit without a session all funnel
+  // back to the central login (HomePage), the single entry point that routes
+  // each role to its area. No per-page login form.
   if (!authenticated) {
-    return (
-      <StaffLoginForm
-        title="Simulador operacional"
-        allowedRoles={['ADMIN']}
-        onAuthenticated={() => setAuthenticated(true)}
-      />
-    )
+    return <Navigate to="/" replace />
   }
 
   async function handleLogout() {

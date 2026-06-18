@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
 import { seedStaffSession } from '../test/staffToken'
@@ -66,10 +66,16 @@ function mockRefreshReturning(overview: MockOverview = OVERVIEW_OPEN, counters: 
   })
 }
 
+// The page no longer renders a login form: logout, an expired session, or a
+// direct visit without a session redirect to the central login at '/'. The stub
+// route lets the test observe that redirect.
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <SimuladorPage />
+    <MemoryRouter initialEntries={['/simulador']}>
+      <Routes>
+        <Route path="/" element={<div>central-login</div>} />
+        <Route path="/simulador" element={<SimuladorPage />} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -81,11 +87,11 @@ describe('SimuladorPage', () => {
   })
 
   describe('authentication gate', () => {
-    it('shows login form when not authenticated', () => {
+    it('redirects to the central login when not authenticated', () => {
       vi.mocked(api.get).mockResolvedValue([])
       renderPage()
-      expect(screen.getByRole('heading', { name: 'Simulador operacional' })).toBeInTheDocument()
-      expect(screen.getByLabelText('E-mail')).toBeInTheDocument()
+      expect(screen.getByText('central-login')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Simulador operacional' })).not.toBeInTheDocument()
     })
   })
 
