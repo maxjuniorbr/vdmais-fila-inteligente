@@ -9,7 +9,7 @@ const TICKET_STATE_LABELS: Record<string, string> = {
 }
 
 const COUNTER_STATE_LABELS: Record<string, string> = {
-  UNAVAILABLE: 'Indisponível',
+  UNAVAILABLE: 'Fechado',
   ACTIVE: 'Ativo',
   CALLING: 'Chamando',
   IN_SERVICE: 'Em atendimento',
