@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { api } from '../api/client'
 import {
   getSessionERId,
@@ -15,7 +16,6 @@ import { Modal } from '../components/Modal'
 import { SectionPanel } from '../components/SectionPanel'
 import { Select } from '../components/Select'
 import { StatusDot } from '../components/StatusDot'
-import { StaffLoginForm } from '../components/StaffLoginForm'
 import { useToast } from '../components/Toast'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
@@ -69,8 +69,8 @@ const QUEUE_EVENTS = [
 
 export function OperationPage() {
   const [authenticated, setAuthenticated] = useStaffSession(['OPERATOR'])
-  const [erId, setErId] = useState(() => getSessionERId())
-  const [operatorId, setOperatorId] = useState(() => getStaffSessionProfile()?.id ?? '')
+  const [erId] = useState(() => getSessionERId())
+  const [operatorId] = useState(() => getStaffSessionProfile()?.id ?? '')
   const [counterId, setCounterId] = useState(() => sessionStorage.getItem('counterId') ?? '')
   const [overview, setOverview] = useState<QueueOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -171,18 +171,11 @@ export function OperationPage() {
     setCounterId('')
   }
 
+  // Logout, an expired session, or a direct visit without a session all funnel
+  // back to the central login (HomePage), which is the single entry point that
+  // routes each role to its area. No per-page login form.
   if (!authenticated) {
-    return (
-      <StaffLoginForm
-        title="Operação da fila"
-        allowedRoles={['OPERATOR']}
-        onAuthenticated={(profile) => {
-          setOperatorId(profile.id)
-          setErId(profile.erId ?? '')
-          setAuthenticated(true)
-        }}
-      />
-    )
+    return <Navigate to="/" replace />
   }
 
   const hasOpenService = currentTicket?.state === 'IN_SERVICE'

@@ -1,9 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
-import { makeStaffToken, seedStaffSession } from '../test/staffToken'
+import { seedStaffSession } from '../test/staffToken'
 import { OperationPage } from './OperationPage'
 
 vi.mock('../api/client', () => ({ api: { get: vi.fn(), post: vi.fn() } }))
@@ -83,32 +82,23 @@ describe('OperationPage coverage', () => {
     expect(screen.queryByText(/Operação encerrada/)).not.toBeInTheDocument()
   })
 
-  it('renders the staff login form when unauthenticated and authenticates', async () => {
+  it('redirects to the central login when unauthenticated', () => {
     sessionStorage.clear()
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          access_token: makeStaffToken({ id: 'op-9', role: 'OPERATOR', erId: 'er-9' }),
-          user: { id: 'op-9', name: 'Nova Operadora', role: 'OPERATOR', erId: 'er-9' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
-    vi.stubGlobal('fetch', fetchMock)
     setOverview({ counters: [] })
 
+    // No per-page login form: an unauthenticated visit redirects to the central
+    // login at '/', which routes each role to its area after sign-in.
     render(
-      <MemoryRouter>
-        <OperationPage />
+      <MemoryRouter initialEntries={['/operacao']}>
+        <Routes>
+          <Route path="/" element={<div>central-login</div>} />
+          <Route path="/operacao" element={<OperationPage />} />
+        </Routes>
       </MemoryRouter>,
     )
 
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('E-mail'), 'op@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'senha123')
-    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-
-    expect(await screen.findByText('Painel da Operadora')).toBeInTheDocument()
+    expect(screen.getByText('central-login')).toBeInTheDocument()
+    expect(screen.queryByText('Painel da Operadora')).not.toBeInTheDocument()
   })
 
   it('shows an error when an action fails', async () => {
