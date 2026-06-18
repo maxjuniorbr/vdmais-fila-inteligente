@@ -198,6 +198,10 @@ export class MetricsService {
     const waitingSince = new Map<string, Date>()
     const calledAt = new Map<string, Date>()
     const serviceStartedAt = new Map<string, Date>()
+    // Uma senha que foi pausada em atendimento e reatendida tem mais de um
+    // `service_started`. A espera só conta no PRIMEIRO atendimento — senão a
+    // segunda amostra mediria desde a criação original (espera inflada/duplicada).
+    const waitCounted = new Set<string>()
     const waitSamples: Array<{ duration: number; at: Date }> = []
     const serviceSamples: Array<{ duration: number; at: Date }> = []
     const callToStartSamples: Array<{ duration: number; at: Date }> = []
@@ -211,7 +215,8 @@ export class MetricsService {
         calledAt.set(event.ticketId, event.createdAt)
       } else if (event.eventType === 'service_started') {
         const startedWaitingAt = waitingSince.get(event.ticketId)
-        if (startedWaitingAt) {
+        if (startedWaitingAt && !waitCounted.has(event.ticketId)) {
+          waitCounted.add(event.ticketId)
           const pausedMs = (pausedSecondsMap.get(event.ticketId) ?? 0) * 1000
           const rawDuration = event.createdAt.getTime() - startedWaitingAt.getTime()
           waitSamples.push({

@@ -128,6 +128,27 @@ describe('MetricsService', () => {
     expect(result.totalRestored).toBe(1)
   })
 
+  it('counts wait only once when a ticket is paused mid-service and re-served', async () => {
+    mockPrisma.ticket.findMany.mockResolvedValue([makeTicket()])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      makeEvent('ticket_created', '2026-06-10T12:00:00Z'),
+      makeEvent('ticket_called', '2026-06-10T12:08:00Z'),
+      makeEvent('service_started', '2026-06-10T12:10:00Z'),
+      // Pausada em atendimento e retomada (volta ao fim da fila) → nova chamada/atendimento.
+      makeEvent('ticket_resumed', '2026-06-10T12:13:00Z'),
+      makeEvent('ticket_called', '2026-06-10T12:20:00Z'),
+      makeEvent('service_started', '2026-06-10T12:30:00Z'),
+      makeEvent('service_finished', '2026-06-10T12:35:00Z'),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    // Só UMA amostra de espera, a do 1º atendimento (600s). Sem a 2ª amostra
+    // inflada (1800s desde a criação) que dobraria a média.
+    expect(result.avgWaitSeconds).toBe(600)
+    expect(result.medianWaitSeconds).toBe(600)
+  })
+
   it('counts cancellations and no-shows independently by entry channel', async () => {
     mockPrisma.ticket.findMany.mockResolvedValue([
       makeTicket({ id: 'qr', entryChannel: EntryChannel.QR_CODE }),
