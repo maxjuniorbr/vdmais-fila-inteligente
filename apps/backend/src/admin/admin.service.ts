@@ -4,6 +4,7 @@ import { CounterState, EntryChannel, Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { PanelTokenService } from '../panel/panel-token.service'
+import { PanelGateway } from '../panel/panel.gateway'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { CreateERDto } from './dto/create-er.dto'
 import { UpdateERDto } from './dto/update-er.dto'
@@ -28,6 +29,7 @@ export class AdminService {
     private readonly auditLog: AuditLogService,
     private readonly panelTokens: PanelTokenService,
     private readonly queueEntryTokens: QueueEntryTokenService,
+    private readonly panelGateway: PanelGateway,
   ) {}
 
   listERs() {
@@ -127,6 +129,12 @@ export class AdminService {
         operatorId: user.userId,
         metadata: { counterId: counter.id, number: counter.number },
       })
+      // Notifica a operação/gestão do ER para a lista de caixas atualizar em
+      // tempo real, sem depender do polling.
+      this.panelGateway.emitToER(erId, 'counter.created', {
+        counterId: counter.id,
+        number: counter.number,
+      })
       return counter
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -170,6 +178,10 @@ export class AdminService {
       erId,
       operatorId: user.userId,
       metadata: { counterId, number: counter.number },
+    })
+    this.panelGateway.emitToER(erId, 'counter.deleted', {
+      counterId,
+      number: counter.number,
     })
   }
 
