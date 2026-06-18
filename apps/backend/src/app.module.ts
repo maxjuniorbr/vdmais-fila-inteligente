@@ -18,6 +18,7 @@ import { TelemetryModule } from './telemetry/telemetry.module'
 import { ObservabilityModule } from './observability/observability.module'
 import { AdminModule } from './admin/admin.module'
 import { IntegrationModule } from './integration/integration.module'
+import { SimulationModule } from './simulation/simulation.module'
 import { ContextualThrottlerGuard } from './common/guards/contextual-throttler.guard'
 
 @Module({
@@ -40,6 +41,7 @@ import { ContextualThrottlerGuard } from './common/guards/contextual-throttler.g
     ObservabilityModule,
     AdminModule,
     IntegrationModule,
+    SimulationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ContextualThrottlerGuard },
