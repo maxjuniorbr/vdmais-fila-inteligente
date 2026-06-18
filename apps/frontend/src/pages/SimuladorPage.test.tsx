@@ -10,12 +10,33 @@ vi.mock('../api/client', () => ({
   api: { get: vi.fn(), post: vi.fn() },
 }))
 
+interface MockTicket {
+  id: string
+  code: string
+  counter?: { number: number }
+  representative?: { fullName: string }
+}
+interface MockOverview {
+  isDayOpen: boolean
+  waiting: MockTicket[]
+  calling: MockTicket[]
+  inService: MockTicket[]
+  paused: MockTicket[]
+}
+interface MockCounter {
+  id: string
+  number: number
+  state: string
+  operator: { id: string; name: string } | null
+  isFree: boolean
+}
+
 const ERS = [
   { id: 'er-1', name: 'RE Campinas', isDayOpen: true },
   { id: 'er-2', name: 'RE Curitiba', isDayOpen: false },
 ]
 
-const OVERVIEW_OPEN = {
+const OVERVIEW_OPEN: MockOverview = {
   isDayOpen: true,
   waiting: [],
   calling: [],
@@ -23,10 +44,10 @@ const OVERVIEW_OPEN = {
   paused: [],
 }
 
-const OVERVIEW_CLOSED = { ...OVERVIEW_OPEN, isDayOpen: false }
+const OVERVIEW_CLOSED: MockOverview = { ...OVERVIEW_OPEN, isDayOpen: false }
 
-const COUNTERS_FREE = [{ id: 'c-1', number: 1, state: 'UNAVAILABLE', operator: null, isFree: true }]
-const COUNTERS_ACTIVE = [{ id: 'c-1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Operadora 1' }, isFree: false }]
+const COUNTERS_FREE: MockCounter[] = [{ id: 'c-1', number: 1, state: 'UNAVAILABLE', operator: null, isFree: true }]
+const COUNTERS_ACTIVE: MockCounter[] = [{ id: 'c-1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Operadora 1' }, isFree: false }]
 const OPERATORS = [{ id: 'op-1', name: 'Operadora 1', email: 'op1@gb.com.br', hasOpenCounter: false, counterNumber: null }]
 const REPS = [{ id: 're-1', fullName: 'RE Um', reCode: 'RE0001', ticket: null }]
 
@@ -34,10 +55,7 @@ function authenticate() {
   seedStaffSession({ id: 'admin-1', name: 'Admin', role: 'ADMIN' })
 }
 
-function mockRefreshReturning(overview = OVERVIEW_OPEN, counters = COUNTERS_FREE) {
-  vi.mocked(api.get)
-    .mockResolvedValueOnce(ERS)           // /simulation/ers
-    .mockResolvedValue(overview)           // subsequent calls all return overview
+function mockRefreshReturning(overview: MockOverview = OVERVIEW_OPEN, counters: MockCounter[] = COUNTERS_FREE) {
   vi.mocked(api.get).mockImplementation(async (url: string) => {
     if (url.startsWith('/simulation/ers')) return ERS
     if (url.includes('/simulation/state')) return overview
