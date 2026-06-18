@@ -33,3 +33,4 @@ Thumbs.db
 
 # Local test credentials (plaintext — never version)
 /docs/credenciais-teste-local.md
+/docs/credenciais-teste-supabase.md
