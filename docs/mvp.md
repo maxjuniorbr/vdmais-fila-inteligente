@@ -263,13 +263,18 @@ Estados mínimos:
     
 8. **Pausado**  
     
-    A RE avisa que não está pronta e pausa a própria senha. Ela sai temporariamente da fila sem perder o cadastro. Ao retomar, volta para o **fim** da fila. O tempo pausado é excluído das métricas de espera.
+    A senha sai temporariamente da fila sem perder o cadastro. Pode ser pausada
+    pela **própria RE** ("Não estou pronta") **ou pela operação** (operadora) — ver
+    9.5 e 9.5.1. Ao retomar, volta para o **fim** da fila. O tempo pausado é
+    excluído das métricas de espera. Ao **expirar** o tempo de pausa, a senha **não
+    é cancelada**: ela volta automaticamente ao **fim** da fila (mesma regra da
+    retomada), seja a pausa da RE ou da operação.
     
 
 Observação:
 
 > Restaurado deve ser tratado preferencialmente como evento. Após restauração, a senha volta para Aguardando (no fim da fila).
-> Pausado é controlado pela própria RE (pausar/retomar); ao retomar, a senha recebe nova posição no fim da fila e é sempre vinculada à fila do **dia atual**.
+> Pausado é controlado pela RE ou pela operação (pausar/retomar); ao retomar — manual ou por tempo esgotado — a senha recebe nova posição no fim da fila e é sempre vinculada à fila do **dia atual**.
 
 > **Encerramento automático na virada de dia.** Senhas que ficaram em
 > **Aguardando**, **Chamando**, **Em atendimento** ou **Pausado** de um dia que
@@ -451,6 +456,11 @@ Motivos possíveis de pausa:
 - fechamento de caixa;
 - outro.
 
+> **Pausar o caixa ≠ pausar a senha.** Pausar o caixa (acima) suspende a
+> **operadora**, mantendo o vínculo. Já **pausar a senha** de um RE que estava em
+> chamada/atendimento (ver 9.5.1) **libera o caixa** (volta a *Ativo*, sem
+> operadora) e pausa apenas a senha do RE.
+
 ### 9.5 Pausa da senha pela RE
 
 1. Na tela da própria senha, a RE clica em **Não estou pronta** (pausar).
@@ -460,11 +470,44 @@ Motivos possíveis de pausa:
 5. O tempo pausado é descontado das métricas de espera.
 
 > **Tempo limite da pausa.** A pausa tem tolerância configurável por ER
-> (`pauseTimeoutSeconds`, padrão 5 minutos). Se a RE não retomar dentro da janela,
-> a senha é **cancelada** automaticamente (motivo "Tempo de pausa esgotado",
-> evento `ticket_pause_expired`). A expiração é aplicada tanto por verificação
-> periódica quanto na própria tela da RE, para que ela veja o cancelamento sem
-> depender do sweep.
+> (`pauseTimeoutSeconds`, padrão 5 minutos). Se a pausa não for retomada dentro da
+> janela, a senha **volta automaticamente ao fim da fila** (estado **Aguardando**,
+> nova posição/código) — **não é mais cancelada**. O evento `ticket_pause_expired`
+> é mantido para os indicadores, seguido de `ticket_resumed`. A expiração é
+> aplicada tanto por verificação periódica (sweep) quanto na própria tela da RE,
+> para que ela veja a senha de volta à fila sem depender do sweep.
+
+### 9.5.1 Pausa da senha pela operação
+
+A operação (operadora; o atendente de check-in é previsto, com UI futura) pode
+pausar a senha de um RE com **o mesmo tempo e a mesma experiência** da pausa feita
+pela própria RE. Ela é usada, por exemplo, quando a RE pede uma pausa
+presencialmente ou saiu no meio.
+
+1. A operadora pausa a senha pela tela de Operação: **Pausar senha** na lista
+   **Aguardando** (senha da fila) ou no card **Senha atual** (a senha em chamada
+   ou em atendimento no próprio caixa).
+2. Estados aceitos: **Aguardando**, **Chamando** e **Em atendimento**. Se a senha
+   estava num caixa (chamada/atendimento), o **caixa é liberado** (volta a
+   **Ativo**, sem operadora) para a operadora seguir o fluxo — ver 9.4.
+3. A senha vai para **Pausado** com o mesmo `pauseTimeoutSeconds`; a RE vê na tela
+   dela a mesma experiência de pausa (contador regressivo).
+4. **A RE ou a operação** podem retomar; ao retomar, a senha volta ao **fim** da
+   fila. Ao expirar o tempo, volta ao fim da fila (não cancela), igual à pausa da
+   RE.
+
+**Restrições da pausa pela operação** (ações da operadora ficam atreladas ao caixa):
+
+- exige a **operação do dia aberta**;
+- exige a operadora com um **caixa aberto e não-pausado** (Ativo / em chamada /
+  em atendimento). Com o caixa **em pausa** ou **sem caixa**, as ações de
+  pausar/retomar somem;
+- a operadora pausa senhas da **fila** (Aguardando) e a senha do **próprio caixa**;
+  pausar a senha **em atendimento de outra operadora** (outro caixa) não é
+  permitido — fica restrito à gestora. (Admin não tem essas restrições.)
+
+> Eventos: `ticket_paused` (com `byStaff: true`) ao pausar; `ticket_resumed` ao
+> retomar (manual ou por expiração).
 
 ### 9.6 Saída da fila pela RE
 
@@ -653,7 +696,8 @@ Permissões sugeridas:
 - rechamar (segunda chamada);
 - finalizar atendimento;
 - marcar não compareceu;
-- pausar/retomar próprio caixa.
+- pausar/retomar próprio caixa;
+- pausar/retomar a senha de um RE (ver 9.5.1).
 
 **Atendente/check-in**
 
