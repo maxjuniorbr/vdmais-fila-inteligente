@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { logoutStaffSession } from '../auth/session'
 import { useStaffSession } from '../auth/useStaffSession'
@@ -12,7 +12,6 @@ import { CopyField } from '../components/CopyField'
 import { Input } from '../components/Input'
 import { Modal } from '../components/Modal'
 import { Select } from '../components/Select'
-import { StaffLoginForm } from '../components/StaffLoginForm'
 import { useToast } from '../components/Toast'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
@@ -58,14 +57,11 @@ interface ERDetail extends Omit<ERSummary, '_count'> {
 export function AdminPage() {
   const [authenticated, setAuthenticated] = useStaffSession(['ADMIN'])
 
+  // Logout, an expired session, or a direct visit without a session all funnel
+  // back to the central login (HomePage), the single entry point that routes
+  // each role to its area. No per-page login form.
   if (!authenticated) {
-    return (
-      <StaffLoginForm
-        title="Administração"
-        allowedRoles={['ADMIN']}
-        onAuthenticated={() => setAuthenticated(true)}
-      />
-    )
+    return <Navigate to="/" replace />
   }
 
   return <AdminDashboard onLogout={() => setAuthenticated(false)} />

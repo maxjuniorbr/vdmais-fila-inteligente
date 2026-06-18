@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
-import { makeStaffToken, seedStaffSession } from '../test/staffToken'
+import { seedStaffSession } from '../test/staffToken'
 import { ManagerPage } from './ManagerPage'
 
 vi.mock('../api/client', () => ({
@@ -117,10 +117,16 @@ function mockGet() {
   })
 }
 
+// The page no longer renders a login form: logout, an expired session, or a
+// direct visit without a session redirect to the central login at '/'. The stub
+// route lets the test observe that redirect.
 function renderManager() {
   return render(
-    <MemoryRouter>
-      <ManagerPage />
+    <MemoryRouter initialEntries={['/gestao']}>
+      <Routes>
+        <Route path="/" element={<div>central-login</div>} />
+        <Route path="/gestao" element={<ManagerPage />} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -381,56 +387,7 @@ describe('ManagerPage', () => {
     expect(select).toHaveValue('er-2')
   })
 
-  it('shows the login form and authenticates a manager through it', async () => {
-    sessionStorage.clear()
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          access_token: makeStaffToken({ id: 'mgr-2', role: 'MANAGER', erId: 'er-1' }),
-          user: { id: 'mgr-2', name: 'Nova Gestora', role: 'MANAGER', erId: 'er-1' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-    renderManager()
-
-    expect(screen.getByRole('heading', { name: 'Gestão da fila' })).toBeInTheDocument()
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('E-mail'), 'gestora@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'senha-segura')
-    fireEvent.click(screen.getByRole('button', { name: /entrar/i }))
-
-    expect(await screen.findByText('Caixas')).toBeInTheDocument()
-  })
-
-  it('authenticates an admin through the login form into ER selection', async () => {
-    sessionStorage.clear()
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          access_token: makeStaffToken({ id: 'admin-2', role: 'ADMIN' }),
-          user: { id: 'admin-2', name: 'Admin', role: 'ADMIN' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-    vi.mocked(api.get).mockImplementation((path: string) => {
-      if (path === '/admin/ers') return Promise.resolve([])
-      return Promise.resolve([])
-    })
-    renderManager()
-
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('E-mail'), 'admin@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'senha-segura')
-    fireEvent.click(screen.getByRole('button', { name: /entrar/i }))
-
-    expect(await screen.findByText('ER acompanhado')).toBeInTheDocument()
-  })
-
-  it('logs out and returns to the login form', async () => {
+  it('logs out and redirects to the central login', async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetchMock)
     renderManager()
@@ -438,7 +395,7 @@ describe('ManagerPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /sair/i }))
 
-    expect(await screen.findByRole('heading', { name: 'Gestão da fila' })).toBeInTheDocument()
+    expect(await screen.findByText('central-login')).toBeInTheDocument()
   })
 
   it('navigates home and to administration from the header', async () => {
