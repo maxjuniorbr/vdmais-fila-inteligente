@@ -494,7 +494,14 @@ export function ManagerPage() {
                   ['Restaurados', metrics.totalRestored],
                   ['Encerradas na virada', metrics.totalForceClosed],
                   ['Duplicidades bloqueadas', metrics.duplicateAttempts],
-                  ['Caixas ativos/pausados', `${metrics.activeCounters}/${metrics.pausedCounters}`],
+                  // Indicador ao vivo: só faz sentido com a operação aberta. Com
+                  // o dia encerrado os caixas já foram liberados (closeDay), então
+                  // exibir "0/0" no painel retrospectivo seria enganoso — mostramos
+                  // "—". As demais tiles vêm da auditoria e seguem retroativas.
+                  [
+                    'Caixas ativos/pausados',
+                    er?.isDayOpen ? `${metrics.activeCounters}/${metrics.pausedCounters}` : '—',
+                  ],
                 ] as [string, string | number][]
               ).map(([label, value]) => (
                 <MetricCard key={label} label={label} value={value} />

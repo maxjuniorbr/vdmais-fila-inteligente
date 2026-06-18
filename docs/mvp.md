@@ -520,6 +520,12 @@ Senhas ainda **Aguardando**, **Chamando** ou **Pausado** continuam **bloqueando*
 o encerramento (não se encerra com gente na fila); para a chamada abandonada,
 valem o tempo limite (9.8) e a liberação de caixa pela gestora (9.4).
 
+O encerramento também **fecha todos os caixas do ER** (voltam para *indisponível*,
+sem operadora), com o evento `counters_reset_for_day` — nenhum caixa fica
+"aberto" com a operação encerrada. O mesmo saneamento na **abertura** (ver 9.7)
+permanece como rede de segurança idempotente para o dia que nunca foi encerrado
+explicitamente.
+
 ### 9.10 Liberação de caixa pela gestora
 
 Quando uma operadora abandona o caixa no meio do expediente (saiu sem fechar,
