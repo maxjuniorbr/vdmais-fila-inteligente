@@ -186,6 +186,8 @@ const REFRESH_EVENTS = [
   'counter.paused',
   'counter.resumed',
   'counter.closed',
+  'counter.created',
+  'counter.deleted',
   'day.opened',
   'day.closed',
 ]
