@@ -307,9 +307,23 @@ export function TicketConfirmationPage() {
       .finally(() => setLoading(false))
   }, [erId, navigate, fetchMyStatus])
 
+  const refetchMyStatus = useCallback((): Promise<void> => {
+    const token = sessionStorage.getItem('token')
+    if (!token) return Promise.resolve()
+    return fetchMyStatus(token)
+      .then((res) => (res.ok ? (res.json() as Promise<TicketInfo>) : Promise.reject(new Error('status'))))
+      .then((data) => setTicket(data))
+  }, [fetchMyStatus])
+
   const handlePauseExpired = useCallback(() => {
-    setTicket((prev) => (prev?.state === 'PAUSED' ? { ...prev, state: 'CANCELLED' } : prev))
-  }, [])
+    // A pausa expirada agora RETOMA a senha (volta ao fim da fila), não cancela.
+    // Re-busca o status para refletir o novo estado (AGUARDANDO). Se falhar, tenta
+    // de novo em 3s para o contador não ficar travado em 00:00 (o polling de 10s
+    // também reconcilia, como rede de segurança).
+    void refetchMyStatus().catch(() => {
+      setTimeout(() => void refetchMyStatus(), 3000)
+    })
+  }, [refetchMyStatus])
 
   const handleCallExpired = useCallback(() => {
     setTicket((prev) => (prev?.state === 'CALLING' ? { ...prev, state: 'NO_SHOW' } : prev))
@@ -469,7 +483,7 @@ export function TicketConfirmationPage() {
             startAt={ticket.pausedAt}
             timeoutSeconds={ticket.pauseTimeoutSeconds as number}
             label="Tempo restante para retomar"
-            hint="Se o tempo acabar, sua senha será cancelada automaticamente."
+            hint="Se o tempo acabar, sua senha voltará ao fim da fila."
             onExpire={handlePauseExpired}
           />
         )}

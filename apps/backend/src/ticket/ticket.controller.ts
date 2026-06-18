@@ -98,6 +98,18 @@ export class TicketController {
     return this.ticketService.resumeTicket(id, req.user.userId)
   }
 
+  @Post(':id/staff-pause')
+  @Roles('OPERATOR', 'ATTENDANT', 'ADMIN')
+  staffPause(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.ticketService.staffPauseTicket(id, req.user)
+  }
+
+  @Post(':id/staff-resume')
+  @Roles('OPERATOR', 'ATTENDANT', 'ADMIN')
+  staffResume(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.ticketService.staffResumeTicket(id, req.user)
+  }
+
   @Post(':id/self-cancel')
   @Roles('REPRESENTATIVE')
   selfCancel(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
