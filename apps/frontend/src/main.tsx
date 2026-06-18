@@ -11,6 +11,7 @@ import { PanelPage } from './pages/PanelPage'
 import { AdminPage } from './pages/AdminPage'
 import { HomePage } from './pages/HomePage'
 import { PlaygroundPage } from './pages/PlaygroundPage'
+import { SimuladorPage } from './pages/SimuladorPage'
 import { ToastProvider } from './components/Toast'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/painel/:erId" element={<PanelPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/playground" element={<PlaygroundPage />} />
+          <Route path="/simulador" element={<SimuladorPage />} />
         </Routes>
       </ToastProvider>
     </BrowserRouter>

@@ -5,6 +5,7 @@ import {
   entryChannelLabel,
   roleLabel,
   ticketStateLabel,
+  ticketStateTone,
 } from './labels'
 
 describe('labels', () => {
@@ -39,5 +40,16 @@ describe('labels', () => {
     expect(counterStateTone('PAUSED')).toBe('warning')
     expect(counterStateTone('UNAVAILABLE')).toBe('neutral')
     expect(counterStateTone('???')).toBe('neutral')
+  })
+
+  it('maps ticket states to semantic badge tones', () => {
+    expect(ticketStateTone('WAITING')).toBe('warning')
+    expect(ticketStateTone('CALLING')).toBe('info')
+    expect(ticketStateTone('IN_SERVICE')).toBe('success')
+    expect(ticketStateTone('PAUSED')).toBe('neutral')
+    expect(ticketStateTone('FINISHED')).toBe('success')
+    expect(ticketStateTone('NO_SHOW')).toBe('danger')
+    expect(ticketStateTone('CANCELLED')).toBe('danger')
+    expect(ticketStateTone('???')).toBe('neutral')
   })
 })
