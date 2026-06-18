@@ -149,6 +149,27 @@ describe('ManagerPage', () => {
     expect(screen.getByText('A001')).toBeInTheDocument()
   })
 
+  it('shows the live active/paused counters tile while the day is open', async () => {
+    renderManager()
+    const tile = (await screen.findByText('Caixas ativos/pausados')).closest('article')!
+    expect(within(tile).getByText('1/0')).toBeInTheDocument()
+  })
+
+  it('blanks the active/paused counters tile once the day is closed', async () => {
+    vi.mocked(api.get).mockImplementation((path: string) => {
+      if (path.includes('/overview')) return Promise.resolve(overview)
+      if (path.includes('/daily')) return Promise.resolve(metrics)
+      if (path.startsWith('/ers/')) return Promise.resolve({ ...er, isDayOpen: false })
+      return Promise.resolve([])
+    })
+    renderManager()
+    // The day is closed: counters were already released, so the live tile shows
+    // "—" instead of a misleading "0/0" under the "último dia operado" banner.
+    const tile = (await screen.findByText('Caixas ativos/pausados')).closest('article')!
+    expect(within(tile).getByText('—')).toBeInTheDocument()
+    expect(within(tile).queryByText('1/0')).not.toBeInTheDocument()
+  })
+
   it('shows prolonged services for a long-running attendance', async () => {
     renderManager()
     expect(await screen.findByText('Atendimentos prolongados')).toBeInTheDocument()

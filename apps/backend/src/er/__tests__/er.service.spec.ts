@@ -69,7 +69,7 @@ describe('ERService', () => {
     )
   })
 
-  it('auto-finishes in-service tickets when closing the day', async () => {
+  it('auto-finishes in-service tickets and releases their counter when closing the day', async () => {
     tx.ticket.count.mockResolvedValue(0)
     tx.ticket.findMany.mockResolvedValue([{ id: 'svc-1', counterId: 'c1' }])
     tx.ticket.updateMany.mockResolvedValue({ count: 1 })
@@ -83,6 +83,13 @@ describe('ERService', () => {
     })
     expect(tx.auditEvent.createMany).toHaveBeenCalledWith({
       data: [expect.objectContaining({ eventType: 'service_force_finished', ticketId: 'svc-1' })],
+    })
+    // The most common close path: the operator was still mid-service at a
+    // counter. Finishing the ticket must also free that counter (no caixa left
+    // "open" after the day closes).
+    expect(tx.counter.updateMany).toHaveBeenCalledWith({
+      where: { erId: 'er-1', state: { not: CounterState.UNAVAILABLE } },
+      data: { state: CounterState.UNAVAILABLE, operatorId: null },
     })
   })
 
@@ -103,10 +110,11 @@ describe('ERService', () => {
     expect(tx.eR.update).not.toHaveBeenCalled()
   })
 
-  it('finishes in-service tickets without touching counters when none are assigned', async () => {
+  it('releases all counters and finishes in-service tickets when closing the day', async () => {
     tx.ticket.count.mockResolvedValue(0)
     tx.ticket.findMany.mockResolvedValue([{ id: 'svc-1', counterId: null }])
     tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+    tx.counter.updateMany.mockResolvedValue({ count: 2 })
 
     await service.closeDay('er-1', manager)
 
@@ -114,7 +122,15 @@ describe('ERService', () => {
       where: { id: { in: ['svc-1'] } },
       data: { state: TicketState.FINISHED, serviceFinishedAt: expect.any(Date) },
     })
-    expect(tx.counter.updateMany).not.toHaveBeenCalled()
+    // Closing the day frees every open counter (UNAVAILABLE + no operator), the
+    // same reset the next openDay applies — so no counter is left "open".
+    expect(tx.counter.updateMany).toHaveBeenCalledWith({
+      where: { erId: 'er-1', state: { not: CounterState.UNAVAILABLE } },
+      data: { state: CounterState.UNAVAILABLE, operatorId: null },
+    })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: 'counters_reset_for_day', erId: 'er-1' }),
+    })
   })
 
   it('fails to open the day when the ER no longer exists', async () => {

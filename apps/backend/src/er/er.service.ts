@@ -206,6 +206,12 @@ export class ERService {
 
       await this._forceFinishInServiceTickets(tx, erId, businessDate, now, user)
 
+      // Encerrar a operação também fecha os caixas: nenhum caixa permanece
+      // "aberto" com a operação do dia encerrada. O saneamento na abertura
+      // (openDay) continua existindo como rede de segurança idempotente para o
+      // dia que nunca foi encerrado explicitamente.
+      await this._releaseAllCounters(tx, erId, user)
+
       await tx.queue.updateMany({
         where: { erId, businessDate, closedAt: null },
         data: { closedAt: now },
@@ -250,19 +256,9 @@ export class ERService {
       data: { state: TicketState.FINISHED, serviceFinishedAt: now },
     })
 
-    const counterIds = [
-      ...new Set(
-        open
-          .map((ticket) => ticket.counterId)
-          .filter((counterId): counterId is string => Boolean(counterId)),
-      ),
-    ]
-    if (counterIds.length > 0) {
-      await tx.counter.updateMany({
-        where: { id: { in: counterIds } },
-        data: { state: CounterState.ACTIVE },
-      })
-    }
+    // Não reativamos o caixa aqui: o encerramento libera todos os caixas logo
+    // em seguida (_releaseAllCounters), então setá-los ACTIVE seria trabalho
+    // descartado e deixaria um estado intermediário inconsistente.
 
     await tx.auditEvent.createMany({
       data: open.map((ticket) => ({
