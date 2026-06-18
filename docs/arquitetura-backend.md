@@ -289,6 +289,30 @@ joinER.denied  { erId }             // falha de autenticação
 
 ---
 
+### Simulador operacional — `simulation/`
+
+Console interno de simulação para desenvolvimento e demonstração. **Bloqueado fora de `NODE_ENV=development|test`** pelo `SimulationGuard` (fail-closed) e por banco remoto sem `SIMULATION_ALLOW_REMOTE=true`. Requer JWT de ADMIN.
+
+| Método | Caminho | Auth | Descrição |
+|---|---|---|---|
+| `GET` | `/simulation/ers` | ADMIN | Lista todos os ERs |
+| `GET` | `/simulation/state?erId=` | ADMIN | Snapshot da fila (overview) |
+| `GET` | `/simulation/operators?erId=` | ADMIN | Lista operadoras do ER |
+| `GET` | `/simulation/counters?erId=` | ADMIN | Lista caixas do ER |
+| `GET` | `/simulation/representatives?erId=` | ADMIN | Lista REs disponíveis/ativas no ER |
+| `POST` | `/simulation/counters/open` | ADMIN | Abre caixas em lote, auto-pareando com operadoras livres |
+| `POST` | `/simulation/counters/close` | ADMIN | Fecha um caixa |
+| `POST` | `/simulation/counters/call-next` | ADMIN | Chama próxima senha em um caixa ativo |
+| `POST` | `/simulation/queue/add-existing` | ADMIN | Coloca REs existentes na fila |
+| `POST` | `/simulation/queue/pause` | ADMIN | Pausa uma senha (WAITING → PAUSED) |
+| `POST` | `/simulation/queue/resume` | ADMIN | Retoma uma senha pausada (PAUSED → WAITING) |
+| `POST` | `/simulation/queue/cancel` | ADMIN | Cancela uma senha (desistência da RE) |
+| `POST` | `/simulation/attendance/start` | ADMIN | Inicia atendimento (CALLING → IN_SERVICE) |
+| `POST` | `/simulation/attendance/finish` | ADMIN | Encerra atendimento (IN_SERVICE → FINISHED) |
+| `POST` | `/simulation/attendance/no-show` | ADMIN | Registra não comparecimento (CALLING → NO_SHOW) |
+
+---
+
 ### Observabilidade — `observability/`
 
 | Método | Caminho | Auth | Descrição |

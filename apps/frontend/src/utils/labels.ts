@@ -58,3 +58,17 @@ const COUNTER_STATE_TONES: Record<string, BadgeTone> = {
 export function counterStateTone(state: string): BadgeTone {
   return COUNTER_STATE_TONES[state] ?? 'neutral'
 }
+
+const TICKET_STATE_TONES: Record<string, BadgeTone> = {
+  WAITING: 'warning',
+  CALLING: 'info',
+  IN_SERVICE: 'success',
+  PAUSED: 'neutral',
+  FINISHED: 'success',
+  NO_SHOW: 'danger',
+  CANCELLED: 'danger',
+}
+
+export function ticketStateTone(state: string): BadgeTone {
+  return TICKET_STATE_TONES[state] ?? 'neutral'
+}

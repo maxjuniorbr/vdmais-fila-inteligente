@@ -32,6 +32,7 @@ apps/frontend/src/
 | `/gestao` | `ManagerPage` | MANAGER | Abertura/fechamento do dia, métricas, correções |
 | `/painel/:erId` | `PanelPage` | Público (token) | Painel TV com chamadas em tempo real |
 | `/admin` | `AdminPage` | ADMIN | Configuração de ERs, caixas e contas |
+| `/simulador` | `SimuladorPage` | ADMIN | Console interno de simulação operacional (bloqueado fora de dev/test) |
 | `/playground` | `PlaygroundPage` | Dev | Catálogo de componentes do design system |
 
 **Proteção de rotas:** páginas de staff validam o JWT via hook `useStaffSession(allowedRoles)` na montagem. Sessão inválida ou expirada redireciona para `/` imediatamente.
