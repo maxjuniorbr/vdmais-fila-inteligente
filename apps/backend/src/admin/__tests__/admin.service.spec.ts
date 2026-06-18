@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt'
 import { AuditLogService } from '../../audit-log/audit-log.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { PanelTokenService } from '../../panel/panel-token.service'
+import { PanelGateway } from '../../panel/panel.gateway'
 import { AdminService } from '../admin.service'
 import { QueueEntryTokenService } from '../../auth/queue-entry-token.service'
 
@@ -17,6 +18,7 @@ const prisma = {
 }
 const auditLog = { log: jest.fn() }
 const panelTokens = { rotate: jest.fn(), revoke: jest.fn() }
+const panelGateway = { emitToER: jest.fn() }
 // The implementation is (re)set in beforeEach after resetAllMocks.
 const queueEntryTokens = { issue: jest.fn() }
 const user = { userId: 'admin-1', role: Role.ADMIN, erId: undefined }
@@ -41,6 +43,7 @@ describe('AdminService', () => {
       auditLog as unknown as AuditLogService,
       panelTokens as unknown as PanelTokenService,
       queueEntryTokens as unknown as QueueEntryTokenService,
+      panelGateway as unknown as PanelGateway,
     )
     mockedBcrypt.hash.mockResolvedValue('hashed' as never)
     prisma.eR.findUnique.mockResolvedValue({ id: 'er-1' })
@@ -127,12 +130,16 @@ describe('AdminService', () => {
     )
   })
 
-  it('creates a counter and audits it', async () => {
+  it('creates a counter, audits it and notifies the ER in real time', async () => {
     prisma.counter.create.mockResolvedValue({ id: 'c-1', number: 3 })
     await service.createCounter('er-1', { number: 3 }, user)
     expect(auditLog.log).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'counter_created' }),
     )
+    expect(panelGateway.emitToER).toHaveBeenCalledWith('er-1', 'counter.created', {
+      counterId: 'c-1',
+      number: 3,
+    })
   })
 
   it('rejects a duplicated counter number', async () => {
@@ -164,6 +171,10 @@ describe('AdminService', () => {
     expect(auditLog.log).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'counter_deleted' }),
     )
+    expect(panelGateway.emitToER).toHaveBeenCalledWith('er-1', 'counter.deleted', {
+      counterId: 'c-1',
+      number: 2,
+    })
   })
 
   it('refuses to delete a counter with service history', async () => {
