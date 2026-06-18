@@ -104,6 +104,8 @@ Eventos que o frontend escuta:
 |---|---|---|
 | `ticket.called` | `{ ticketId, code, displayName, counterNumber, calledAt }` | Painel TV, operação |
 | `counter.opened` | `{ counterId, number }` | Painel TV |
+| `counter.created` | `{ counterId, number }` | Gestão, operação |
+| `counter.deleted` | `{ counterId, number }` | Gestão, operação |
 | `panel.updated` | `{ event, payload }` | Painel TV (broadcast genérico) |
 | `joinER.denied` | `{ erId }` | Painel TV (falha de autenticação) |
 

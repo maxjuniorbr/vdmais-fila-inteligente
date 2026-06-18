@@ -257,10 +257,12 @@ joinER { erId, clientType, token? }
   clientType: 'dashboard'  → aceita JWT de staff
 
 // Servidor → Cliente
-ticket.called  { ticketId, code, displayName, counterNumber, calledAt }
-counter.opened { counterId, number }
-panel.updated  { event, payload }   // broadcast genérico de atualização de estado
-joinER.denied  { erId }             // falha de autenticação
+ticket.called    { ticketId, code, displayName, counterNumber, calledAt }
+counter.opened   { counterId, number }
+counter.created  { counterId, number }
+counter.deleted  { counterId, number }
+panel.updated    { event, payload }   // broadcast genérico de atualização de estado
+joinER.denied    { erId }             // falha de autenticação
 ```
 
 ---
