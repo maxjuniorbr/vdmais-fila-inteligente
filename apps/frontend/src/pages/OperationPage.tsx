@@ -8,6 +8,7 @@ import {
   logoutStaffSession,
 } from '../auth/session'
 import { useStaffSession } from '../auth/useStaffSession'
+import { ActionMenu } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Button } from '../components/Button'
@@ -81,6 +82,11 @@ export function OperationPage() {
   const [confirmingClose, setConfirmingClose] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // "Chamar próximo" é a ação mais repetida da tela e tem atalho de teclado
+  // (Enter). Refs deixam o listener montar uma única vez e sempre ler o estado
+  // atual (habilitado + callback), sem re-assinar a cada render.
+  const callNextEnabledRef = useRef(false)
+  const callNextRef = useRef<() => void>(() => {})
   const socket = useSocket(authenticated ? erId : '')
   const { showToast } = useToast()
 
@@ -115,6 +121,23 @@ export function OperationPage() {
       QUEUE_EVENTS.forEach((event) => socket.off(event, refreshOverview))
     }
   }, [refreshOverview, socket])
+
+  // Atalho: Enter chama a próxima senha — só quando o foco não está num
+  // controle (input/textarea/select/botão/link) para não conflitar com formulários.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Enter' || event.defaultPrevented || !callNextEnabledRef.current) return
+      const el = document.activeElement
+      const interactive =
+        el instanceof HTMLElement &&
+        (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(el.tagName) || el.isContentEditable)
+      if (interactive) return
+      event.preventDefault()
+      callNextRef.current()
+    }
+    globalThis.addEventListener('keydown', onKeyDown)
+    return () => globalThis.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const currentCounter = overview?.counters.find((counter) => counter.id === counterId)
   const currentTicket = useMemo(
@@ -185,6 +208,20 @@ export function OperationPage() {
   const counterIsActive = currentCounter?.state === 'ACTIVE'
   const isOwnCounter = currentCounter?.operator?.id === operatorId
 
+  // "Chamar próximo" é a ação principal do caixa ativo (mora no card Caixa).
+  const canCallNext = isOwnCounter && counterIsActive && !currentTicket && !loading
+  // A operadora só gerencia a fila (pausar/retomar senhas) com o caixa aberto e
+  // NÃO pausado. Em pausa ou sem caixa, some as ações.
+  const canManageQueue = isOwnCounter && currentCounter?.state !== 'PAUSED'
+  const callNext = () => {
+    void act(() => api.post(`/queues/${erId}/call-next`, { counterId }))
+  }
+  let callNextHint = 'Pressione Enter para chamar a próxima.'
+  if (currentTicket) callNextHint = 'Conclua a senha atual antes de chamar a próxima.'
+  else if (currentCounter?.state === 'PAUSED') callNextHint = 'Retome o caixa para chamar a próxima.'
+  callNextEnabledRef.current = canCallNext && !confirmingClose
+  callNextRef.current = callNext
+
   return (
     <div style={styles.shell}>
       <AppHeader
@@ -242,7 +279,17 @@ export function OperationPage() {
               )}
 
               {isOwnCounter && (
-                <div style={styles.counterActions}>
+                <>
+                  <Button
+                    style={{ width: '100%', marginTop: `${brand.spacing[12]}px` }}
+                    onClick={callNext}
+                    disabled={!canCallNext}
+                    title="Chamar próximo (Enter)"
+                  >
+                    Chamar próximo
+                  </Button>
+                  <p style={styles.callHint}>{callNextHint}</p>
+                  <div style={styles.counterActions}>
                   {currentCounter.state === 'ACTIVE' && (
                     <>
                       <Input
@@ -290,7 +337,8 @@ export function OperationPage() {
                       Fechar caixa
                     </Button>
                   )}
-                </div>
+                  </div>
+                </>
               )}
             </section>
 
@@ -317,20 +365,19 @@ export function OperationPage() {
                     )}
                   </p>
                 </div>
-
-                <Button
-                  onClick={() => act(() => api.post(`/queues/${erId}/call-next`, { counterId }))}
-                  disabled={loading || !counterId || !counterIsActive || Boolean(currentTicket)}
-                >
-                  Chamar próximo
-                </Button>
               </div>
+
+              {!currentTicket && isOwnCounter && (
+                <p style={styles.callHint}>Use "Chamar próximo" no caixa para iniciar.</p>
+              )}
 
               {(isCalling || hasOpenService) && (
                 <div style={styles.ticketActions}>
                   {isCalling && (
                     <>
+                      {/* Caminho principal (RE chegou): uma única ação primária em destaque. */}
                       <Button
+                        style={{ width: '100%' }}
                         onClick={() =>
                           act(() => api.post(`/tickets/${currentTicket.id}/start-service`))
                         }
@@ -338,39 +385,61 @@ export function OperationPage() {
                       >
                         Iniciar atendimento
                       </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/recall`))}
-                        disabled={loading}
-                      >
-                        Chamar novamente
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/no-show`), 'Marcada como não compareceu.')}
-                        disabled={loading}
-                      >
-                        Não compareceu
-                      </Button>
+                      {/* Exceções agrupadas: a RE não está no caixa. */}
+                      <div style={styles.absentGroup}>
+                        <p style={styles.absentLabel}>A RE não está no caixa?</p>
+                        <div style={styles.absentActions}>
+                          <Button
+                            variant="secondary"
+                            onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/recall`))}
+                            disabled={loading}
+                          >
+                            Chamar novamente
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/staff-pause`), 'Senha pausada.')}
+                            disabled={loading}
+                          >
+                            Pausar senha
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/no-show`), 'Marcada como não compareceu.')}
+                            disabled={loading}
+                          >
+                            Não compareceu
+                          </Button>
+                        </div>
+                      </div>
                     </>
                   )}
                   {hasOpenService && (
-                    <Button
-                      onClick={() =>
-                        act(() => api.post(`/tickets/${currentTicket.id}/finish-service`), 'Atendimento finalizado.')
-                      }
-                      disabled={loading}
-                    >
-                      Finalizar atendimento
-                    </Button>
+                    <>
+                      <Button
+                        style={{ width: '100%' }}
+                        onClick={() =>
+                          act(() => api.post(`/tickets/${currentTicket.id}/finish-service`), 'Atendimento finalizado.')
+                        }
+                        disabled={loading}
+                      >
+                        Finalizar atendimento
+                      </Button>
+                      <div style={styles.absentGroup}>
+                        <p style={styles.absentLabel}>A RE saiu no meio do atendimento?</p>
+                        <div style={styles.absentActions}>
+                          <Button
+                            variant="secondary"
+                            onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/staff-pause`), 'Senha pausada.')}
+                            disabled={loading}
+                          >
+                            Pausar senha
+                          </Button>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
-              )}
-
-              {hasOpenService && (
-                <p style={styles.warning}>
-                  Atendimento em aberto. Finalize antes de chamar o próximo.
-                </p>
               )}
             </section>
           </div>
@@ -387,8 +456,23 @@ export function OperationPage() {
                 <div style={styles.panelList}>
                   {overview?.waiting.slice(0, 8).map((ticket) => (
                     <div key={ticket.id} style={styles.panelRow}>
-                      <strong>{ticket.code}</strong>
-                      <span style={styles.rowName}>{ticket.representative?.fullName ?? '—'}</span>
+                      <span style={styles.rowMain}>
+                        <strong>{ticket.code}</strong>
+                        <span style={styles.rowName}>{ticket.representative?.fullName ?? '—'}</span>
+                      </span>
+                      {canManageQueue && (
+                        <ActionMenu
+                          label={`Ações da senha ${ticket.code}`}
+                          items={[
+                            {
+                              label: 'Pausar senha',
+                              disabled: loading,
+                              onClick: () =>
+                                act(() => api.post(`/tickets/${ticket.id}/staff-pause`), 'Senha pausada.'),
+                            },
+                          ]}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -405,8 +489,23 @@ export function OperationPage() {
                 <div style={styles.panelList}>
                   {overview?.paused.slice(0, 8).map((ticket) => (
                     <div key={ticket.id} style={styles.panelRow}>
-                      <strong>{ticket.code}</strong>
-                      <span style={styles.rowName}>{ticket.representative?.fullName ?? '—'}</span>
+                      <span style={styles.rowMain}>
+                        <strong>{ticket.code}</strong>
+                        <span style={styles.rowName}>{ticket.representative?.fullName ?? '—'}</span>
+                      </span>
+                      {canManageQueue && (
+                        <ActionMenu
+                          label={`Ações da senha ${ticket.code}`}
+                          items={[
+                            {
+                              label: 'Retomar senha',
+                              disabled: loading,
+                              onClick: () =>
+                                act(() => api.post(`/tickets/${ticket.id}/staff-resume`), 'Senha retomada.'),
+                            },
+                          ]}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -423,10 +522,12 @@ export function OperationPage() {
                 <div style={styles.panelList}>
                   {overview?.inService.slice(0, 8).map((ticket) => (
                     <div key={ticket.id} style={styles.panelRow}>
-                      <strong>{ticket.code}</strong>
-                      <span style={styles.rowName}>
-                        {ticket.counter ? `Caixa ${ticket.counter.number} · ` : ''}
-                        {ticket.representative?.fullName ?? '—'}
+                      <span style={styles.rowMain}>
+                        <strong>{ticket.code}</strong>
+                        <span style={styles.rowName}>
+                          {ticket.counter ? `Caixa ${ticket.counter.number} · ` : ''}
+                          {ticket.representative?.fullName ?? '—'}
+                        </span>
                       </span>
                     </div>
                   ))}
@@ -525,9 +626,26 @@ const styles: Record<string, React.CSSProperties> = {
   },
   ticketActions: {
     display: 'flex',
-    gap: `${brand.spacing[8]}px`,
-    flexWrap: 'wrap',
+    flexDirection: 'column',
+    gap: `${brand.spacing[16]}px`,
     marginTop: `${brand.spacing[16]}px`,
+  },
+  absentGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: `${brand.spacing[8]}px`,
+    paddingTop: `${brand.spacing[12]}px`,
+    borderTop: `1px solid ${brand.border}`,
+  },
+  absentLabel: {
+    margin: 0,
+    ...brand.typography.auxiliar,
+    color: brand.inkMuted,
+  },
+  absentActions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: `${brand.spacing[8]}px`,
   },
   currentRow: {
     display: 'flex',
@@ -559,19 +677,26 @@ const styles: Record<string, React.CSSProperties> = {
   elapsed: {
     color: brand.inkMuted,
   },
-  warning: {
-    margin: '1rem 0 0',
-    padding: `${brand.spacing[12]}px ${brand.spacing[16]}px`,
-    borderRadius: brand.radius.medium,
-    background: brand.warningSoft,
-    border: `1px solid ${brand.warningBorder}`,
-    color: brand.warning,
-    fontWeight: 600,
-    fontSize: brand.typography.bodySmall.fontSize,
+  callHint: {
+    margin: `${brand.spacing[8]}px 0 0`,
+    ...brand.typography.auxiliar,
+    color: brand.inkMuted,
   },
   panelList: {
     display: 'grid',
     gap: '0.5rem',
+  },
+  panelRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: `${brand.spacing[8]}px`,
+  },
+  rowMain: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: `${brand.spacing[8]}px`,
+    minWidth: 0,
   },
   rowName: {
     color: brand.inkSoft,

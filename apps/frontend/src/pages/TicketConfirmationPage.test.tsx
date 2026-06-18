@@ -989,9 +989,15 @@ describe('TicketConfirmationPage', () => {
       expect(screen.getByText('#3')).toBeInTheDocument()
     })
 
-    it('cancels the ticket when the pause countdown expires', async () => {
+    it('resumes the ticket to the queue when the pause countdown expires', async () => {
       await renderWaitingTicket(
-        async () => new Response(null, { status: 200 }),
+        async (input) => {
+          if (input.toString().includes('/api/tickets/my-status')) {
+            // Expirar a pausa agora RETOMA a senha (volta ao fim da fila).
+            return statusResponse({ code: 'A005', currentPosition: 5, state: 'WAITING' })
+          }
+          return new Response(null, { status: 200 })
+        },
         {
           state: 'PAUSED',
           currentPosition: 0,
@@ -1001,11 +1007,47 @@ describe('TicketConfirmationPage', () => {
       )
 
       expect(screen.getByText('Pausada')).toBeInTheDocument()
-      // Drive the countdown past its 1s deadline so onExpire cancels the ticket.
+      // Drive the countdown past its 1s deadline so onExpire re-fetches the status.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2000)
       })
-      expect(screen.getByText('Senha cancelada')).toBeInTheDocument()
+      expect(screen.queryByText('Senha cancelada')).not.toBeInTheDocument()
+      expect(screen.queryByText('Pausada')).not.toBeInTheDocument()
+      expect(screen.getByText('#5')).toBeInTheDocument()
+    })
+
+    it('retries the status re-fetch if it fails when the pause expires', async () => {
+      let statusCalls = 0
+      await renderWaitingTicket(
+        async (input) => {
+          if (input.toString().includes('/api/tickets/my-status')) {
+            statusCalls += 1
+            // 1ª re-busca falha; a retentativa (3s) deve reconciliar para WAITING.
+            if (statusCalls === 1) return new Response(null, { status: 500 })
+            return statusResponse({ code: 'A005', currentPosition: 5, state: 'WAITING' })
+          }
+          return new Response(null, { status: 200 })
+        },
+        {
+          state: 'PAUSED',
+          currentPosition: 0,
+          pausedAt: new Date().toISOString(),
+          pauseTimeoutSeconds: 1,
+        },
+      )
+
+      // Conta expira → 1ª re-busca falha → ainda pausada.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+      expect(screen.getByText('Pausada')).toBeInTheDocument()
+
+      // Retentativa após 3s → sucesso → volta para a fila.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+      expect(screen.queryByText('Pausada')).not.toBeInTheDocument()
+      expect(screen.getByText('#5')).toBeInTheDocument()
     })
   })
 })

@@ -114,6 +114,109 @@ describe('OperationPage coverage', () => {
     expect(await screen.findByText('Falha na ação')).toBeInTheDocument()
   })
 
+  it('calls the next ticket when pressing Enter with no field focused', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Eu' } }],
+    })
+    render(<OperationPage />)
+
+    await screen.findByRole('button', { name: 'Chamar próximo' })
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/queues/er-1/call-next', { counterId: 'c1' }),
+    )
+  })
+
+  it('does not call next on Enter while typing in a field', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Eu' } }],
+    })
+    render(<OperationPage />)
+
+    const reason = await screen.findByLabelText('Motivo da pausa')
+    reason.focus()
+    fireEvent.keyDown(reason, { key: 'Enter' })
+
+    expect(api.post).not.toHaveBeenCalledWith('/queues/er-1/call-next', expect.anything())
+  })
+
+  it('pauses a waiting ticket from the kebab menu (staff-pause)', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Eu' } }],
+      waiting: [{ id: 't-w', code: 'A010', state: 'WAITING', representative: { fullName: 'Ana' } }],
+    })
+    render(<OperationPage />)
+
+    await screen.findByText('A010')
+    fireEvent.click(screen.getByRole('button', { name: 'Ações da senha A010' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Pausar senha' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/t-w/staff-pause'))
+  })
+
+  it('resumes a paused ticket from the kebab menu (staff-resume)', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Eu' } }],
+      paused: [{ id: 't-p', code: 'A011', state: 'PAUSED', representative: { fullName: 'Bia' } }],
+    })
+    render(<OperationPage />)
+
+    await screen.findByText('A011')
+    fireEvent.click(screen.getByRole('button', { name: 'Ações da senha A011' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Retomar senha' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/t-p/staff-resume'))
+  })
+
+  it('pauses the current calling ticket from the action bar (staff-pause)', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'CALLING', operator: { id: 'op-1', name: 'Eu' } }],
+      calling: [
+        { id: 't-c', code: 'A012', state: 'CALLING', calledAt: minutesAgo(0), counter: { id: 'c1', number: 1 } },
+      ],
+    })
+    render(<OperationPage />)
+
+    await screen.findAllByText('A012')
+    fireEvent.click(screen.getByRole('button', { name: 'Pausar senha' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/t-c/staff-pause'))
+  })
+
+  it('pauses the own in-service ticket from the action bar (staff-pause)', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'IN_SERVICE', operator: { id: 'op-1', name: 'Eu' } }],
+      inService: [
+        { id: 't-s', code: 'A020', state: 'IN_SERVICE', serviceStartedAt: minutesAgo(1), counter: { id: 'c1', number: 1 } },
+      ],
+    })
+    render(<OperationPage />)
+
+    await screen.findAllByText('A020')
+    fireEvent.click(screen.getByRole('button', { name: 'Pausar senha' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/t-s/staff-pause'))
+  })
+
+  it('hides the pause action on the queue when the counter is paused', async () => {
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'PAUSED', operator: { id: 'op-1', name: 'Eu' } }],
+      waiting: [{ id: 't-w', code: 'A021', state: 'WAITING', representative: { fullName: 'Ana' } }],
+    })
+    render(<OperationPage />)
+
+    await screen.findByText('A021')
+    // Caixa pausado: sem kebab de ações na fila.
+    expect(screen.queryByRole('button', { name: /Ações da senha A021/ })).not.toBeInTheDocument()
+  })
+
   it('logs out, calling the telemetry endpoint and clearing the session', async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetchMock)

@@ -665,13 +665,20 @@ export class TicketService {
     // Enforce the pause/call timeouts on read so the RE sees the outcome
     // promptly even before the periodic sweeps run.
     if (this._isPauseExpired(ticket.state, ticket.pausedAt, ticket.er.pauseTimeoutSeconds)) {
-      await this._expirePause({
-        id: ticket.id,
-        code: ticket.code,
-        erId: ticket.erId,
-        representativeId: ticket.representativeId,
+      // Expirar a pausa agora RETOMA a senha (volta ao fim da fila) em vez de
+      // cancelar, então ela continua ativa — re-busca e devolve já em AGUARDANDO.
+      await this._expirePause(ticket)
+      const refreshed = await this.prisma.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: REPRESENTATIVE_TICKET_INCLUDE,
       })
-      throw new NotFoundException('Nenhuma senha ativa encontrada para este ER')
+      // Em corrida (a senha saiu de PAUSED entre a leitura e a retomada — ex.: um
+      // cancelamento concorrente), a retomada não acontece. Preserva o contrato do
+      // endpoint: sem senha ATIVA, responde 404 em vez de devolver uma terminal.
+      if (!ACTIVE_STATES.includes(refreshed.state)) {
+        throw new NotFoundException('Nenhuma senha ativa encontrada para este ER')
+      }
+      return this._buildRepresentativeTicketView(refreshed)
     }
     if (this._isCallExpired(ticket.state, ticket.calledAt, ticket.er.callTimeoutSeconds)) {
       await this._expireCallTimeout(ticket)
@@ -696,7 +703,8 @@ export class TicketService {
     if (!ticket) throw new NotFoundException('Nenhuma senha encontrada para este ER')
 
     // Same pause/call timeout enforcement as getMyActiveTicket, but the RE keeps
-    // seeing the resulting (CANCELLED / NO_SHOW) ticket instead of a 404.
+    // seeing the resulting ticket instead of a 404: a pause that expired is now
+    // RESUMED (back to WAITING), and a call that expired becomes NO_SHOW.
     const pauseExpired = this._isPauseExpired(
       ticket.state,
       ticket.pausedAt,
@@ -709,12 +717,7 @@ export class TicketService {
     )
     if (pauseExpired || callExpired) {
       if (pauseExpired) {
-        await this._expirePause({
-          id: ticket.id,
-          code: ticket.code,
-          erId: ticket.erId,
-          representativeId: ticket.representativeId,
-        })
+        await this._expirePause(ticket)
       } else {
         await this._expireCallTimeout(ticket)
       }
@@ -823,8 +826,10 @@ export class TicketService {
       },
       select: {
         id: true,
-        code: true,
         erId: true,
+        code: true,
+        queueId: true,
+        queuePosition: true,
         pausedAt: true,
         representativeId: true,
         er: { select: { pauseTimeoutSeconds: true } },
@@ -838,49 +843,21 @@ export class TicketService {
     }
   }
 
+  // Expirar a pausa NÃO cancela mais a senha: ela retoma e volta ao FIM da fila
+  // (mesma regra da retomada manual), seja a pausa da RE ou da operação. O evento
+  // `ticket_pause_expired` é mantido (dentro da retomada) para os indicadores, e
+  // a retomada emite `ticket.created`. Se a senha já saiu de PAUSED (corrida), a
+  // retomada devolve null e o ciclo simplesmente ignora.
   private async _expirePause(ticket: {
     id: string
-    code: string
     erId: string
+    code: string
+    queueId: string
+    queuePosition: number
+    pausedAt: Date | null
     representativeId: string
   }) {
-    const cancelled = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.ticket.updateMany({
-        where: { id: ticket.id, state: TicketState.PAUSED },
-        data: {
-          state: TicketState.CANCELLED,
-          cancelReason: 'Tempo de pausa esgotado',
-          cancelledAt: new Date(),
-        },
-      })
-      if (result.count !== 1) return false
-
-      await tx.auditEvent.create({
-        data: {
-          eventType: 'ticket_pause_expired',
-          erId: ticket.erId,
-          ticketId: ticket.id,
-          representativeId: ticket.representativeId,
-        },
-      })
-      await tx.auditEvent.create({
-        data: {
-          eventType: 'ticket_cancelled',
-          erId: ticket.erId,
-          ticketId: ticket.id,
-          representativeId: ticket.representativeId,
-          metadata: { reason: 'Tempo de pausa esgotado', pauseExpired: true },
-        },
-      })
-      return true
-    })
-
-    if (cancelled) {
-      this.panelGateway.emitToER(ticket.erId, 'ticket.cancelled', {
-        ticketId: ticket.id,
-        code: ticket.code,
-      })
-    }
+    await this._resumeToEndOfQueue(ticket, { pauseExpired: true })
   }
 
   async pauseTicket(ticketId: string, representativeId: string) {
@@ -931,9 +908,117 @@ export class TicketService {
     if (ticket.state !== TicketState.PAUSED) {
       throw new BadRequestException('Somente senhas pausadas podem ser retomadas')
     }
+    const resumed = await this._resumeToEndOfQueue(ticket, {})
+    if (!resumed) throw new BadRequestException('Não foi possível retomar a senha')
+    return resumed
+  }
+
+  async staffResumeTicket(ticketId: string, user: AuthenticatedUser) {
+    const ticket = await this._getTicket(ticketId)
+    this._assertStaffER(ticket.erId, user)
+    if (ticket.state !== TicketState.PAUSED) {
+      throw new BadRequestException('Somente senhas pausadas podem ser retomadas')
+    }
+    await this._assertOperationOpen(ticket.erId)
+    await this._assertOperatorActiveCounter(ticket.erId, user, null)
+    const resumed = await this._resumeToEndOfQueue(ticket, { operatorId: user.userId })
+    if (!resumed) throw new BadRequestException('Não foi possível retomar a senha')
+    return resumed
+  }
+
+  // A operação (operadora/atendente) pausa a senha de um RE com o mesmo tempo e a
+  // mesma experiência da pausa feita pela própria RE. Aceita senha aguardando, em
+  // chamada ou em atendimento; nos dois últimos, LIBERA o caixa (volta a ACTIVE) e
+  // desfaz os vínculos da senha com o caixa para a operadora seguir o fluxo. Ao
+  // expirar, a senha volta ao fim da fila (não cancela), igual à pausa da RE.
+  async staffPauseTicket(ticketId: string, user: AuthenticatedUser) {
+    const ticket = await this._getTicket(ticketId)
+    this._assertStaffER(ticket.erId, user)
+    const pausableStates: TicketState[] = [
+      TicketState.WAITING,
+      TicketState.CALLING,
+      TicketState.IN_SERVICE,
+    ]
+    if (!pausableStates.includes(ticket.state)) {
+      throw new BadRequestException(
+        'Somente senhas aguardando, em chamada ou em atendimento podem ser pausadas',
+      )
+    }
+    await this._assertOperationOpen(ticket.erId)
+    await this._assertOperatorActiveCounter(ticket.erId, user, ticket.counterId)
+    const fromState = ticket.state
+    const counterId = ticket.counterId
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.ticket.updateMany({
+        // Compare-and-swap no estado atual: se a senha transicionou (ex.: chamada
+        // virou atendimento) entre a leitura e a escrita, não pausamos às cegas.
+        where: { id: ticketId, state: fromState },
+        data: {
+          state: TicketState.PAUSED,
+          pausedAt: new Date(),
+          counterId: null,
+          operatorId: null,
+          calledAt: null,
+          serviceStartedAt: null,
+        },
+      })
+      if (result.count !== 1) {
+        throw new BadRequestException('Não foi possível pausar a senha')
+      }
+
+      // Senha em chamada/atendimento estava num caixa: libera o caixa (guardado por
+      // estado para não sobrescrever um caixa que já seguiu adiante).
+      if (counterId) {
+        await tx.counter.updateMany({
+          where: { id: counterId, state: { in: [CounterState.CALLING, CounterState.IN_SERVICE] } },
+          data: { state: CounterState.ACTIVE },
+        })
+      }
+
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_paused',
+          erId: ticket.erId,
+          ticketId,
+          representativeId: ticket.representativeId,
+          operatorId: user.userId,
+          metadata: { byStaff: true, fromState, ...(counterId ? { counterId } : {}) },
+        },
+      })
+      return tx.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: {
+          representative: { select: { fullName: true } },
+          er: { select: { pauseTimeoutSeconds: true } },
+        },
+      })
+    })
+
+    this.panelGateway.emitToER(ticket.erId, 'ticket.paused', { ticketId, code: ticket.code })
+    const { er, ...rest } = updated
+    return { ...rest, currentPosition: 0, pauseTimeoutSeconds: er.pauseTimeoutSeconds }
+  }
+
+  // Núcleo da retomada: devolve a senha PAUSED ao FIM da fila do dia atual (novo
+  // código/posição), acumula o tempo pausado e emite `ticket.created`. Usado pela
+  // retomada da RE, pela retomada da operação e pela expiração da pausa. A posse
+  // (representativeId) é checada pelo chamador, não aqui. Retorna null se a senha
+  // já não estava PAUSED (corrida) — o chamador decide se isso é erro.
+  private async _resumeToEndOfQueue(
+    ticket: {
+      id: string
+      erId: string
+      queueId: string
+      queuePosition: number
+      pausedAt: Date | null
+      representativeId: string
+    },
+    opts: { operatorId?: string; pauseExpired?: boolean },
+  ) {
     const businessDate = getBusinessDate()
 
-    const { updated, queueId } = await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       const now = new Date()
       const additionalPausedSeconds = ticket.pausedAt
         ? Math.round((now.getTime() - ticket.pausedAt.getTime()) / 1000)
@@ -961,7 +1046,7 @@ export class TicketService {
       })
 
       const result = await tx.ticket.updateMany({
-        where: { id: ticketId, state: TicketState.PAUSED },
+        where: { id: ticket.id, state: TicketState.PAUSED },
         data: {
           state: TicketState.WAITING,
           queueId: queue.id,
@@ -971,44 +1056,59 @@ export class TicketService {
           pausedSeconds: { increment: additionalPausedSeconds },
         },
       })
-      if (result.count !== 1) {
-        throw new BadRequestException('Não foi possível retomar a senha')
+      if (result.count !== 1) return null
+
+      if (opts.pauseExpired) {
+        await tx.auditEvent.create({
+          data: {
+            eventType: 'ticket_pause_expired',
+            erId: ticket.erId,
+            ticketId: ticket.id,
+            representativeId: ticket.representativeId,
+          },
+        })
       }
 
       await tx.auditEvent.create({
         data: {
           eventType: 'ticket_resumed',
           erId: ticket.erId,
-          ticketId,
-          representativeId,
+          ticketId: ticket.id,
+          representativeId: ticket.representativeId,
+          operatorId: opts.operatorId,
           metadata: {
             newPosition: queue.nextSequence,
             pausedSeconds: additionalPausedSeconds,
+            ...(opts.operatorId ? { byStaff: true } : {}),
+            ...(opts.pauseExpired ? { pauseExpired: true } : {}),
             ...(queue.id === ticket.queueId ? {} : { migratedFromQueueId: ticket.queueId }),
           },
         },
       })
+
       const fresh = await tx.ticket.findUniqueOrThrow({
-        where: { id: ticketId },
+        where: { id: ticket.id },
         include: { representative: { select: { fullName: true } } },
       })
       return { updated: fresh, queueId: queue.id }
     })
 
+    if (!outcome) return null
+
     const currentPosition = await this.prisma.ticket.count({
       where: {
-        queueId,
+        queueId: outcome.queueId,
         state: TicketState.WAITING,
-        queuePosition: { lte: updated.queuePosition },
+        queuePosition: { lte: outcome.updated.queuePosition },
       },
     })
 
     this.panelGateway.emitToER(ticket.erId, 'ticket.created', {
-      ticketId,
-      code: updated.code,
+      ticketId: ticket.id,
+      code: outcome.updated.code,
       queuePosition: currentPosition,
     })
-    return { ...updated, currentPosition }
+    return { ...outcome.updated, currentPosition }
   }
 
   private async _markNoShow(ticketId: string, user: AuthenticatedUser) {
@@ -1202,6 +1302,40 @@ export class TicketService {
     if (user.role === Role.ADMIN) return
     if (!user.erId || user.erId !== erId) {
       throw new ForbiddenException('Não é possível gerenciar uma senha de outro ER')
+    }
+  }
+
+  private async _assertOperationOpen(erId: string) {
+    const er = await this.prisma.eR.findUnique({ where: { id: erId }, select: { isDayOpen: true } })
+    if (!er?.isDayOpen) {
+      throw new BadRequestException('A operação do dia está encerrada')
+    }
+  }
+
+  // Uma OPERADORA só gerencia a fila a partir do seu caixa aberto e não-pausado.
+  // Com o caixa pausado (em pausa) ou sem caixa, ela não pausa/retoma senhas. E
+  // não pode pausar uma senha que está em OUTRO caixa (atendimento de outra
+  // operadora) — isso fica restrito à gestora. Atendente/admin não operam caixa,
+  // então não passam por esta checagem.
+  private async _assertOperatorActiveCounter(
+    erId: string,
+    user: AuthenticatedUser,
+    ticketCounterId: string | null,
+  ) {
+    if (user.role !== Role.OPERATOR) return
+    const counter = await this.prisma.counter.findFirst({
+      where: {
+        erId,
+        operatorId: user.userId,
+        state: { in: [CounterState.ACTIVE, CounterState.CALLING, CounterState.IN_SERVICE] },
+      },
+      select: { id: true },
+    })
+    if (!counter) {
+      throw new BadRequestException('Abra ou retome seu caixa para gerenciar senhas.')
+    }
+    if (ticketCounterId && ticketCounterId !== counter.id) {
+      throw new ForbiddenException('Não é possível pausar uma senha que está em outro caixa.')
     }
   }
 
