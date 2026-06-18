@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { seedStaffSession } from '../test/staffToken'
 import { CheckinAttendantPage } from './CheckinAttendantPage'
@@ -9,10 +9,16 @@ function authenticate() {
   seedStaffSession({ id: 'att-1', name: 'Atendente', role: 'ATTENDANT', erId: 'er-1' })
 }
 
+// The page itself no longer renders a login form: logout, an expired session, or
+// a direct visit without a session redirect to the central login at '/'. The
+// stub route lets the test observe that redirect.
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <CheckinAttendantPage />
+    <MemoryRouter initialEntries={['/checkin']}>
+      <Routes>
+        <Route path="/" element={<div>central-login</div>} />
+        <Route path="/checkin" element={<CheckinAttendantPage />} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -22,10 +28,10 @@ describe('CheckinAttendantPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows the staff login form when not authenticated', () => {
+  it('redirects to the central login when not authenticated', () => {
     renderPage()
-    expect(screen.getByRole('heading', { name: 'Check-in assistido' })).toBeInTheDocument()
-    expect(screen.getByLabelText('E-mail')).toBeInTheDocument()
+    expect(screen.getByText('central-login')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Check-in assistido' })).not.toBeInTheDocument()
   })
 
   it('searches representatives and reports an empty result', async () => {
@@ -157,7 +163,7 @@ describe('CheckinAttendantPage', () => {
     expect(await screen.findByText('Falha no servidor')).toBeInTheDocument()
   })
 
-  it('returns to the login form when an authenticated request gets a 401', async () => {
+  it('redirects to the central login when an authenticated request gets a 401', async () => {
     authenticate()
     vi.stubGlobal(
       'fetch',
@@ -175,7 +181,7 @@ describe('CheckinAttendantPage', () => {
     await user.type(screen.getByLabelText('CPF, telefone ou código RE'), 'ana')
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
 
-    expect(await screen.findByLabelText('E-mail')).toBeInTheDocument()
+    expect(await screen.findByText('central-login')).toBeInTheDocument()
     expect(sessionStorage.getItem('token')).toBeNull()
   })
 
@@ -287,25 +293,10 @@ describe('CheckinAttendantPage', () => {
     expect(screen.queryByText('Check-in realizado')).not.toBeInTheDocument()
   })
 
-  it('falls back to an empty ER when the profile has no erId', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            access_token: 'tok',
-            user: { id: 'att-2', name: 'Atendente', role: 'ATTENDANT' },
-          }),
-          { status: 200 },
-        ),
-      ),
-    )
+  it('falls back to an empty ER when the session has no erId', async () => {
+    seedStaffSession({ id: 'att-2', name: 'Atendente', role: 'ATTENDANT' })
 
     renderPage()
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('E-mail'), 'att@x.com')
-    await user.type(screen.getByLabelText('Senha'), 'segredo123')
-    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
 
     expect(await screen.findByText('ER:')).toBeInTheDocument()
   })
@@ -393,7 +384,7 @@ describe('CheckinAttendantPage', () => {
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: /sair/i }))
 
-    expect(await screen.findByLabelText('E-mail')).toBeInTheDocument()
+    expect(await screen.findByText('central-login')).toBeInTheDocument()
   })
 
   it('logs out from the confirmation screen', async () => {
@@ -428,6 +419,6 @@ describe('CheckinAttendantPage', () => {
     await screen.findByText('Check-in realizado')
 
     fireEvent.click(screen.getByRole('button', { name: /sair/i }))
-    expect(await screen.findByLabelText('E-mail')).toBeInTheDocument()
+    expect(await screen.findByText('central-login')).toBeInTheDocument()
   })
 })

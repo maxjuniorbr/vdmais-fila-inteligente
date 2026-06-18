@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import {
   getManagementERId,
@@ -20,7 +20,6 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { MetricCard } from '../components/MetricCard'
 import { Modal } from '../components/Modal'
 import { Select } from '../components/Select'
-import { StaffLoginForm } from '../components/StaffLoginForm'
 import { Table, type Column } from '../components/Table'
 import { Tabs, type TabItem } from '../components/Tabs'
 import { useToast } from '../components/Toast'
@@ -365,17 +364,11 @@ export function ManagerPage() {
     setPendingCounter(counter)
   }
 
+  // Logout, an expired session, or a direct visit without a session all funnel
+  // back to the central login (HomePage), the single entry point that routes
+  // each role to its area. No per-page login form.
   if (!authenticated) {
-    return (
-      <StaffLoginForm
-        title="Gestão da fila"
-        allowedRoles={['MANAGER', 'ADMIN']}
-        onAuthenticated={(profile) => {
-          setErId(profile.role === 'ADMIN' ? getManagementERId() : (profile.erId ?? ''))
-          setAuthenticated(true)
-        }}
-      />
-    )
+    return <Navigate to="/" replace />
   }
 
   return (
