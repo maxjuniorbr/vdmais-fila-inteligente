@@ -32,7 +32,7 @@
     "class-validator": "^0.15.1",
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
-    "jwks-rsa": "^3.2.2",
+    "jwks-rsa": "^4.1.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
@@ -67,6 +67,9 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^jwks-rsa$": "<rootDir>/../test/mocks/jwks-rsa.mock.ts"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s",
