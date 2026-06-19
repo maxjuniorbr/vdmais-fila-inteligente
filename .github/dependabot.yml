@@ -5,6 +5,12 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    # Título no formato do projeto: `chore: bump ...` (type válido, sem escopo).
+    # O body (changelog) ainda é anexado pelo Dependabot — ele some no merge por
+    # squash configurado para usar só o título do PR (ver fluxo de release).
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
     groups:
       # Prisma CLI and client must move together (same major/minor), otherwise
       # `prisma generate` fails on a version mismatch. Routine patches only.
@@ -40,6 +46,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    commit-message:
+      prefix: "chore"
     groups:
       github-actions:
         patterns:
