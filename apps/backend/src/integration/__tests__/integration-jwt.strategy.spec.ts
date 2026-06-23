@@ -57,6 +57,39 @@ describe('IntegrationJwtStrategy', () => {
     expect(typeof internals(strategy)._secretOrKeyProvider).toBe('function')
   })
 
+  it('refuses to boot when JWKS is set without issuer (fail-closed)', () => {
+    // Without issuer, jsonwebtoken skips `iss` verification — accepting any RS256
+    // token signed by a key in that JWKS. The strategy must throw at construction.
+    expect(() =>
+      strategyWith({
+        INTEGRATION_JWKS_URI: 'https://idp.example/.well-known/jwks.json',
+        INTEGRATION_JWT_AUDIENCE: 'audience',
+      }),
+    ).toThrow(/INTEGRATION_JWT_ISSUER and INTEGRATION_JWT_AUDIENCE are required/)
+  })
+
+  it('refuses to boot when JWKS is set without audience (fail-closed)', () => {
+    // Without audience, a legit token minted for a different `aud` of the same IdP
+    // would be accepted. The strategy must throw at construction.
+    expect(() =>
+      strategyWith({
+        INTEGRATION_JWKS_URI: 'https://idp.example/.well-known/jwks.json',
+        INTEGRATION_JWT_ISSUER: 'issuer',
+      }),
+    ).toThrow(/INTEGRATION_JWT_ISSUER and INTEGRATION_JWT_AUDIENCE are required/)
+  })
+
+  it('allows the dev key path without issuer/audience in development/test', () => {
+    // The relaxed dev path is not exposed to untrusted networks, so issuer/audience
+    // stay optional there — only the JWKS (production) path enforces them.
+    expect(() =>
+      strategyWith({
+        NODE_ENV: 'test',
+        INTEGRATION_DEV_PUBLIC_KEY: DEV_PUBLIC_KEY,
+      }),
+    ).not.toThrow()
+  })
+
   it('resolves the normalized dev public key in development/test', () => {
     const strategy = strategyWith({
       NODE_ENV: 'test',

@@ -40,12 +40,25 @@ export class IntegrationJwtStrategy extends PassportStrategy(Strategy, INTEGRATI
       ? normalizePem(config.get<string>('INTEGRATION_DEV_PUBLIC_KEY'))
       : undefined
 
+    const issuer = config.get<string>('INTEGRATION_JWT_ISSUER')?.trim() || undefined
+    const audience = config.get<string>('INTEGRATION_JWT_AUDIENCE')?.trim() || undefined
+
+    // With a JWKS configured, issuer and audience are mandatory: without them
+    // jsonwebtoken skips `iss`/`aud` verification, so the backend would accept any
+    // RS256 token signed by any key in that JWKS (e.g. a legit token minted for a
+    // different audience). Fail closed at boot instead of widening the audience.
+    if (jwksUri && (!issuer || !audience)) {
+      throw new Error(
+        'Integration auth misconfigured: INTEGRATION_JWT_ISSUER and INTEGRATION_JWT_AUDIENCE are required when INTEGRATION_JWKS_URI is set',
+      )
+    }
+
     const common = {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       algorithms: ['RS256'] as Algorithm[],
-      issuer: config.get<string>('INTEGRATION_JWT_ISSUER')?.trim() || undefined,
-      audience: config.get<string>('INTEGRATION_JWT_AUDIENCE')?.trim() || undefined,
+      issuer,
+      audience,
       passReqToCallback: false as const,
     }
 
