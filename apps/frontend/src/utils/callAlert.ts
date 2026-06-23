@@ -31,7 +31,7 @@ function getCtx(): AudioContext | null {
 
 export function unlockCallAlert(): void {
   const ctx = getCtx()
-  if (ctx && ctx.state === 'suspended') void ctx.resume()
+  if (ctx?.state === 'suspended') void ctx.resume()
 }
 
 export function playCallAlert(): void {
