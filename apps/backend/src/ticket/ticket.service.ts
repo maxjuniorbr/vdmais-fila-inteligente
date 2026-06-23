@@ -922,7 +922,7 @@ export class TicketService {
     if (ticket.state !== TicketState.PAUSED) {
       throw new BadRequestException('Somente senhas pausadas podem ser retomadas')
     }
-    const resumed = await this._resumeToEndOfQueue(ticket, {})
+    const resumed = await this._resumeInPlace(ticket, {})
     if (!resumed) throw new BadRequestException('Não foi possível retomar a senha')
     return resumed
   }
@@ -935,7 +935,7 @@ export class TicketService {
     }
     await this._assertOperationOpen(ticket.erId)
     await this._assertOperatorActiveCounter(ticket.erId, user, null)
-    const resumed = await this._resumeToEndOfQueue(ticket, { operatorId: user.userId })
+    const resumed = await this._resumeInPlace(ticket, { operatorId: user.userId })
     if (!resumed) throw new BadRequestException('Não foi possível retomar a senha')
     return resumed
   }
@@ -1185,6 +1185,71 @@ export class TicketService {
       queuePosition: currentPosition,
     })
     return { ...outcome.updated, currentPosition }
+  }
+
+  // Retomada MANUAL (RE ou operação): a senha volta à MESMA posição e código que tinha
+  // antes de pausar. O slot (queueId, queuePosition) fica reservado durante a pausa
+  // (a linha PAUSED ainda o ocupa; senhas novas usam nextSequence maior), então não há
+  // conflito com a unique(queueId, queuePosition). A ordenação `isPriority DESC,
+  // queuePosition ASC` coloca a senha automaticamente ATRÁS de qualquer preferencial
+  // que tenha entrado durante a pausa e à frente dos normais que chegaram depois. A
+  // EXPIRAÇÃO do tempo de pausa usa `_resumeToEndOfQueue` (volta ao fim, penalidade).
+  // Retorna null se a senha já não estava PAUSED (corrida).
+  private async _resumeInPlace(
+    ticket: { id: string; erId: string; pausedAt: Date | null; representativeId: string },
+    opts: { operatorId?: string },
+  ) {
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const now = new Date()
+      const additionalPausedSeconds = ticket.pausedAt
+        ? Math.round((now.getTime() - ticket.pausedAt.getTime()) / 1000)
+        : 0
+
+      const result = await tx.ticket.updateMany({
+        where: { id: ticket.id, state: TicketState.PAUSED },
+        data: {
+          state: TicketState.WAITING,
+          pausedAt: null,
+          pausedSeconds: { increment: additionalPausedSeconds },
+        },
+      })
+      if (result.count !== 1) return null
+
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_resumed',
+          erId: ticket.erId,
+          ticketId: ticket.id,
+          representativeId: ticket.representativeId,
+          operatorId: opts.operatorId,
+          metadata: {
+            inPlace: true,
+            pausedSeconds: additionalPausedSeconds,
+            ...(opts.operatorId ? { byStaff: true } : {}),
+          },
+        },
+      })
+
+      return tx.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: { representative: { select: { fullName: true } } },
+      })
+    })
+
+    if (!outcome) return null
+
+    const currentPosition = await this._waitingPositionCount(this.prisma, {
+      queueId: outcome.queueId,
+      isPriority: outcome.isPriority,
+      queuePosition: outcome.queuePosition,
+    })
+
+    this.panelGateway.emitToER(ticket.erId, 'ticket.created', {
+      ticketId: ticket.id,
+      code: outcome.code,
+      queuePosition: currentPosition,
+    })
+    return { ...outcome, currentPosition }
   }
 
   private async _markNoShow(ticketId: string, user: AuthenticatedUser) {

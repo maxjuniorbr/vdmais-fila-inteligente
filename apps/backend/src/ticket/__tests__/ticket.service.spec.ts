@@ -845,20 +845,17 @@ describe('TicketService', () => {
   describe('resumeTicket', () => {
     const pausedAt = new Date(Date.now() - 120_000)
 
-    it('transitions a PAUSED ticket back to WAITING, accumulates pausedSeconds and clears pausedAt', async () => {
+    it('resumes a PAUSED ticket in place, keeping position/code and accumulating pausedSeconds', async () => {
       prisma.ticket.findUnique.mockResolvedValue({
         ...ticketBase,
         state: TicketState.PAUSED,
         pausedAt,
         pausedSeconds: 0,
       })
-      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 5 })
       tx.ticket.updateMany.mockResolvedValue({ count: 1 })
       tx.ticket.findUniqueOrThrow.mockResolvedValue({
         ...ticketBase,
         state: TicketState.WAITING,
-        code: 'A005',
-        queuePosition: 5,
         pausedAt: null,
         pausedSeconds: 120,
         representative: { fullName: 'Maria Teste' },
@@ -867,6 +864,8 @@ describe('TicketService', () => {
 
       const result = await service.resumeTicket('ticket-1', 'rep-1')
 
+      // Retomada no lugar: não cria/incrementa a fila nem reatribui posição/código.
+      expect(tx.queue.upsert).not.toHaveBeenCalled()
       expect(tx.ticket.updateMany).toHaveBeenCalledWith({
         where: { id: 'ticket-1', state: TicketState.PAUSED },
         data: expect.objectContaining({
@@ -876,17 +875,20 @@ describe('TicketService', () => {
         }),
       })
       const updateCall = tx.ticket.updateMany.mock.calls[0][0] as { data: { pausedSeconds: { increment: number } } }
+      expect(updateCall.data).not.toHaveProperty('queuePosition')
+      expect(updateCall.data).not.toHaveProperty('code')
       expect(updateCall.data.pausedSeconds.increment).toBeGreaterThanOrEqual(110)
 
       expect(tx.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           eventType: 'ticket_resumed',
-          metadata: expect.objectContaining({ pausedSeconds: expect.any(Number) }),
+          metadata: expect.objectContaining({ inPlace: true, pausedSeconds: expect.any(Number) }),
         }),
       })
       expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.created', expect.objectContaining({ ticketId: 'ticket-1' }))
       expect(result.state).toBe(TicketState.WAITING)
-      expect(result.code).toBe('A005')
+      expect(result.code).toBe('A001')
+      expect(result.queuePosition).toBe(1)
       expect(result.currentPosition).toBe(3)
     })
 
@@ -897,13 +899,10 @@ describe('TicketService', () => {
         pausedAt: null,
         pausedSeconds: 0,
       })
-      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 2 })
       tx.ticket.updateMany.mockResolvedValue({ count: 1 })
       tx.ticket.findUniqueOrThrow.mockResolvedValue({
         ...ticketBase,
         state: TicketState.WAITING,
-        code: 'A002',
-        queuePosition: 2,
         pausedAt: null,
         pausedSeconds: 0,
         representative: { fullName: 'Maria Teste' },
@@ -1076,89 +1075,90 @@ describe('TicketService', () => {
   })
 
   describe('staffResumeTicket', () => {
-    it('resumes a PAUSED ticket to the end of the queue without an ownership check', async () => {
+    it('resumes a PAUSED ticket in place without an ownership check', async () => {
       prisma.ticket.findUnique.mockResolvedValue({
         ...ticketBase,
         state: TicketState.PAUSED,
         representativeId: 'rep-other',
         pausedAt: new Date(Date.now() - 60_000),
       })
-      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 7 })
       tx.ticket.updateMany.mockResolvedValue({ count: 1 })
       tx.ticket.findUniqueOrThrow.mockResolvedValue({
         ...ticketBase,
         state: TicketState.WAITING,
-        code: 'A007',
-        queuePosition: 7,
-        representative: { fullName: 'Maria Teste' },
-      })
-      prisma.ticket.count.mockResolvedValue(7)
-
-      const result = await service.staffResumeTicket('ticket-1', operator)
-
-      expect(tx.auditEvent.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventType: 'ticket_resumed',
-          operatorId: 'op-1',
-          metadata: expect.objectContaining({ byStaff: true }),
-        }),
-      })
-      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.created', expect.objectContaining({ ticketId: 'ticket-1' }))
-      expect(result.state).toBe(TicketState.WAITING)
-    })
-
-    // Execução 1: senha PREFERENCIAL retomada mantém a prioridade (volta ao fim do
-    // grupo de preferenciais, não perde o enquadramento legal).
-    it('keeps isPriority when resuming a preferential ticket', async () => {
-      prisma.ticket.findUnique.mockResolvedValue({
-        ...ticketBase,
-        state: TicketState.PAUSED,
-        isPriority: true,
-        pausedAt: new Date(Date.now() - 60_000),
-      })
-      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 7 })
-      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
-      tx.ticket.findUniqueOrThrow.mockResolvedValue({
-        ...ticketBase,
-        state: TicketState.WAITING,
-        code: 'A007',
-        queuePosition: 7,
-        isPriority: true,
+        pausedAt: null,
         representative: { fullName: 'Maria Teste' },
       })
       prisma.ticket.count.mockResolvedValue(2)
 
       const result = await service.staffResumeTicket('ticket-1', operator)
 
-      // O resume reatribui posição mas NÃO mexe em isPriority — o flag é preservado.
-      expect(tx.ticket.updateMany.mock.calls[0][0].data).not.toHaveProperty('isPriority')
-      expect(result.isPriority).toBe(true)
+      expect(tx.queue.upsert).not.toHaveBeenCalled()
+      expect(tx.ticket.updateMany.mock.calls[0][0].data).not.toHaveProperty('queuePosition')
+      expect(tx.auditEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          eventType: 'ticket_resumed',
+          operatorId: 'op-1',
+          metadata: expect.objectContaining({ byStaff: true, inPlace: true }),
+        }),
+      })
+      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.created', expect.objectContaining({ ticketId: 'ticket-1' }))
+      expect(result.state).toBe(TicketState.WAITING)
+      expect(result.queuePosition).toBe(1)
     })
 
-    // Execução 2: senha NORMAL retomada continua normal (mesma regra, status oposto).
-    it('keeps a normal ticket normal when resuming', async () => {
+    // Senha PREFERENCIAL retomada mantém a prioridade e a posição original.
+    it('keeps isPriority and position when resuming a preferential ticket', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.PAUSED,
+        isPriority: true,
+        pausedAt: new Date(Date.now() - 60_000),
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        isPriority: true,
+        pausedAt: null,
+        representative: { fullName: 'Maria Teste' },
+      })
+      prisma.ticket.count.mockResolvedValue(2)
+
+      const result = await service.staffResumeTicket('ticket-1', operator)
+
+      const data = tx.ticket.updateMany.mock.calls[0][0].data
+      expect(data).not.toHaveProperty('isPriority')
+      expect(data).not.toHaveProperty('queuePosition')
+      expect(result.isPriority).toBe(true)
+      expect(result.queuePosition).toBe(1)
+    })
+
+    // Senha NORMAL retomada continua normal e na posição original.
+    it('keeps a normal ticket normal and in place when resuming', async () => {
       prisma.ticket.findUnique.mockResolvedValue({
         ...ticketBase,
         state: TicketState.PAUSED,
         isPriority: false,
         pausedAt: new Date(Date.now() - 60_000),
       })
-      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 7 })
       tx.ticket.updateMany.mockResolvedValue({ count: 1 })
       tx.ticket.findUniqueOrThrow.mockResolvedValue({
         ...ticketBase,
         state: TicketState.WAITING,
-        code: 'A007',
-        queuePosition: 7,
         isPriority: false,
+        pausedAt: null,
         representative: { fullName: 'Maria Teste' },
       })
-      prisma.ticket.count.mockResolvedValue(7)
+      prisma.ticket.count.mockResolvedValue(3)
 
       const result = await service.staffResumeTicket('ticket-1', operator)
 
-      expect(tx.ticket.updateMany.mock.calls[0][0].data).not.toHaveProperty('isPriority')
+      const data = tx.ticket.updateMany.mock.calls[0][0].data
+      expect(data).not.toHaveProperty('isPriority')
+      expect(data).not.toHaveProperty('queuePosition')
       expect(result.isPriority).toBe(false)
+      expect(result.queuePosition).toBe(1)
     })
 
     it('rejects resuming a ticket that is not paused', async () => {

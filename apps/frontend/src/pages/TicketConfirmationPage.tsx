@@ -149,7 +149,8 @@ function TicketStatus({
         <p style={styles.positionLabel}>Situação</p>
         <p style={{ ...styles.position, color: brand.warning }}>Pausada</p>
         <p style={styles.hint}>
-          Quando estiver pronta, retome sua senha. Ela voltará ao fim da fila.
+          Quando estiver pronta, retome sua senha. Você volta à sua posição, atrás de
+          eventuais senhas preferenciais que entraram durante a pausa.
         </p>
       </>
     )
