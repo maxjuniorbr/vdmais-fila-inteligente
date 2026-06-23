@@ -139,5 +139,7 @@ describe('PanelGateway', () => {
     client.data.panelER = 'er-1234567890'
     gateway.handleDisconnect(client as never)
     await new Promise((resolve) => setImmediate(resolve))
+    // A auditoria do disconnect foi tentada e a falha foi engolida (não propaga).
+    expect(auditLog.logIfERExists).toHaveBeenCalled()
   })
 })
