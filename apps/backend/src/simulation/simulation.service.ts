@@ -235,7 +235,7 @@ export class SimulationService {
     return this.ticketService.pauseTicket(ticketId, await this.ticketRepresentative(ticketId))
   }
 
-  /** "Estou pronta": PAUSED → WAITING (volta para o fim da fila). */
+  /** "Estou pronta": PAUSED → WAITING, retomada no lugar (mesma posição/código). */
   async resumeTicket(ticketId: string) {
     return this.ticketService.resumeTicket(ticketId, await this.ticketRepresentative(ticketId))
   }
