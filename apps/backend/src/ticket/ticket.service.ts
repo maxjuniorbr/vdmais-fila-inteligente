@@ -134,6 +134,9 @@ export class TicketService {
           select: { id: true, nextSequence: true },
         })
 
+        // A própria representante não pode se marcar preferencial; só staff
+        // (check-in assistido) pode entrar com a senha já preferencial.
+        const isPriority = user.role === Role.REPRESENTATIVE ? false : (dto.isPriority ?? false)
         const ticket = await tx.ticket.create({
           data: {
             code: this._generateCode(queue.nextSequence),
@@ -142,6 +145,7 @@ export class TicketService {
             representativeId,
             entryChannel: dto.entryChannel,
             queuePosition: queue.nextSequence,
+            isPriority,
             checkinAttendantId,
           },
         })
@@ -157,6 +161,7 @@ export class TicketService {
               code: ticket.code,
               entryChannel: dto.entryChannel,
               checkinAttendantId,
+              isPriority,
             },
           },
         })
@@ -171,13 +176,7 @@ export class TicketService {
             },
           })
         }
-        const currentPosition = await tx.ticket.count({
-          where: {
-            queueId: queue.id,
-            state: TicketState.WAITING,
-            queuePosition: { lte: ticket.queuePosition },
-          },
-        })
+        const currentPosition = await this._waitingPositionCount(tx, ticket)
         return {
           ticket: {
             ...ticket,
@@ -731,16 +730,31 @@ export class TicketService {
     return this._buildRepresentativeTicketView(ticket)
   }
 
+  // Posição na fila ciente da prioridade. Preferenciais são chamadas antes das
+  // normais (ORDER BY isPriority DESC, queuePosition ASC), então a posição é o nº
+  // de senhas aguardando que vêm antes-ou-igual a esta nessa ordenação: toda
+  // preferencial precede uma normal; dentro do mesmo grupo, ordena por queuePosition.
+  private _waitingPositionCount(
+    client: Prisma.TransactionClient,
+    ticket: { queueId: string; isPriority: boolean; queuePosition: number },
+  ): Promise<number> {
+    const aheadBuckets: Prisma.TicketWhereInput[] = ticket.isPriority ? [] : [{ isPriority: true }]
+    return client.ticket.count({
+      where: {
+        queueId: ticket.queueId,
+        state: TicketState.WAITING,
+        OR: [
+          ...aheadBuckets,
+          { isPriority: ticket.isPriority, queuePosition: { lte: ticket.queuePosition } },
+        ],
+      },
+    })
+  }
+
   private async _buildRepresentativeTicketView(ticket: RepresentativeTicket) {
     const currentPosition =
       ticket.state === TicketState.WAITING
-        ? await this.prisma.ticket.count({
-            where: {
-              queueId: ticket.queueId,
-              state: TicketState.WAITING,
-              queuePosition: { lte: ticket.queuePosition },
-            },
-          })
+        ? await this._waitingPositionCount(this.prisma, ticket)
         : 0
     const { er, ...rest } = ticket
     return {
@@ -926,6 +940,70 @@ export class TicketService {
     return resumed
   }
 
+  // Marca/desmarca atendimento preferencial (Lei 10.048). Afeta só a ordem da fila
+  // de espera: preferenciais são chamadas antes das normais (ORDER BY isPriority
+  // DESC, queuePosition ASC). Permitido apenas enquanto a senha aguarda ou está
+  // pausada; o queuePosition é preservado, então a posição relativa é recalculada.
+  async setTicketPriority(ticketId: string, isPriority: boolean, user: AuthenticatedUser) {
+    const ticket = await this._getTicket(ticketId)
+    this._assertStaffER(ticket.erId, user)
+    const settableStates: TicketState[] = [TicketState.WAITING, TicketState.PAUSED]
+    if (!settableStates.includes(ticket.state)) {
+      throw new BadRequestException(
+        'Só é possível alterar a prioridade de senhas aguardando ou pausadas',
+      )
+    }
+    // Alterar prioridade é uma mudança de estado real: rejeita o no-op (a senha já
+    // está no valor pedido) em vez de reemitir evento e gravar auditoria à toa. Mesma
+    // mensagem é reusada na corrida (CAS-miss) mais abaixo.
+    const alreadyAtTargetMessage = isPriority
+      ? 'A senha já é preferencial'
+      : 'A senha já não é preferencial'
+    if (ticket.isPriority === isPriority) {
+      throw new BadRequestException(alreadyAtTargetMessage)
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Compare-and-swap no estado E na prioridade: se a senha transicionou (ex.: foi
+      // chamada) ou já teve a prioridade alterada entre a leitura e a escrita, não
+      // mexemos às cegas — o where exige o valor oposto ao que está sendo aplicado.
+      const result = await tx.ticket.updateMany({
+        where: { id: ticketId, state: { in: settableStates }, isPriority: !isPriority },
+        data: { isPriority },
+      })
+      if (result.count !== 1) {
+        // Distingue a corrida de mesmo sentido (outra operadora já aplicou o valor) do
+        // caso em que a senha saiu de WAITING/PAUSED — para dar a mensagem correta.
+        const current = await tx.ticket.findUnique({
+          where: { id: ticketId },
+          select: { isPriority: true },
+        })
+        throw new BadRequestException(
+          current?.isPriority === isPriority
+            ? alreadyAtTargetMessage
+            : 'Não foi possível alterar a prioridade da senha',
+        )
+      }
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_priority_changed',
+          erId: ticket.erId,
+          ticketId,
+          representativeId: ticket.representativeId,
+          operatorId: user.userId,
+          metadata: { isPriority, byStaff: true, fromState: ticket.state },
+        },
+      })
+      return tx.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: REPRESENTATIVE_TICKET_INCLUDE,
+      })
+    })
+
+    this.panelGateway.emitToER(ticket.erId, 'ticket.priority_changed', { ticketId, isPriority })
+    return this._buildRepresentativeTicketView(updated)
+  }
+
   // A operação (operadora/atendente) pausa a senha de um RE com o mesmo tempo e a
   // mesma experiência da pausa feita pela própria RE. Aceita senha aguardando, em
   // chamada ou em atendimento; nos dois últimos, LIBERA o caixa (volta a ACTIVE) e
@@ -1095,12 +1173,10 @@ export class TicketService {
 
     if (!outcome) return null
 
-    const currentPosition = await this.prisma.ticket.count({
-      where: {
-        queueId: outcome.queueId,
-        state: TicketState.WAITING,
-        queuePosition: { lte: outcome.updated.queuePosition },
-      },
+    const currentPosition = await this._waitingPositionCount(this.prisma, {
+      queueId: outcome.queueId,
+      isPriority: outcome.updated.isPriority,
+      queuePosition: outcome.updated.queuePosition,
     })
 
     this.panelGateway.emitToER(ticket.erId, 'ticket.created', {

@@ -14,7 +14,14 @@ import { logoutStaffSession } from '../auth/session'
 import { api } from '../api/client'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
-import { counterStateLabel, counterStateTone, ticketStateLabel, ticketStateTone } from '../utils/labels'
+import {
+  counterStateLabel,
+  counterStateTone,
+  PRIORITY_LABEL,
+  PRIORITY_TONE,
+  ticketStateLabel,
+  ticketStateTone,
+} from '../utils/labels'
 
 interface Er {
   id: string
@@ -49,6 +56,7 @@ interface TicketLite {
   id: string
   code: string
   queuePosition?: number
+  isPriority?: boolean
   counter?: { number: number } | null
   representative?: { fullName: string } | null
 }
@@ -94,7 +102,16 @@ type StateRow = TicketLite & { state: string }
 type ActionOutcome = string | { message: string; tone: 'success' | 'info' } | void
 
 const STATE_COLUMNS: Column<StateRow>[] = [
-  { key: 'code', header: 'Senha', render: (row) => <span style={styles.code}>{row.code}</span> },
+  {
+    key: 'code',
+    header: 'Senha',
+    render: (row) => (
+      <span style={styles.codeCell}>
+        <span style={styles.code}>{row.code}</span>
+        {row.isPriority && <Badge tone={PRIORITY_TONE}>{PRIORITY_LABEL}</Badge>}
+      </span>
+    ),
+  },
   {
     key: 'state',
     header: 'Estado',
@@ -559,6 +576,11 @@ const styles: Record<string, CSSProperties> = {
     ...brand.typography.bodyLarge,
     color: brand.emphasis,
     fontVariantNumeric: 'tabular-nums',
+  },
+  codeCell: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: `${brand.spacing[8]}px`,
   },
   itemMeta: {
     ...brand.typography.bodySmall,

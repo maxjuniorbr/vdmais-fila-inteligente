@@ -32,8 +32,8 @@ export class PanelService {
       }),
       this.prisma.ticket.findMany({
         where: { erId, state: TicketState.WAITING },
-        orderBy: { queuePosition: 'asc' },
-        select: { code: true },
+        orderBy: [{ isPriority: 'desc' }, { queuePosition: 'asc' }],
+        select: { code: true, isPriority: true },
       }),
       this.prisma.ticket.findMany({
         where: {
@@ -102,6 +102,7 @@ export class PanelService {
       waiting: waiting.map((ticket, index) => ({
         code: ticket.code,
         position: index + 1,
+        isPriority: ticket.isPriority,
       })),
       avgServiceSeconds,
       avgWaitSeconds,

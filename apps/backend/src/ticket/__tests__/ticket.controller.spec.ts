@@ -16,6 +16,7 @@ const service = {
   pauseTicket: jest.fn(),
   resumeTicket: jest.fn(),
   selfCancel: jest.fn(),
+  setTicketPriority: jest.fn(),
 }
 const req = { user: { userId: 're-1', role: Role.REPRESENTATIVE, erId: 'er-1' } }
 
@@ -92,5 +93,15 @@ describe('TicketController', () => {
   it('self-cancels a ticket', () => {
     controller.selfCancel('t-1', req)
     expect(service.selfCancel).toHaveBeenCalledWith('t-1', 're-1')
+  })
+
+  it('marks a ticket as preferential', () => {
+    controller.markPriority('t-1', req)
+    expect(service.setTicketPriority).toHaveBeenCalledWith('t-1', true, req.user)
+  })
+
+  it('unmarks a ticket as preferential', () => {
+    controller.unmarkPriority('t-1', req)
+    expect(service.setTicketPriority).toHaveBeenCalledWith('t-1', false, req.user)
   })
 })

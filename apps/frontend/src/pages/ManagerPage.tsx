@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import {
@@ -27,7 +27,14 @@ import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
 import { formatDuration } from '../utils/format'
-import { counterStateLabel, counterStateTone, entryChannelLabel, ticketStateLabel } from '../utils/labels'
+import {
+  counterStateLabel,
+  counterStateTone,
+  entryChannelLabel,
+  PRIORITY_LABEL,
+  PRIORITY_TONE,
+  ticketStateLabel,
+} from '../utils/labels'
 
 const COUNTER_TONE_COLOR: Record<string, string> = {
   success: brand.success,
@@ -41,6 +48,7 @@ interface Ticket {
   id: string
   code: string
   state: string
+  isPriority?: boolean
   entryChannel: string
   createdAt: string
   serviceStartedAt?: string
@@ -120,6 +128,7 @@ type PendingActionKind = Exclude<PendingAction, null>['kind']
 type TicketActionComponent = React.ComponentType<{
   ticket: Ticket
   onSelect: (action: PendingAction) => void
+  onTogglePriority?: (ticket: Ticket) => void
 }>
 
 function pendingActionTitle(kind: PendingActionKind): string {
@@ -132,11 +141,28 @@ function pendingActionTitle(kind: PendingActionKind): string {
 function CancelTicketAction({
   ticket,
   onSelect,
-}: Readonly<{ ticket: Ticket; onSelect: (action: PendingAction) => void }>) {
+  onTogglePriority,
+}: Readonly<{
+  ticket: Ticket
+  onSelect: (action: PendingAction) => void
+  onTogglePriority?: (ticket: Ticket) => void
+}>) {
+  // Prioridade só faz sentido enquanto a senha aguarda; em chamada/atendimento o
+  // toggle não aparece (o backend também recusa).
+  const priorityItems =
+    ticket.state === 'WAITING' && onTogglePriority
+      ? [
+          {
+            label: ticket.isPriority ? 'Remover preferencial' : 'Marcar preferencial',
+            onClick: () => onTogglePriority(ticket),
+          },
+        ]
+      : []
   return (
     <ActionMenu
       label={`Ações da senha ${ticket.code}`}
       items={[
+        ...priorityItems,
         {
           label: 'Cancelar senha',
           tone: 'danger',
@@ -182,6 +208,7 @@ const REFRESH_EVENTS = [
   'ticket.cancelled',
   'ticket.paused',
   'ticket.restored',
+  'ticket.priority_changed',
   'counter.opened',
   'counter.paused',
   'counter.resumed',
@@ -281,10 +308,10 @@ export function ManagerPage() {
   // Tick once per second so elapsed durations and the prolonged-service threshold
   // (both derived from Date.now() at render time) stay live between the 15s
   // refreshes — otherwise times look frozen and the 30-min alert lags up to 15s.
-  const [, setClockTick] = useState(0)
+  const [, bumpClock] = useReducer((tick: number) => tick + 1, 0)
   useEffect(() => {
     if (!authenticated || !erId) return
-    const id = setInterval(() => setClockTick((tick) => tick + 1), 1000)
+    const id = setInterval(bumpClock, 1000)
     return () => clearInterval(id)
   }, [authenticated, erId])
 
@@ -359,6 +386,14 @@ export function ManagerPage() {
   function openTicketAction(action: PendingAction) {
     setError(null)
     setPendingAction(action)
+  }
+
+  function togglePriority(ticket: Ticket) {
+    const next = !ticket.isPriority
+    void execute(
+      () => api.post(`/tickets/${ticket.id}/${next ? 'mark-priority' : 'unmark-priority'}`),
+      next ? 'Senha marcada como preferencial.' : 'Prioridade removida.',
+    )
   }
 
   function openCounterRelease(counter: Counter) {
@@ -578,6 +613,7 @@ export function ManagerPage() {
             tickets={activeTickets}
             ActionComponent={CancelTicketAction}
             onSelect={openTicketAction}
+            onTogglePriority={togglePriority}
           />
         </section>
 
@@ -698,13 +734,24 @@ function TicketTable({
   tickets,
   ActionComponent,
   onSelect,
+  onTogglePriority,
 }: Readonly<{
   tickets: Ticket[]
   ActionComponent: TicketActionComponent
   onSelect: (action: PendingAction) => void
+  onTogglePriority?: (ticket: Ticket) => void
 }>) {
   const columns: Column<Ticket>[] = [
-    { key: 'code', header: 'Senha', render: (ticket) => ticket.code },
+    {
+      key: 'code',
+      header: 'Senha',
+      render: (ticket) => (
+        <span style={styles.ticketCodeCell}>
+          {ticket.code}
+          {ticket.isPriority && <Badge tone={PRIORITY_TONE}>{PRIORITY_LABEL}</Badge>}
+        </span>
+      ),
+    },
     { key: 'state', header: 'Estado', render: (ticket) => ticketStateLabel(ticket.state) },
     { key: 're', header: 'RE', render: (ticket) => ticket.representative?.fullName ?? '-' },
     { key: 'wait', header: 'Espera', render: (ticket) => formatDuration(elapsedSeconds(ticket.createdAt)) },
@@ -714,7 +761,9 @@ function TicketTable({
       key: 'actions',
       header: 'Ações',
       align: 'right',
-      render: (ticket) => <ActionComponent ticket={ticket} onSelect={onSelect} />,
+      render: (ticket) => (
+        <ActionComponent ticket={ticket} onSelect={onSelect} onTogglePriority={onTogglePriority} />
+      ),
     },
   ]
   return (
@@ -939,6 +988,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   counterBadge: {
     justifySelf: 'start',
+  },
+  ticketCodeCell: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: `${brand.spacing[8]}px`,
   },
   counterOperatorRow: {
     display: 'grid',
