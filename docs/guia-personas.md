@@ -55,9 +55,10 @@ Relacionamento e precisa ser atendida.
 
 - **Pausar ("Não estou pronta"):** sai temporariamente da fila sem perder o
   cadastro. O tempo pausado **não conta** nas métricas de espera. A pausa tem
-  tolerância (padrão 5 min): se a RE não retomar a tempo, a senha é **cancelada**
-  automaticamente e ela precisa entrar de novo.
-- **Retomar:** volta para o **fim** da fila (recebe nova posição).
+  tolerância (padrão 5 min): se a RE não retomar a tempo, a senha volta
+  automaticamente ao **fim** da fila (não é mais cancelada).
+- **Retomar:** volta à sua **posição original**, ficando atrás apenas das senhas
+  **preferenciais** que entraram durante a pausa.
 - **Sair da fila:** cancela a própria senha. Para voltar, precisa entrar de novo.
 
 > Se a RE fechar a página e voltar pelo mesmo acesso, o sistema **recupera a
@@ -251,7 +252,7 @@ Aguardando → Chamando → Em atendimento → Finalizado
                  ├─→ Não compareceu  (automático: tempo limite de chamada excedido)
                  └─→ Chamar novamente (operadora; segunda chamada, continua Chamando)
 
-Aguardando → Pausado → Aguardando (RE pausa/retoma; volta ao fim da fila de hoje)
+Aguardando → Pausado → Aguardando (RE pausa/retoma; retomada manual mantém a posição; timeout vai ao fim)
 Aguardando/Pausado → Cancelado    (RE sai da fila, ou staff cancela com motivo)
 Cancelado (antes do atendimento) → Aguardando (gestora restaura → fim da fila)
 

@@ -265,16 +265,17 @@ Estados mínimos:
     
     A senha sai temporariamente da fila sem perder o cadastro. Pode ser pausada
     pela **própria RE** ("Não estou pronta") **ou pela operação** (operadora) — ver
-    9.5 e 9.5.1. Ao retomar, volta para o **fim** da fila. O tempo pausado é
-    excluído das métricas de espera. Ao **expirar** o tempo de pausa, a senha **não
-    é cancelada**: ela volta automaticamente ao **fim** da fila (mesma regra da
-    retomada), seja a pausa da RE ou da operação.
+    9.5 e 9.5.1. Ao retomar (manual), a senha volta à **mesma posição** que tinha
+    antes de pausar — ficando atrás apenas das senhas **preferenciais** que entraram
+    durante a pausa. O tempo pausado é excluído das métricas de espera. Ao **expirar**
+    o tempo de pausa, a senha **não é cancelada**, mas vai para o **fim** da fila
+    (penalidade por exceder a janela), seja a pausa da RE ou da operação.
     
 
 Observação:
 
 > Restaurado deve ser tratado preferencialmente como evento. Após restauração, a senha volta para Aguardando (no fim da fila).
-> Pausado é controlado pela RE ou pela operação (pausar/retomar); ao retomar — manual ou por tempo esgotado — a senha recebe nova posição no fim da fila e é sempre vinculada à fila do **dia atual**.
+> Pausado é controlado pela RE ou pela operação (pausar/retomar). Na retomada **manual**, a senha mantém sua **posição original**, respeitando as preferenciais que entraram durante a pausa; quando o tempo de pausa **esgota**, ela vai para o **fim** da fila (vinculada à fila do **dia atual**).
 
 > **Encerramento automático na virada de dia.** Senhas que ficaram em
 > **Aguardando**, **Chamando**, **Em atendimento** ou **Pausado** de um dia que
@@ -466,7 +467,8 @@ Motivos possíveis de pausa:
 1. Na tela da própria senha, a RE clica em **Não estou pronta** (pausar).
 2. A senha muda para **Pausado** e sai temporariamente da fila.
 3. Quando estiver pronta, a RE clica em **Retomar**.
-4. A senha volta para **Aguardando**, no **fim** da fila (nova posição).
+4. A senha volta para **Aguardando**, na **mesma posição** de antes da pausa —
+   ficando atrás apenas das senhas **preferenciais** que entraram durante a pausa.
 5. O tempo pausado é descontado das métricas de espera.
 
 > **Tempo limite da pausa.** A pausa tem tolerância configurável por ER
@@ -492,9 +494,9 @@ presencialmente ou saiu no meio.
    **Ativo**, sem operadora) para a operadora seguir o fluxo — ver 9.4.
 3. A senha vai para **Pausado** com o mesmo `pauseTimeoutSeconds`; a RE vê na tela
    dela a mesma experiência de pausa (contador regressivo).
-4. **A RE ou a operação** podem retomar; ao retomar, a senha volta ao **fim** da
-   fila. Ao expirar o tempo, volta ao fim da fila (não cancela), igual à pausa da
-   RE.
+4. **A RE ou a operação** podem retomar; na retomada **manual**, a senha volta à
+   **mesma posição** (atrás das preferenciais que entraram na pausa). Ao **expirar**
+   o tempo, vai para o **fim** da fila (não cancela), igual à pausa da RE.
 
 **Restrições da pausa pela operação** (ações da operadora ficam atreladas ao caixa):
 
@@ -815,7 +817,7 @@ Regras:
 > • A operação (operadora, atendente ou gestora) pode **marcar/desmarcar** uma senha como preferencial. No check-in assistido, o atendente pode já incluir a RE como preferencial; a própria RE **não** pode se autopromover.
 > • Só é possível alterar a prioridade de senhas **Aguardando** ou **Pausada**.
 > • A chamada (`call-next`) atende **preferenciais primeiro**; entre senhas do mesmo grupo vale a ordem de chegada (FIFO). A posição mostrada à RE e no painel já considera essa ordenação.
-> • A prioridade é um atributo da senha: ao **pausar/retomar** ou **restaurar**, a senha mantém o status (preferencial continua preferencial; normal continua normal) e volta ao **fim do seu grupo**.
+> • A prioridade é um atributo da senha: é preservada ao **pausar/retomar** ou **restaurar** (preferencial continua preferencial; normal continua normal). O posicionamento segue cada fluxo: a retomada **manual** mantém a posição original (ver 9.5); a **expiração** da pausa e o **restaurar** vão para o fim.
 > • Toda marcação é auditada (`ticket_priority_changed`) e emite atualização em tempo real para painel, operação e gestão.
 
 ---
