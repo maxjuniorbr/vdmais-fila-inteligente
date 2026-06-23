@@ -46,7 +46,10 @@ menos 32 bytes e rotacione-o conforme a política do ambiente.
 
 Em produção, configure apenas a validação como *resource server* — apontando para o
 emissor corporativo (Apigee): `INTEGRATION_JWT_ISSUER`, `INTEGRATION_JWT_AUDIENCE` e
-`INTEGRATION_JWKS_URI`. As variáveis `INTEGRATION_DEV_*` e `INTEGRATION_DOCS_ENABLED`
+`INTEGRATION_JWKS_URI`. Quando `INTEGRATION_JWKS_URI` está definido, `INTEGRATION_JWT_ISSUER`
+e `INTEGRATION_JWT_AUDIENCE` são **obrigatórios**: o backend falha no boot (fail-closed) se
+faltarem, garantindo que nunca aceite um token RS256 emitido para outra audience daquele JWKS.
+As variáveis `INTEGRATION_DEV_*` e `INTEGRATION_DOCS_ENABLED`
 são **exclusivas de desenvolvimento** e não devem ser promovidas (o emissor de dev já
 fica bloqueado fora de `development`/`test`). Equivalências dev × produção em
 [`arquitetura-backend.md`](arquitetura-backend.md#local-dev--produção-corporativo).
