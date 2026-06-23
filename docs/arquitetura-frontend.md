@@ -103,6 +103,7 @@ Eventos que o frontend escuta:
 | Evento | Payload | Quem recebe |
 |---|---|---|
 | `ticket.called` | `{ ticketId, code, displayName, counterNumber, calledAt }` | Painel TV, operação |
+| `ticket.priority_changed` | `{ ticketId, isPriority }` | Painel TV, operação, gestão |
 | `counter.opened` | `{ counterId, number }` | Painel TV |
 | `counter.created` | `{ counterId, number }` | Gestão, operação |
 | `counter.deleted` | `{ counterId, number }` | Gestão, operação |

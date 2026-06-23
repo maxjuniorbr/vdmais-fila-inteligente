@@ -27,9 +27,20 @@ Canonical deploy process: [deployment-mvp.md](../../docs/deployment-mvp.md)
 > Production delivery will NOT use these providers. Treat this as the present pilot
 > setup only; when the target environment changes, update just this section.
 
+- **Two independent databases must receive EVERY schema migration right now: the
+  local dev Postgres AND Supabase.** Supabase is the de-facto production database
+  in this pilot (it won't be the final production target, but today it is). They
+  track migrations separately and neither updates the other, so applying a
+  migration to only one leaves the other broken — the app then throws Prisma
+  `P2022 column ... does not exist` against the stale database. Apply to both:
+  - Local dev DB: confirm `DATABASE_URL` is `localhost`, then `prisma migrate deploy`
+    (or `prisma migrate dev`). Verify with `prisma migrate status` → "up to date".
+  - Supabase: apply via the Supabase MCP `apply_migration` (name = migration folder
+    name, so the ledger matches the repo) or the CLI. The user does NOT apply
+    migrations by hand in the dashboard — use the MCP/CLI.
 - Backend runs on Render (free tier) and does NOT run `prisma migrate deploy`
-  (no migrate step in build or start). So today migrations must be applied to the
-  database manually before each release.
+  (no migrate step in build or start). So today the Supabase migration must be
+  applied before each release, and code that depends on it ships only after.
 - Database is managed Postgres on Supabase (project `vdmais-fila-inteligente-supabase`),
   migrated through the Supabase migration ledger `supabase_migrations.schema_migrations`
   (tracked by folder name) instead of Prisma's `_prisma_migrations`.

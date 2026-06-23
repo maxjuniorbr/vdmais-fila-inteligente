@@ -74,7 +74,9 @@ operatorId? (unique)    calledAt? / serviceStartedAt?
                         cancelledAt? / pausedAt?
                         pausedSeconds
                         cancelReason? / restoreReason?
+                        queuePosition / isPriority (atendimento preferencial)
                         Constraint: UNIQUE(queueId, queuePosition)
+                        Index: (erId, state, isPriority, queuePosition)
 
 AuditEvent
 ──────────
@@ -90,9 +92,9 @@ metadata (JSON) / createdAt
 | Role | Escopo | Capacidades principais |
 |---|---|---|
 | `REPRESENTATIVE` | Auto | Entrar na fila, pausar/retomar/cancelar própria senha |
-| `OPERATOR` | ER | Abrir caixa, chamar próximo, iniciar/finalizar atendimento |
-| `ATTENDANT` | ER | Check-in assistido, criar representantes, cancelar senhas |
-| `MANAGER` | ER | Abrir/fechar dia, métricas, correções, liberar caixas órfãos |
+| `OPERATOR` | ER | Abrir caixa, chamar próximo, iniciar/finalizar atendimento, marcar preferencial |
+| `ATTENDANT` | ER | Check-in assistido (pode já entrar preferencial), criar representantes, cancelar senhas, marcar preferencial |
+| `MANAGER` | ER | Abrir/fechar dia, métricas, correções, liberar caixas órfãos, marcar preferencial |
 | `ADMIN` | Global | Criar ERs, caixas, contas de equipe, rotacionar token do painel |
 
 ---
@@ -152,7 +154,7 @@ Endpoints centrais para operação e integração.
 
 | Método | Caminho | Auth | Descrição |
 |---|---|---|---|
-| `POST` | `/queues/:erId/call-next` | OPERATOR | Chama o próximo da fila (transação atômica com lock de linha) |
+| `POST` | `/queues/:erId/call-next` | OPERATOR | Chama o próximo da fila — preferenciais primeiro, depois por ordem de chegada (transação atômica com lock de linha) |
 | `GET` | `/queues/:erId/overview` | OPERATOR, ATTENDANT, MANAGER | Visão geral: isDayOpen, filas, caixas, últimos atendimentos |
 
 **`POST /queues/:erId/call-next`**
@@ -191,7 +193,7 @@ Endpoints centrais para operação e integração.
 
 | Método | Caminho | Auth | Throttle | Descrição |
 |---|---|---|---|---|
-| `POST` | `/tickets` | REPRESENTATIVE, ATTENDANT | 40/min por IP | Criar senha na fila |
+| `POST` | `/tickets` | REPRESENTATIVE, ATTENDANT | 40/min por IP | Criar senha na fila (aceita `isPriority` opcional — só honrado quando criada por staff/check-in; ignorado para a própria RE) |
 | `GET` | `/tickets/my-active?erId=` | REPRESENTATIVE | — | Senha ativa da RE |
 | `GET` | `/tickets/my-status?erId=` | REPRESENTATIVE | — | Senha mais recente da RE em qualquer estado (polling da tela da RE: reflete não-comparecimento, cancelamento e restauração) |
 | `POST` | `/tickets/:id/start-service` | OPERATOR | — | Iniciar atendimento (CALLING → IN_SERVICE) |
@@ -202,6 +204,8 @@ Endpoints centrais para operação e integração.
 | `POST` | `/tickets/:id/resume` | REPRESENTATIVE | — | Retomar senha pausada |
 | `POST` | `/tickets/:id/staff-pause` | OPERATOR, ATTENDANT, ADMIN | — | Pausar senha de um RE pela operação (aceita WAITING/CALLING/IN_SERVICE; libera o caixa se estava em uso) |
 | `POST` | `/tickets/:id/staff-resume` | OPERATOR, ATTENDANT, ADMIN | — | Retomar senha pausada pela operação |
+| `POST` | `/tickets/:id/mark-priority` | OPERATOR, ATTENDANT, MANAGER | — | Marcar atendimento preferencial (Lei 10.048); só senha WAITING/PAUSED |
+| `POST` | `/tickets/:id/unmark-priority` | OPERATOR, ATTENDANT, MANAGER | — | Remover atendimento preferencial; só senha WAITING/PAUSED |
 | `POST` | `/tickets/:id/self-cancel` | REPRESENTATIVE | — | Cancelamento próprio da RE |
 | `POST` | `/tickets/:id/cancel` | ATTENDANT, MANAGER | — | Cancelar senha |
 | `POST` | `/tickets/:id/restore` | MANAGER | — | Restaurar senha cancelada/não-comparecida |
@@ -260,6 +264,7 @@ joinER { erId, clientType, token? }
 
 // Servidor → Cliente
 ticket.called    { ticketId, code, displayName, counterNumber, calledAt }
+ticket.priority_changed { ticketId, isPriority }   // atendimento preferencial marcado/removido
 counter.opened   { counterId, number }
 counter.created  { counterId, number }
 counter.deleted  { counterId, number }
