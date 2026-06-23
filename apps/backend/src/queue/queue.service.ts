@@ -83,7 +83,7 @@ export class QueueService {
         FROM "tickets"
         WHERE "queueId" = ${queue.id}
           AND "state" = 'WAITING'
-        ORDER BY "queuePosition" ASC
+        ORDER BY "isPriority" DESC, "queuePosition" ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       `
@@ -154,7 +154,7 @@ export class QueueService {
       this.prisma.eR.findUnique({ where: { id: erId }, select: { isDayOpen: true } }),
       this.prisma.ticket.findMany({
         where: { erId, state: TicketState.WAITING, queue: { businessDate } },
-        orderBy: { queuePosition: 'asc' },
+        orderBy: [{ isPriority: 'desc' }, { queuePosition: 'asc' }],
         include: { representative: { select: { fullName: true } } },
       }),
       this.prisma.ticket.findMany({

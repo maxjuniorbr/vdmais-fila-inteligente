@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator'
 import { EntryChannel } from '@prisma/client'
 
 export class CreateTicketDto {
@@ -13,4 +13,10 @@ export class CreateTicketDto {
   @IsOptional()
   @MaxLength(40)
   representativeId?: string
+
+  // Atendimento preferencial. Só honrado quando quem cria é staff (check-in
+  // assistido); ignorado para a própria representante, que não pode se autopromover.
+  @IsBoolean()
+  @IsOptional()
+  isPriority?: boolean
 }

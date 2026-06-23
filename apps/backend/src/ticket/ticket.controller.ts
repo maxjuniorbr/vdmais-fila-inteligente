@@ -115,4 +115,16 @@ export class TicketController {
   selfCancel(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
     return this.ticketService.selfCancel(id, req.user.userId)
   }
+
+  @Post(':id/mark-priority')
+  @Roles('OPERATOR', 'ATTENDANT', 'MANAGER')
+  markPriority(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.ticketService.setTicketPriority(id, true, req.user)
+  }
+
+  @Post(':id/unmark-priority')
+  @Roles('OPERATOR', 'ATTENDANT', 'MANAGER')
+  unmarkPriority(@Param('id') id: string, @Request() req: { user: AuthenticatedUser }) {
+    return this.ticketService.setTicketPriority(id, false, req.user)
+  }
 }

@@ -7,12 +7,14 @@ import { Button } from '../components/Button'
 import { Modal } from '../components/Modal'
 import { brand } from '../styles/brand'
 import { playCallAlert, unlockCallAlert } from '../utils/callAlert'
+import { PRIORITY_SERVICE_LABEL } from '../utils/labels'
 
 interface TicketInfo {
   id: string
   code: string
   queuePosition: number
   currentPosition: number
+  isPriority?: boolean
   state: string
   erId: string
   representative?: { fullName: string }
@@ -119,7 +121,8 @@ function TicketStatus({
   state,
   isPaused,
   currentPosition,
-}: Readonly<{ state: string; isPaused: boolean; currentPosition: number }>) {
+  isPriority,
+}: Readonly<{ state: string; isPaused: boolean; currentPosition: number; isPriority?: boolean }>) {
   if (state === 'IN_SERVICE') {
     return (
       <>
@@ -157,6 +160,7 @@ function TicketStatus({
       <p style={{ ...styles.position, color: brand.emphasis }}>
         {currentPosition > 0 ? `#${currentPosition}` : 'Em chamada'}
       </p>
+      {isPriority && <p style={{ ...styles.hint, color: brand.info }}>{PRIORITY_SERVICE_LABEL}</p>}
       <p style={styles.hint}>
         Fique de olho no painel. Sua senha será chamada pelo número acima.
       </p>
@@ -190,11 +194,11 @@ export function TicketConfirmationPage() {
   // fallback unlock for any direct interaction with this screen.
   useEffect(() => {
     const unlock = () => unlockCallAlert()
-    window.addEventListener('pointerdown', unlock, { once: true })
-    window.addEventListener('keydown', unlock, { once: true })
+    globalThis.addEventListener('pointerdown', unlock, { once: true })
+    globalThis.addEventListener('keydown', unlock, { once: true })
     return () => {
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown', unlock)
+      globalThis.removeEventListener('pointerdown', unlock)
+      globalThis.removeEventListener('keydown', unlock)
     }
   }, [])
 
@@ -475,6 +479,7 @@ export function TicketConfirmationPage() {
             state={ticket.state}
             isPaused={isPaused}
             currentPosition={ticket.currentPosition}
+            isPriority={ticket.isPriority}
           />
         </div>
 

@@ -263,6 +263,17 @@ describe('ManagerPage', () => {
     expect(screen.getByRole('heading', { name: 'Cancelar senha' })).toBeInTheDocument()
   })
 
+  it('lets the manager mark a waiting ticket as preferential', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    renderManager()
+    await screen.findByText('Fila ativa')
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Ações da senha A001/ })[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Marcar preferencial' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/w1/mark-priority'))
+  })
+
   it('cancels a ticket with a reason through the confirm dialog', async () => {
     vi.mocked(api.post).mockResolvedValue({})
     renderManager()

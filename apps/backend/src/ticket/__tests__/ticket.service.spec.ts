@@ -33,6 +33,7 @@ const ticketBase = {
   state: TicketState.WAITING,
   entryChannel: EntryChannel.QR_CODE,
   queuePosition: 1,
+  isPriority: false,
   queueId: 'queue-1',
   erId: 'er-1',
   representativeId: 'rep-1',
@@ -211,6 +212,53 @@ describe('TicketService', () => {
       data: expect.objectContaining({
         representativeId: 'rep-2',
         checkinAttendantId: 'att-1',
+      }),
+    })
+  })
+
+  it('honors isPriority from a staff assisted check-in and counts position priority-aware', async () => {
+    tx.representative.findUnique.mockResolvedValue({ id: 'rep-2', fullName: 'Joana Teste' })
+    tx.ticket.create.mockResolvedValue({
+      ...ticketBase,
+      representativeId: 'rep-2',
+      entryChannel: EntryChannel.CHECKIN_ASSISTED,
+      isPriority: true,
+    })
+
+    await service.create(attendant, {
+      erId: 'er-1',
+      entryChannel: EntryChannel.CHECKIN_ASSISTED,
+      representativeId: 'rep-2',
+      isPriority: true,
+    })
+
+    expect(tx.ticket.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isPriority: true }),
+    })
+    // Senha preferencial só conta as preferenciais à frente dela.
+    expect(tx.ticket.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        state: TicketState.WAITING,
+        OR: [{ isPriority: true, queuePosition: { lte: 1 } }],
+      }),
+    })
+  })
+
+  it('forces isPriority to false when a representative self-creates a ticket', async () => {
+    await service.create(representative, {
+      erId: 'er-1',
+      entryChannel: EntryChannel.QR_CODE,
+      isPriority: true,
+    })
+
+    expect(tx.ticket.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isPriority: false }),
+    })
+    // Senha normal fica atrás de todas as preferenciais.
+    expect(tx.ticket.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        state: TicketState.WAITING,
+        OR: [{ isPriority: true }, { isPriority: false, queuePosition: { lte: 1 } }],
       }),
     })
   })
@@ -1059,6 +1107,60 @@ describe('TicketService', () => {
       expect(result.state).toBe(TicketState.WAITING)
     })
 
+    // Execução 1: senha PREFERENCIAL retomada mantém a prioridade (volta ao fim do
+    // grupo de preferenciais, não perde o enquadramento legal).
+    it('keeps isPriority when resuming a preferential ticket', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.PAUSED,
+        isPriority: true,
+        pausedAt: new Date(Date.now() - 60_000),
+      })
+      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 7 })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        code: 'A007',
+        queuePosition: 7,
+        isPriority: true,
+        representative: { fullName: 'Maria Teste' },
+      })
+      prisma.ticket.count.mockResolvedValue(2)
+
+      const result = await service.staffResumeTicket('ticket-1', operator)
+
+      // O resume reatribui posição mas NÃO mexe em isPriority — o flag é preservado.
+      expect(tx.ticket.updateMany.mock.calls[0][0].data).not.toHaveProperty('isPriority')
+      expect(result.isPriority).toBe(true)
+    })
+
+    // Execução 2: senha NORMAL retomada continua normal (mesma regra, status oposto).
+    it('keeps a normal ticket normal when resuming', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.PAUSED,
+        isPriority: false,
+        pausedAt: new Date(Date.now() - 60_000),
+      })
+      tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 7 })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        code: 'A007',
+        queuePosition: 7,
+        isPriority: false,
+        representative: { fullName: 'Maria Teste' },
+      })
+      prisma.ticket.count.mockResolvedValue(7)
+
+      const result = await service.staffResumeTicket('ticket-1', operator)
+
+      expect(tx.ticket.updateMany.mock.calls[0][0].data).not.toHaveProperty('isPriority')
+      expect(result.isPriority).toBe(false)
+    })
+
     it('rejects resuming a ticket that is not paused', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
       await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
@@ -1067,6 +1169,144 @@ describe('TicketService', () => {
     it('rejects an operator from another ER', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED, erId: 'er-2' })
       await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(ForbiddenException)
+    })
+  })
+
+  describe('setTicketPriority', () => {
+    const priorityView = {
+      ...ticketBase,
+      isPriority: true,
+      state: TicketState.WAITING,
+      representative: { fullName: 'Maria Teste' },
+      er: { pauseTimeoutSeconds: 300, callTimeoutSeconds: 600 },
+    }
+
+    it('marks a WAITING ticket as preferential, audits and emits', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue(priorityView)
+
+      const result = await service.setTicketPriority('ticket-1', true, operator)
+
+      // CAS exige o valor oposto (isPriority: false) para não reaplicar às cegas.
+      expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+        where: { id: 'ticket-1', state: { in: [TicketState.WAITING, TicketState.PAUSED] }, isPriority: false },
+        data: { isPriority: true },
+      })
+      expect(tx.auditEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          eventType: 'ticket_priority_changed',
+          operatorId: 'op-1',
+          metadata: expect.objectContaining({ isPriority: true, byStaff: true }),
+        }),
+      })
+      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.priority_changed', {
+        ticketId: 'ticket-1',
+        isPriority: true,
+      })
+      expect(result.isPriority).toBe(true)
+    })
+
+    it('unmarks priority on a PAUSED ticket that is currently preferential', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.PAUSED,
+        isPriority: true,
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...priorityView,
+        isPriority: false,
+        state: TicketState.PAUSED,
+      })
+
+      await service.setTicketPriority('ticket-1', false, operator)
+
+      expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+        where: { id: 'ticket-1', state: { in: [TicketState.WAITING, TicketState.PAUSED] }, isPriority: true },
+        data: { isPriority: false },
+      })
+      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.priority_changed', {
+        ticketId: 'ticket-1',
+        isPriority: false,
+      })
+    })
+
+    it('rejects marking a ticket that is already preferential (no event, no audit)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        isPriority: true,
+      })
+      await expect(service.setTicketPriority('ticket-1', true, operator)).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+      expect(panel.emitToER).not.toHaveBeenCalled()
+    })
+
+    it('rejects unmarking a ticket that is already normal', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        isPriority: false,
+      })
+      await expect(service.setTicketPriority('ticket-1', false, operator)).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('rejects changing priority of a ticket that is not waiting or paused', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.IN_SERVICE })
+      await expect(service.setTicketPriority('ticket-1', true, operator)).rejects.toThrow(
+        BadRequestException,
+      )
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('rejects an operator from another ER', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        erId: 'er-2',
+      })
+      await expect(service.setTicketPriority('ticket-1', true, operator)).rejects.toThrow(
+        ForbiddenException,
+      )
+    })
+
+    // Corrida: a leitura inicial vê a senha como normal, mas outra operadora já a
+    // marcou preferencial antes da escrita (CAS bate count 0). A mensagem deve ser a
+    // específica de "já está no valor", não a genérica.
+    it('returns the "already preferential" message on a same-direction race (CAS miss)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        isPriority: false,
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+      tx.ticket.findUnique.mockResolvedValue({ isPriority: true })
+
+      await expect(service.setTicketPriority('ticket-1', true, operator)).rejects.toThrow(
+        'A senha já é preferencial',
+      )
+    })
+
+    // CAS bate count 0 porque a senha saiu de WAITING/PAUSED (ex.: foi chamada) entre
+    // a leitura e a escrita — aí a mensagem genérica é a correta.
+    it('returns the generic message when the CAS miss is due to a state change', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        isPriority: false,
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+      tx.ticket.findUnique.mockResolvedValue({ isPriority: false })
+
+      await expect(service.setTicketPriority('ticket-1', true, operator)).rejects.toThrow(
+        'Não foi possível alterar a prioridade da senha',
+      )
     })
   })
 

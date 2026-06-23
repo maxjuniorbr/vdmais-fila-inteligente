@@ -160,6 +160,7 @@ model Ticket {
   state         TicketState  @default(WAITING)
   entryChannel  EntryChannel
   queuePosition Int
+  isPriority    Boolean      @default(false) // atendimento preferencial (Lei 10.048): chamado antes das senhas normais
 
   queueId String
   queue   Queue  @relation(fields: [queueId], references: [id])
@@ -195,7 +196,7 @@ model Ticket {
   auditEvents AuditEvent[]
 
   @@unique([queueId, queuePosition])
-  @@index([erId, state, queuePosition])
+  @@index([erId, state, isPriority, queuePosition])
   @@map("tickets")
 }
 
