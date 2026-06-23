@@ -62,7 +62,14 @@ const overview = {
   ],
   paused: [],
   recent: [
-    { id: 'r1', code: 'A003', state: 'NO_SHOW', entryChannel: 'QR_CODE', createdAt: minutesAgo(60) },
+    {
+      id: 'r1',
+      code: 'A003',
+      state: 'NO_SHOW',
+      entryChannel: 'QR_CODE',
+      createdAt: minutesAgo(60),
+      calledAt: minutesAgo(57),
+    },
   ],
   counters: [
     { id: 'c1', number: 1, state: 'ACTIVE', operator: { name: 'Operadora 1' } },
@@ -174,6 +181,28 @@ describe('ManagerPage', () => {
     renderManager()
     expect(await screen.findByText('Atendimentos prolongados')).toBeInTheDocument()
     expect(screen.getAllByText('Bia Lima').length).toBeGreaterThan(0)
+  })
+
+  it('freezes the wait of a recent ticket instead of counting it live', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      renderManager()
+      // A003 foi criada há 60min e chamada há 57min: a espera real é fixa em 3min.
+      // Antes da correção a coluna usava (agora − criação), então a espera de uma
+      // senha já encerrada seguia subindo a cada tick de 1s.
+      const recentWait = () => within(screen.getByText('A003').closest('tr')!).getByText('3m 0s')
+      expect(await screen.findByText('A003')).toBeInTheDocument()
+      expect(recentWait()).toBeInTheDocument()
+
+      // A senha já saiu da fila (foi chamada): avançar o relógio não move a espera.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+      expect(recentWait()).toBeInTheDocument()
+    } finally {
+      vi.runOnlyPendingTimers()
+      vi.useRealTimers()
+    }
   })
 
   it('keeps the elapsed service time live between the 15s refreshes', async () => {

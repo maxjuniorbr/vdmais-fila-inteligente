@@ -51,6 +51,9 @@ interface Ticket {
   isPriority?: boolean
   entryChannel: string
   createdAt: string
+  calledAt?: string
+  cancelledAt?: string
+  pausedSeconds?: number
   serviceStartedAt?: string
   representative?: { fullName: string }
   counter?: { number: number }
@@ -225,6 +228,16 @@ function elapsedMinutes(from: string): number {
 
 function elapsedSeconds(from: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(from).getTime()) / 1000))
+}
+
+// Tempo que a senha esperou na fila. Congela quando ela sai da fila (foi chamada,
+// ou cancelada antes da chamada); enquanto ainda aguarda, conta ao vivo. Desconta o
+// tempo pausado, igual à métrica de espera do backend.
+function waitSeconds(ticket: Ticket): number {
+  const leftQueueAt = ticket.calledAt ?? ticket.cancelledAt
+  const ref = leftQueueAt ? new Date(leftQueueAt).getTime() : Date.now()
+  const raw = (ref - new Date(ticket.createdAt).getTime()) / 1000 - (ticket.pausedSeconds ?? 0)
+  return Math.max(0, Math.round(raw))
 }
 
 export function ManagerPage() {
@@ -754,7 +767,7 @@ function TicketTable({
     },
     { key: 'state', header: 'Estado', render: (ticket) => ticketStateLabel(ticket.state) },
     { key: 're', header: 'RE', render: (ticket) => ticket.representative?.fullName ?? '-' },
-    { key: 'wait', header: 'Espera', render: (ticket) => formatDuration(elapsedSeconds(ticket.createdAt)) },
+    { key: 'wait', header: 'Espera', render: (ticket) => formatDuration(waitSeconds(ticket)) },
     { key: 'channel', header: 'Canal', render: (ticket) => entryChannelLabel(ticket.entryChannel) },
     { key: 'counter', header: 'Caixa', render: (ticket) => ticket.counter?.number ?? '-' },
     {
