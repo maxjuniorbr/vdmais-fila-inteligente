@@ -13,13 +13,23 @@ interface ModalProps {
 export function Modal({ title, children, footer, onClose }: Readonly<ModalProps>) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
     const previouslyFocused = document.activeElement as HTMLElement | null
     if (!dialog.open) dialog.showModal()
+    // Fecha ao clicar no backdrop. Registrado imperativamente (e não via prop onClick)
+    // porque um <dialog> é "não interativo" para as regras de a11y; o teclado já é
+    // coberto pelo onCancel (Esc) e pelo foco preso do showModal().
+    const onBackdropClick = (event: MouseEvent) => {
+      if (event.target === dialog) onCloseRef.current()
+    }
+    dialog.addEventListener('click', onBackdropClick)
     return () => {
+      dialog.removeEventListener('click', onBackdropClick)
       if (dialog.open) dialog.close()
       previouslyFocused?.focus()
     }
@@ -34,9 +44,6 @@ export function Modal({ title, children, footer, onClose }: Readonly<ModalProps>
       onCancel={(event) => {
         event.preventDefault()
         onClose()
-      }}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) onClose()
       }}
       style={styles.dialog}
     >
