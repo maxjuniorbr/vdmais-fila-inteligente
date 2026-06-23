@@ -16,6 +16,7 @@
 | [DT-5](#dt-5--dupla-contabilidade-de-migrations-e-deploy-manual) | Dupla contabilidade de migrations e deploy manual | Média | Não |
 | [DT-6](#dt-6--major-do-prisma-adiado) | Major do Prisma adiado | Baixa | Não |
 | [DT-7](#dt-7--overrides-de-dependências-para-patches-de-segurança) | Overrides de dependências para patches de segurança | Baixa | Não |
+| [DT-8](#dt-8--complexidade-cognitiva-do-operationpage-acima-do-limite) | Complexidade cognitiva do OperationPage acima do limite | Baixa | Não |
 
 ---
 
@@ -134,3 +135,20 @@ Risco baixo — patches dentro do mesmo major, validados por unit + e2e.
 **Encaminhamento.** Remover cada override quando o pacote pai subir para uma versão que já
 traga o transitivo corrigido; revisar na rotina do Dependabot. Relacionado a
 [DT-6](#dt-6--major-do-prisma-adiado) (gestão de dependências).
+
+---
+
+## DT-8 — Complexidade cognitiva do OperationPage acima do limite
+
+**Contexto.** O componente `OperationPage` (tela da operadora) tem complexidade cognitiva
+16, um ponto acima do limite 15 do SonarQube (regra `typescript:S3776`). O smell é
+**pré-existente** e vem da densidade de condicionais do render principal (cards de Caixa e
+Senha atual), não da feature de atendimento preferencial — extrair a lista "Aguardando"
+(`WaitingTicketRow`/`priorityMenuItem`) não reduziu o número. O Quality Gate segue verde
+(a regra não bloqueia o gate).
+
+**Impacto.** Apenas manutenibilidade — sem efeito em runtime, comportamento ou desempenho.
+A tela funciona igual; a função é só mais difícil de ler e manter.
+
+**Encaminhamento.** Decompor o `OperationPage` em subcomponentes (`CounterCard`,
+`CurrentTicketCard`, etc.) num PR dedicado, com testes, até a complexidade ficar ≤ 15.

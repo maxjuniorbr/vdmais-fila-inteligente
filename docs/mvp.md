@@ -59,6 +59,7 @@ Dentro do MVP:
 - não comparecimento;
 - cancelamento;
 - restauração manual excepcional;
+- atendimento preferencial (marcar senha como preferencial — Lei 10.048);
 - métricas básicas;
 - registro de eventos mínimos.
 
@@ -69,7 +70,6 @@ Fora do MVP:
 - validação de status oficial da RE;
 - validação de elegibilidade comercial;
 - Pedido Expresso;
-- fila prioritária;
 - múltiplas filas;
 - entrada remota controlada;
 - confirmação de presença;
@@ -685,6 +685,7 @@ Tela mínima:
 - botão **Finalizar atendimento**;
 - botão **Não compareceu**;
 - botão **Pausar/Retomar**;
+- ação **Marcar/Remover preferencial** (no menu da senha em Aguardando);
 - lista curta de aguardando, pausados e em atendimento.
 
 Permissões sugeridas:
@@ -697,14 +698,16 @@ Permissões sugeridas:
 - finalizar atendimento;
 - marcar não compareceu;
 - pausar/retomar próprio caixa;
-- pausar/retomar a senha de um RE (ver 9.5.1).
+- pausar/retomar a senha de um RE (ver 9.5.1);
+- marcar/remover atendimento preferencial (ver 13.5).
 
 **Atendente/check-in**
 
 - criar cadastro mínimo;
-- incluir RE na fila;
+- incluir RE na fila (podendo já marcar como preferencial);
 - consultar cadastro;
-- cancelar senha com motivo.
+- cancelar senha com motivo;
+- marcar/remover atendimento preferencial (ver 13.5).
 
 **Gestora**
 
@@ -714,6 +717,7 @@ Permissões sugeridas:
 - liberar caixa (forçado) quando a operadora abandona o caixa;
 - corrigir atendimento em aberto;
 - encerrar fila do dia;
+- marcar/remover atendimento preferencial (ver 13.5);
 - consultar indicadores.
 
 ---
@@ -757,15 +761,16 @@ Indicadores mínimos:
 
 ### 13.1 Tipo de fila
 
-Fila única FIFO.
+Fila única com **atendimento preferencial**. As senhas marcadas como preferenciais
+(Lei 10.048) são chamadas antes das normais; dentro de cada grupo (preferencial e
+normal) a ordem é FIFO, por chegada. Ver 13.5.
 
 Sem:
 
-- prioridade;
 - Pedido Expresso;
 - múltiplas filas;
 - reposicionamento;
-- ordenação manual;
+- ordenação manual livre (a operação não escolhe uma senha específica para chamar);
 - fila remota;
 - ETA.
 
@@ -799,7 +804,19 @@ Regra:
 > Operadora chama sempre o próximo da fila.
 > 
 
-A operadora não escolhe manualmente quem chamar. Exceções como restauração e cancelamento ficam registradas e exigem permissão adequada.
+A operadora não escolhe manualmente uma senha específica para chamar. A ordem pode ser influenciada marcando uma senha como **preferencial** (13.5) — ação auditada e restrita a perfis autorizados. Exceções como restauração e cancelamento também ficam registradas e exigem permissão adequada.
+
+### 13.5 Atendimento preferencial
+
+Atendimento preferencial por lei (Lei 10.048/2000): idosos, gestantes, lactantes, pessoas com deficiência, com crianças de colo e obesos têm prioridade.
+
+Regras:
+
+> • A operação (operadora, atendente ou gestora) pode **marcar/desmarcar** uma senha como preferencial. No check-in assistido, o atendente pode já incluir a RE como preferencial; a própria RE **não** pode se autopromover.
+> • Só é possível alterar a prioridade de senhas **Aguardando** ou **Pausada**.
+> • A chamada (`call-next`) atende **preferenciais primeiro**; entre senhas do mesmo grupo vale a ordem de chegada (FIFO). A posição mostrada à RE e no painel já considera essa ordenação.
+> • A prioridade é um atributo da senha: ao **pausar/retomar** ou **restaurar**, a senha mantém o status (preferencial continua preferencial; normal continua normal) e volta ao **fim do seu grupo**.
+> • Toda marcação é auditada (`ticket_priority_changed`) e emite atualização em tempo real para painel, operação e gestão.
 
 ---
 
@@ -846,6 +863,7 @@ ticket_paused
 ticket_resumed
 ticket_pause_expired
 ticket_recalled
+ticket_priority_changed
 ticket_force_closed
 ticket_auto_no_show
 counter_force_released

@@ -151,7 +151,7 @@ Responsabilidades mínimas:
 - cadastro mínimo da RE;
 - autenticação/login;
 - criação de senha;
-- controle de fila FIFO;
+- controle de fila com atendimento preferencial (preferenciais primeiro; FIFO dentro do grupo);
 - bloqueio de senha ativa duplicada;
 - controle transacional da chamada do próximo;
 - estados da senha;

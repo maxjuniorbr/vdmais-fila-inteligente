@@ -83,9 +83,10 @@ Relacionamento e precisa ser atendida.
 
 **Atendendo a fila:**
 
-1. **Chamar próximo:** chama a primeira senha em espera. A operação é atômica —
-   **duas operadoras nunca chamam a mesma senha**. A senha vai para **Chamando**
-   e aparece no painel de TV.
+1. **Chamar próximo:** chama a próxima senha em espera — **preferenciais primeiro**
+   (atendimento preferencial, Lei 10.048), depois por ordem de chegada. A operação é
+   atômica — **duas operadoras nunca chamam a mesma senha**. A senha vai para
+   **Chamando** e aparece no painel de TV.
 2. Quando a RE chega ao caixa:
    - **Iniciar atendimento:** a senha passa a **Em atendimento**.
    - **Finalizar atendimento:** conclui; o caixa volta a ficar disponível para a
@@ -98,6 +99,15 @@ Relacionamento e precisa ser atendida.
 > Se a senha ficar em chamada além da tolerância (padrão 10 min) sem ação, o
 > sistema a marca como _não compareceu_ automaticamente e libera o caixa, para
 > que ele não fique preso.
+
+**Atendimento preferencial:**
+
+- No menu (⋯) de uma senha em **Aguardando**, use **Marcar preferencial** /
+  **Remover preferencial** — idosos, gestantes, lactantes, pessoas com deficiência,
+  com crianças de colo e obesos (Lei 10.048). A senha preferencial passa à frente
+  das normais; entre preferenciais, vale a ordem de chegada. No check-in assistido,
+  o atendente pode já incluir a RE como preferencial. A gestora também pode
+  marcar/remover na fila ativa.
 
 **Pausa do caixa:**
 
