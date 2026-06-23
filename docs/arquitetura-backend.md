@@ -200,8 +200,8 @@ Endpoints centrais para operação e integração.
 | `POST` | `/tickets/:id/finish-service` | OPERATOR | — | Finalizar atendimento (IN_SERVICE → FINISHED) |
 | `POST` | `/tickets/:id/no-show` | OPERATOR | — | Marcar não comparecimento |
 | `POST` | `/tickets/:id/recall` | OPERATOR | — | Segunda chamada (rechamada) |
-| `POST` | `/tickets/:id/pause` | REPRESENTATIVE | — | Pausar senha (volta ao fim da fila ao retomar ou ao expirar) |
-| `POST` | `/tickets/:id/resume` | REPRESENTATIVE | — | Retomar senha pausada |
+| `POST` | `/tickets/:id/pause` | REPRESENTATIVE | — | Pausar senha (a retomada mantém a posição original; só o timeout vai ao fim) |
+| `POST` | `/tickets/:id/resume` | REPRESENTATIVE | — | Retomar senha pausada na posição original (atrás de preferenciais que entraram na pausa) |
 | `POST` | `/tickets/:id/staff-pause` | OPERATOR, ATTENDANT, ADMIN | — | Pausar senha de um RE pela operação (aceita WAITING/CALLING/IN_SERVICE; libera o caixa se estava em uso) |
 | `POST` | `/tickets/:id/staff-resume` | OPERATOR, ATTENDANT, ADMIN | — | Retomar senha pausada pela operação |
 | `POST` | `/tickets/:id/mark-priority` | OPERATOR, ATTENDANT, MANAGER | — | Marcar atendimento preferencial (Lei 10.048); só senha WAITING/PAUSED |
