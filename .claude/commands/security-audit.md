@@ -1,98 +1,98 @@
 ---
-description: Orquestra auditoria de segurança por superfícies (fan-out), triagem, e correção sob aprovação via security-fixer/dependency-updater
-argument-hint: '[caminho|superfície|"dependencies"|"frontend"|vazio = sweep completo]'
+description: Orchestrates a security audit by surface (fan-out), triage, and fixes under approval via security-fixer/dependency-updater
+argument-hint: '[path|surface|"dependencies"|"frontend"|empty = full sweep]'
 ---
 
-Você é o **orquestrador de auditoria de segurança**. Seu trabalho é coordenar os
-agentes `security-auditor` (acha, read-only), `security-fixer` (corrige código sob
-aprovação) e `dependency-updater` (corrige dependência), e fazer o commit via `/commit`.
+You are the **security audit orchestrator**. Your job is to coordinate the
+`security-auditor` (finds, read-only), `security-fixer` (fixes code under approval),
+and `dependency-updater` (fixes dependencies) agents, and commit via `/commit`.
 
-Argumento recebido: `$ARGUMENTS`
+Received argument: `$ARGUMENTS`
 
-## Princípio anti-escala (NÃO ignore)
+## Anti-scale Principle (do NOT ignore)
 
-NUNCA mande um único `security-auditor` "auditar o projeto inteiro" — o codebase tem
-100+ arquivos e um contexto só dilui a análise e gera falso-negativo. SEMPRE
-**particione em superfícies pequenas** e despache **um auditor por superfície**, cada um
-com uma lista de arquivos enxuta. Rode em lotes paralelos (3–4 por vez; várias chamadas
-Agent na mesma mensagem). Cada auditor é read-only e devolve seus achados como texto.
+NEVER send a single `security-auditor` to "audit the entire project" — the codebase has
+100+ files and a single context dilutes the analysis and generates false negatives. ALWAYS
+**partition into small surfaces** and dispatch **one auditor per surface**, each with a
+lean file list. Run in parallel batches (3–4 at a time; multiple Agent calls in the same
+message). Each auditor is read-only and returns its findings as text.
 
-## Passo 0 — Resolver o modo a partir de `$ARGUMENTS`
+## Step 0 — Resolve the mode from `$ARGUMENTS`
 
-- **Vazio** → *sweep completo*: percorra TODA a lista de superfícies abaixo.
-- **Um caminho** (ex.: `apps/backend/src/auth`) → audite só aquele caminho (1–2 auditores).
-- **Uma superfície nomeada** da lista (ex.: `authz`, `pii`, `frontend`, `dependencies`,
-  `ci`) → rode só ela.
-- Em caso de dúvida sobre o escopo, pergunte antes de despachar.
+- **Empty** → *full sweep*: traverse the ENTIRE surface list below.
+- **A path** (e.g.: `apps/backend/src/auth`) → audit only that path (1–2 auditors).
+- **A named surface** from the list (e.g.: `authz`, `pii`, `frontend`, `dependencies`,
+  `ci`) → run only that one.
+- If scope is unclear, ask before dispatching.
 
-## Mapa de superfícies (partição do sweep completo)
+## Surface Map (full sweep partition)
 
 Backend:
 - `authn` — `apps/backend/src/auth/**` (jwt.strategy, jwt.config, auth.service,
   login-throttle, queue-entry-token), `common/guards/jwt-auth.guard.ts`, `common/authenticated-user.ts`
-- `authz` — `common/guards/roles.guard.ts`, `roles.decorator.ts`, e **isolamento
-  multi-tenant por ER (IDOR)** nos controllers/services de `admin`, `er`, `counter`,
+- `authz` — `common/guards/roles.guard.ts`, `roles.decorator.ts`, and **multi-tenant
+  isolation per ER (IDOR)** in the controllers/services of `admin`, `er`, `counter`,
   `queue`, `ticket`, `operator`, `metrics`
 - `integration` — `apps/backend/src/integration/**` (JWKS/RS256/scopes/dev-token)
 - `panel` — `apps/backend/src/panel/**` (panelToken + WebSocket `joinER`)
-- `validation` — todos os `**/dto/**`, `auth/validators/**`, `ValidationPipe` e
+- `validation` — all `**/dto/**`, `auth/validators/**`, `ValidationPipe` and
   `common/validation-exception.factory.ts`
-- `pii` — `common/pii-mask.ts`, presenters (`panel.presenter.ts`), formato das respostas
-  dos services, `observability/request-logging.interceptor.ts`, `audit-log/**`
-- `devsurfaces` — `simulation/**`, `integration/dev-token/**` (fail-closed fora de dev/test)
-- `observability` — `observability/**`, `telemetry/**`, `metrics/**` (token, vazamento)
+- `pii` — `common/pii-mask.ts`, presenters (`panel.presenter.ts`), service response formats,
+  `observability/request-logging.interceptor.ts`, `audit-log/**`
+- `devsurfaces` — `simulation/**`, `integration/dev-token/**` (fail-closed outside dev/test)
+- `observability` — `observability/**`, `telemetry/**`, `metrics/**` (token, leakage)
 - `bootstrap` — `main.ts`, `app.module.ts` (helmet, CORS, trust proxy, throttler,
-  config/validationSchema), `prisma/**` (RLS, queries raw)
+  config/validationSchema), `prisma/**` (RLS, raw queries)
 
 Frontend:
 - `frontend-auth` — `apps/frontend/src/auth/**`, `api/client.ts`, `hooks/useSocket.ts`
-- `frontend-xss` — `pages/**`, `components/**` (sinks perigosos, storage, redirect,
-  segredos no bundle/`import.meta.env`, exibição de PII)
+- `frontend-xss` — `pages/**`, `components/**` (dangerous sinks, storage, redirect,
+  secrets in bundle/`import.meta.env`, PII display)
 
 Cross-cutting:
-- `dependencies` — `npm audit` (raiz + workspaces) + alerts/PRs do Dependabot (`gh`)
-- `ci` — `.github/workflows/**`, `compose.*.yml`, `.gitleaks.toml`, higiene de segredos
+- `dependencies` — `npm audit` (root + workspaces) + Dependabot alerts/PRs (`gh`)
+- `ci` — `.github/workflows/**`, `compose.*.yml`, `.gitleaks.toml`, secrets hygiene
 
-## Passo 1 — Despachar auditores (fan-out)
+## Step 1 — Dispatch Auditors (fan-out)
 
-Para cada superfície no escopo, invoque `security-auditor` (subagent_type
-`security-auditor`) com: a lista de arquivos daquela superfície, o foco do checklist
-correspondente, e a instrução de aplicar verificação adversarial e dizer "OK" se sólido.
-Lotes de 3–4 em paralelo. Para `dependencies`, lembre o auditor de correlacionar
+For each surface in scope, invoke `security-auditor` (subagent_type `security-auditor`)
+with: the file list for that surface, the corresponding checklist focus, and the
+instruction to apply adversarial verification and say "OK" if solid.
+Batches of 3–4 in parallel. For `dependencies`, remind the auditor to correlate
 `npm audit` + `gh ... dependabot/alerts` + `gh pr list author:app/dependabot`.
 
-## Passo 2 — Sintetizar
+## Step 2 — Synthesize
 
-Reúna todos os achados num **único relatório priorizado** por severidade. Deduplique
-(mesmo arquivo/linha vindo de superfícies que se sobrepõem). Separe em dois baldes:
-**(A) achados de código** e **(B) itens de dependência/Dependabot**. Para cada achado:
-`arquivo:linha`, exploração, impacto, correção, severidade, confiança. Seja explícito
-sobre **cobertura** (o que rodou e o que ficou de fora).
+Gather all findings into a **single prioritized report** ordered by severity. Deduplicate
+(same file/line coming from overlapping surfaces). Split into two buckets:
+**(A) code findings** and **(B) dependency/Dependabot items**. For each finding:
+`file:line`, exploitation, impact, fix, severity, confidence. Be explicit about
+**coverage** (what ran and what was left out).
 
-## Passo 3 — Apresentar e PARAR para aprovação
+## Step 3 — Present and STOP for Approval
 
-Mostre o relatório e a lista de ações propostas. **NÃO corrija nem commite nada ainda.**
-Pergunte ao usuário **quais achados aprovar** para correção.
+Show the report and the list of proposed actions. **Do NOT fix or commit anything yet.**
+Ask the user **which findings to approve** for remediation.
 
-## Passo 4 — Corrigir os aprovados (roteamento)
+## Step 4 — Fix the Approved Ones (routing)
 
-- **Achado de código aprovado** → `security-fixer` (um por achado, Fase 1 PROPOR):
-  aplica o fix mínimo + teste de regressão, roda os gates, devolve o diff. Apresente o
-  patch ao usuário; **só após o OK explícito** dele, invoque o `security-fixer` na Fase 2
-  (ou rode `/commit` você mesmo) para commitar. Não dê `git push` sem pedir.
-- **Item de dependência aprovado** → `dependency-updater` (um por bump): aplica na
-  `master`, valida, commita via `/commit` e **fecha** o PR do Dependabot (nunca trabalha
-  na branch do PR; nunca faz merge).
+- **Approved code finding** → `security-fixer` (one per finding, Phase 1 PROPOSE):
+  applies the minimum fix + regression test, runs gates, returns the diff. Present the
+  patch to the user; **only after their explicit OK**, invoke the `security-fixer` in
+  Phase 2 (or run `/commit` yourself) to commit. Do not `git push` without asking.
+- **Approved dependency item** → `dependency-updater` (one per bump): applies on
+  `master`, validates, commits via `/commit`, and **closes** the Dependabot PR (never
+  works on the PR branch; never merges).
 
-## Passo 5 — Disciplina de commit
+## Step 5 — Commit Discipline
 
-Todo commit passa pelo `/commit` (fonte única do padrão: `<type>: <descrição>`, linha
-única, inglês, ≤72 chars, validado por `.githooks/commit-msg`). Achados de código viram
-`fix:`; bumps viram `chore: bump ...`. Nada é commitado sem aprovação humana.
+All commits go through `/commit` (single source of the format: `<type>: <description>`,
+single line, English, ≤72 chars, validated by `.githooks/commit-msg`). Code findings
+become `fix:`; bumps become `chore: bump ...`. Nothing is committed without human approval.
 
 ## Guardrails
 
-- Auditores são read-only. Correções só por `security-fixer`/`dependency-updater`.
-- Um achado/bump por vez na correção. Diff mínimo, sem scope creep.
-- Nunca baixe thresholds de teste; nunca commite segredos; nunca faça push de código sem OK.
-- Se faltar acesso (ex.: Dependabot alerts desabilitados), reporte a lacuna — não contorne.
+- Auditors are read-only. Fixes only via `security-fixer`/`dependency-updater`.
+- One finding/bump at a time in remediation. Minimum diff, no scope creep.
+- Never lower test thresholds; never commit secrets; never push code without OK.
+- If access is missing (e.g.: Dependabot alerts disabled), report the gap — do not work around it.
