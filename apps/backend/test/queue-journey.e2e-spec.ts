@@ -602,7 +602,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
       .expect(409)
   })
 
-  it('representative can pause and resume her ticket, accumulating pausedSeconds and receiving a new code', async () => {
+  it('representative can pause and resume her ticket in place, keeping her code and accumulating pausedSeconds', async () => {
     // Create a fresh representative for this scenario
     const pauseRep = await prisma.representative.create({
       data: {
@@ -650,13 +650,13 @@ describe('Full queue journey and concurrency (e2e)', () => {
     )
     expect(waitingCodes).not.toContain(originalCode)
 
-    // Step 3: resume — ticket goes back to WAITING with a new code and end-of-queue position
+    // Step 3: resume — ticket goes back to WAITING keeping its original code and position
     const resumed = await request(app.getHttpServer())
       .post(`/tickets/${pauseTicketId}/resume`)
       .set('Authorization', `Bearer ${pauseToken}`)
       .expect(201)
     expect(resumed.body.state).toBe(TicketState.WAITING)
-    expect(resumed.body.code).not.toBe(originalCode)
+    expect(resumed.body.code).toBe(originalCode)
 
     // pausedSeconds must be > 0 (at least 1 s elapsed between pause and resume)
     const dbTicket = await prisma.ticket.findUniqueOrThrow({ where: { id: pauseTicketId } })
