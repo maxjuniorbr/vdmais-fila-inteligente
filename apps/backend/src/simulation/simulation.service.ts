@@ -191,7 +191,7 @@ export class SimulationService {
    */
   async closeCounter(erId: string, counterId: string) {
     const counter = await this.prisma.counter.findUnique({ where: { id: counterId } })
-    if (!counter || counter.erId !== erId) throw new NotFoundException('Caixa não encontrado neste ER')
+    if (counter?.erId !== erId) throw new NotFoundException('Caixa não encontrado neste ER')
     if (!counter.operatorId) throw new BadRequestException('O caixa não está aberto')
     return this.counterService.closeCounter(counterId, this.operatorUser(erId, counter.operatorId))
   }
@@ -283,8 +283,10 @@ export class SimulationService {
   }
 
   /**
-   * Chama a próxima senha da fila (FIFO) em um caixa ativo específico, via
-   * callNext real (WAITING → CALLING). É a ação "Chamar próxima" da linha do caixa.
+   * Chama a próxima senha da fila em um caixa ativo específico, via callNext real
+   * (WAITING → CALLING). A ordem segue a regra de produção: preferenciais primeiro
+   * (isPriority DESC), depois por chegada (queuePosition ASC). É a ação "Chamar
+   * próxima" da linha do caixa.
    */
   async callNextOnCounter(counterId: string) {
     const counter = await this.prisma.counter.findUnique({

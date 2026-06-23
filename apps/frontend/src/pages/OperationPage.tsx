@@ -11,6 +11,7 @@ import { useStaffSession } from '../auth/useStaffSession'
 import { ActionMenu } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
+import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { Modal } from '../components/Modal'
@@ -22,12 +23,13 @@ import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
 import { formatDuration } from '../utils/format'
-import { counterStateLabel, ticketStateLabel } from '../utils/labels'
+import { counterStateLabel, PRIORITY_LABEL, PRIORITY_TONE, ticketStateLabel } from '../utils/labels'
 
 interface Ticket {
   id: string
   code: string
   state: string
+  isPriority?: boolean
   calledAt?: string
   serviceStartedAt?: string
   representative?: { fullName: string }
@@ -60,6 +62,7 @@ const QUEUE_EVENTS = [
   'ticket.cancelled',
   'ticket.paused',
   'ticket.restored',
+  'ticket.priority_changed',
   'counter.opened',
   'counter.paused',
   'counter.resumed',
@@ -69,6 +72,63 @@ const QUEUE_EVENTS = [
   'day.opened',
   'day.closed',
 ]
+
+// Item de menu para alternar o atendimento preferencial de uma senha aguardando.
+// Fica fora do componente para não somar à complexidade cognitiva do OperationPage.
+function priorityMenuItem(
+  ticket: Ticket,
+  loading: boolean,
+  act: (action: () => Promise<unknown>, successMessage?: string) => unknown,
+) {
+  const toPriority = !ticket.isPriority
+  return {
+    label: toPriority ? 'Marcar preferencial' : 'Remover preferencial',
+    disabled: loading,
+    onClick: () =>
+      act(
+        () => api.post(`/tickets/${ticket.id}/${toPriority ? 'mark' : 'unmark'}-priority`),
+        toPriority ? 'Senha marcada como preferencial.' : 'Prioridade removida.',
+      ),
+  }
+}
+
+// Linha de uma senha em "Aguardando": código, nome, badge de preferencial e o menu
+// de ações. Extraída para fora do OperationPage para manter a complexidade baixa.
+function WaitingTicketRow({
+  ticket,
+  canManageQueue,
+  loading,
+  act,
+}: Readonly<{
+  ticket: Ticket
+  canManageQueue: boolean
+  loading: boolean
+  act: (action: () => Promise<unknown>, successMessage?: string) => unknown
+}>) {
+  return (
+    <div style={styles.panelRow}>
+      <span style={styles.rowMain}>
+        <strong>{ticket.code}</strong>
+        <span style={styles.rowName}>{ticket.representative?.fullName ?? '—'}</span>
+        {ticket.isPriority && <Badge tone={PRIORITY_TONE}>{PRIORITY_LABEL}</Badge>}
+      </span>
+      {canManageQueue && (
+        <ActionMenu
+          label={`Ações da senha ${ticket.code}`}
+          items={[
+            priorityMenuItem(ticket, loading, act),
+            {
+              label: 'Pausar senha',
+              disabled: loading,
+              onClick: () =>
+                act(() => api.post(`/tickets/${ticket.id}/staff-pause`), 'Senha pausada.'),
+            },
+          ]}
+        />
+      )}
+    </div>
+  )
+}
 
 export function OperationPage() {
   const [authenticated, setAuthenticated] = useStaffSession(['OPERATOR'])
@@ -455,25 +515,13 @@ export function OperationPage() {
               ) : (
                 <div style={styles.panelList}>
                   {overview?.waiting.slice(0, 8).map((ticket) => (
-                    <div key={ticket.id} style={styles.panelRow}>
-                      <span style={styles.rowMain}>
-                        <strong>{ticket.code}</strong>
-                        <span style={styles.rowName}>{ticket.representative?.fullName ?? '—'}</span>
-                      </span>
-                      {canManageQueue && (
-                        <ActionMenu
-                          label={`Ações da senha ${ticket.code}`}
-                          items={[
-                            {
-                              label: 'Pausar senha',
-                              disabled: loading,
-                              onClick: () =>
-                                act(() => api.post(`/tickets/${ticket.id}/staff-pause`), 'Senha pausada.'),
-                            },
-                          ]}
-                        />
-                      )}
-                    </div>
+                    <WaitingTicketRow
+                      key={ticket.id}
+                      ticket={ticket}
+                      canManageQueue={canManageQueue}
+                      loading={loading}
+                      act={act}
+                    />
                   ))}
                 </div>
               )}
@@ -535,29 +583,29 @@ export function OperationPage() {
               )}
             </SectionPanel>
           </aside>
-        </div>
 
-        <section style={styles.panel}>
-          <p style={styles.sectionLabel}>
-            <StatusDot />
-            Chamadas recentes
-          </p>
-          {(overview?.recent.length ?? 0) === 0 ? (
-            <p style={styles.dim}>Nenhuma chamada recente</p>
-          ) : (
-            <div style={styles.chipRow}>
-              {overview?.recent.slice(0, 8).map((ticket) => (
-                <span key={ticket.id} style={styles.chip}>
-                  <StatusDot
-                    color={ticket.state === 'NO_SHOW' ? brand.warning : brand.success}
-                  />
-                  <strong>{ticket.code}</strong>
-                  <span style={styles.chipState}>{ticketStateLabel(ticket.state)}</span>
-                </span>
-              ))}
-            </div>
-          )}
-        </section>
+          <section style={{ ...styles.panel, gridColumn: '1 / -1' }}>
+            <p style={styles.sectionLabel}>
+              <StatusDot />
+              Chamadas recentes
+            </p>
+            {(overview?.recent.length ?? 0) === 0 ? (
+              <p style={styles.dim}>Nenhuma chamada recente</p>
+            ) : (
+              <div style={styles.chipRow}>
+                {overview?.recent.slice(0, 8).map((ticket) => (
+                  <span key={ticket.id} style={styles.chip}>
+                    <StatusDot
+                      color={ticket.state === 'NO_SHOW' ? brand.warning : brand.success}
+                    />
+                    <strong>{ticket.code}</strong>
+                    <span style={styles.chipState}>{ticketStateLabel(ticket.state)}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </main>
 
       {confirmingClose && (
@@ -611,10 +659,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   mainColumn: {
     display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr)',
     gap: `${brand.spacing[20]}px`,
   },
   sideColumn: {
     display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr)',
     gap: `${brand.spacing[20]}px`,
   },
   counterActions: {

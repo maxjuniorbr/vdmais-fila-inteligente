@@ -5,8 +5,11 @@ import { logoutStaffSession, getSessionERId } from '../auth/session'
 import { useStaffSession } from '../auth/useStaffSession'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
+import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
+import { Switch } from '../components/Switch'
+import { PRIORITY_SERVICE_LABEL, PRIORITY_TONE } from '../utils/labels'
 import { layout } from '../styles/layout'
 import { brand } from '../styles/brand'
 
@@ -43,6 +46,7 @@ export function CheckinAttendantPage() {
   const [showRegistration, setShowRegistration] = useState(false)
   const [selected, setSelected] = useState<Representative | null>(null)
   const [ticket, setTicket] = useState<Ticket | null>(null)
+  const [isPriority, setIsPriority] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -72,6 +76,7 @@ export function CheckinAttendantPage() {
         erId,
         entryChannel: 'CHECKIN_ASSISTED',
         representativeId: representative.id,
+        isPriority,
       })
       setSelected(representative)
       setTicket(data)
@@ -107,6 +112,7 @@ export function CheckinAttendantPage() {
     setResults([])
     setSelected(null)
     setTicket(null)
+    setIsPriority(false)
     setError(null)
   }
 
@@ -133,6 +139,11 @@ export function CheckinAttendantPage() {
             <p style={styles.successName}>{selected?.fullName}</p>
             <strong style={styles.code}>{ticket.code}</strong>
             <p style={styles.successPosition}>Posição #{ticket.currentPosition}</p>
+            {isPriority && (
+              <p style={styles.successPosition}>
+                <Badge tone={PRIORITY_TONE}>{PRIORITY_SERVICE_LABEL}</Badge>
+              </p>
+            )}
             <Button variant="secondary" onClick={reset}>Novo check-in</Button>
           </section>
         </main>
@@ -163,6 +174,12 @@ export function CheckinAttendantPage() {
               {loading ? 'Buscando...' : 'Buscar'}
             </Button>
           </form>
+
+          <Switch
+            label={PRIORITY_SERVICE_LABEL}
+            checked={isPriority}
+            onChange={(event) => setIsPriority(event.target.checked)}
+          />
 
           {error && <Alert tone="error">{error}</Alert>}
 

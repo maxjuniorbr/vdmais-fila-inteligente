@@ -95,6 +95,44 @@ describe('CheckinAttendantPage', () => {
     expect(screen.getByLabelText('CPF, telefone ou código RE')).toHaveValue('')
   })
 
+  it('sends the preferential flag when the switch is on', async () => {
+    authenticate()
+    let ticketBody: string | null = null
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString()
+        if (url.includes('/representatives/search')) {
+          return new Response(
+            JSON.stringify([
+              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+            ]),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/tickets')) {
+          ticketBody = init?.body ? init.body.toString() : null
+          return new Response(
+            JSON.stringify({ id: 't-1', code: 'A001', queuePosition: 1, currentPosition: 1 }),
+            { status: 201 },
+          )
+        }
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('CPF, telefone ou código RE'), 'ana')
+    fireEvent.click(screen.getByLabelText('Atendimento preferencial'))
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Criar senha' }))
+
+    expect(await screen.findByText('Check-in realizado')).toBeInTheDocument()
+    expect(ticketBody).toContain('"isPriority":true')
+    expect(screen.getByText('Atendimento preferencial')).toBeInTheDocument()
+  })
+
   it('keeps the registration form open with its data when the ticket creation fails after registering', async () => {
     authenticate()
     vi.stubGlobal(

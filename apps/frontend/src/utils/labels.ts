@@ -72,3 +72,9 @@ const TICKET_STATE_TONES: Record<string, BadgeTone> = {
 export function ticketStateTone(state: string): BadgeTone {
   return TICKET_STATE_TONES[state] ?? 'neutral'
 }
+
+// Atendimento preferencial (Lei 10.048). Rótulos e tom centralizados para os
+// badges/telas, evitando o texto espalhado e divergente entre as páginas.
+export const PRIORITY_LABEL = 'Preferencial'
+export const PRIORITY_SERVICE_LABEL = 'Atendimento preferencial'
+export const PRIORITY_TONE: BadgeTone = 'info'

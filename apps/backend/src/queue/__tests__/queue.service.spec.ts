@@ -120,6 +120,27 @@ describe('QueueService.callNext', () => {
     })
   })
 
+  it('orders the waiting overview by priority then queue position', async () => {
+    await service.getQueueOverview('er-1', operator)
+
+    expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ state: TicketState.WAITING }),
+        orderBy: [{ isPriority: 'desc' }, { queuePosition: 'asc' }],
+      }),
+    )
+  })
+
+  it('locks the next ticket ordering preferential ones first', async () => {
+    await service.callNext('er-1', 'counter-1', operator)
+
+    // O segundo $queryRaw seleciona a próxima senha WAITING para travar.
+    const selectTicketCall = tx.$queryRaw.mock.calls[1][0] as string[]
+    const sql = selectTicketCall.join('?')
+    expect(sql).toMatch(/"isPriority"\s+DESC/)
+    expect(sql).toMatch(/"queuePosition"\s+ASC/)
+  })
+
   it('rejects non-operators before opening a transaction', async () => {
     await expect(service.callNext('er-1', 'counter-1', admin)).rejects.toThrow(ForbiddenException)
     expect(prisma.$transaction).not.toHaveBeenCalled()

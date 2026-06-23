@@ -4,6 +4,7 @@ import { AppHeader } from '../components/AppHeader'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { formatDate, formatDuration, formatTimeWithSeconds } from '../utils/format'
+import { PRIORITY_LABEL } from '../utils/labels'
 
 interface Call {
   code: string
@@ -19,6 +20,7 @@ interface InService {
 interface WaitingTicket {
   code: string
   position: number
+  isPriority?: boolean
 }
 
 interface PanelState {
@@ -40,6 +42,7 @@ const REFRESH_EVENTS = [
   'ticket.cancelled',
   'ticket.paused',
   'ticket.restored',
+  'ticket.priority_changed',
   'day.opened',
   'day.closed',
 ]
@@ -309,6 +312,9 @@ export function PanelPage() {
                         {ticket.code}
                       </span>
                       <span style={styles.nextMeta}>
+                        {ticket.isPriority && (
+                          <span style={styles.priorityTag}>{PRIORITY_LABEL.toUpperCase()}</span>
+                        )}
                         {isNext && <span style={styles.nextTag}>PRÓXIMA</span>}
                         <span style={styles.nextPos}>{ticket.position}º</span>
                       </span>
@@ -364,7 +370,19 @@ const C = {
   accent: brand.actionable,
   accentSoft: brand.infoSoft,
   accentBorder: brand.infoBorder,
+  info: brand.info,
   shadow: brand.shadow,
+}
+
+// Pill compartilhado pelas tags do painel (PRÓXIMA / PREFERENCIAL); cada uma só
+// troca o fundo. Mantém os dois badges visualmente idênticos na TV.
+const TAG_STYLE: React.CSSProperties = {
+  fontSize: '0.85vw',
+  fontWeight: 800,
+  letterSpacing: '0.12em',
+  color: C.surface,
+  borderRadius: '999px',
+  padding: '0.4vh 0.7vw',
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -640,15 +658,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '0.7vw',
   },
-  nextTag: {
-    fontSize: '0.85vw',
-    fontWeight: 800,
-    letterSpacing: '0.12em',
-    color: C.surface,
-    background: C.accent,
-    borderRadius: '999px',
-    padding: '0.4vh 0.7vw',
-  },
+  nextTag: { ...TAG_STYLE, background: C.accent },
+  priorityTag: { ...TAG_STYLE, background: C.info },
   nextPos: {
     fontSize: '1.3vw',
     fontWeight: 600,
