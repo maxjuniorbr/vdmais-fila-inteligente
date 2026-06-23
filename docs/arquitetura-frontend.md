@@ -81,7 +81,7 @@ api.patch<T>(path, body?)     → Promise<T>
 api.delete<T>(path)           → Promise<T>
 ```
 
-- Base URL: variável de ambiente `VITE_API_URL` (padrão: relativo `/api`)
+- Base URL HTTP: caminho relativo fixo `/api` (definido em `api/client.ts`), roteado ao backend pela borda — proxy do Vite em dev, rewrite do `vercel.json` em prod; **não** depende de `VITE_API_URL`
 - Header automático: `Authorization: Bearer <token>` quando há sessão ativa
 - 401 automático: chama `notifySessionExpired()` antes de rejeitar a Promise
 
@@ -231,7 +231,7 @@ npm run build --workspace=apps/frontend
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `VITE_API_URL` | Não | URL base do backend. Se omitida, usa `/api` (relativo ao host do frontend) |
+| `VITE_API_URL` | Não | Origem do **WebSocket** (Socket.IO). Se omitida, usa `/` (mesma origem). Em borda que não faz proxy de WS (ex.: Vercel), aponte para a origem do backend. As chamadas HTTP usam sempre `/api`, roteado ao backend pela borda. |
 
 ---
 
