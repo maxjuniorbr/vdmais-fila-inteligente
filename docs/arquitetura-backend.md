@@ -107,11 +107,15 @@ Todas as chamadas autenticadas enviam o JWT no header:
 Authorization: Bearer <token>
 ```
 
-O payload do token carrega as claims necessárias para autorização — role, erId e sessionVersion — eliminando consultas adicionais ao banco por chamada.
+O payload do token carrega as claims necessárias para autorização — `userId`, `role`,
+`erId` e `sv` (sessionVersion) — eliminando consultas adicionais ao banco por chamada.
+As sessões de representante também carregam `entryChannel` e expiram no fim do dia útil
+(ver Segurança), em vez do `JWT_EXPIRES_IN` global da equipe.
 
 ```json
 {
   "sub": "<id do usuário>",
+  "userId": "<id do usuário>",
   "role": "OPERATOR",
   "erId": "<id do ER>",
   "sv": 3
@@ -259,17 +263,20 @@ Conexão via Socket.IO ao endpoint do backend.
 ```
 // Cliente → Servidor (ao conectar)
 joinER { erId, clientType, token? }
-  clientType: 'panel'      → requer panelToken no header
-  clientType: 'dashboard'  → aceita JWT de staff
+  clientType: 'panel'      → token de exibição do ER no campo `token` do joinER
+  clientType: 'dashboard'  → JWT de staff no handshake (auth.token)
 
-// Servidor → Cliente
-ticket.called    { ticketId, code, displayName, counterNumber, calledAt }
-ticket.priority_changed { ticketId, isPriority }   // atendimento preferencial marcado/removido
-counter.opened   { counterId, number }
-counter.created  { counterId, number }
-counter.deleted  { counterId, number }
-panel.updated    { event, payload }   // broadcast genérico de atualização de estado
-joinER.denied    { erId }             // falha de autenticação
+// Servidor → Cliente — cada mudança de estado é emitida sob um nome específico e
+// também encapsulada em panel.updated { event, payload } (broadcast genérico).
+ticket.created           { ticketId, code, queuePosition }
+ticket.called            { ticketId, code, displayName, counterNumber, calledAt }
+ticket.priority_changed  { ticketId, isPriority }
+ticket.paused | ticket.no_show | ticket.cancelled | ticket.restored
+ticket.service_started | ticket.service_finished
+counter.opened | counter.paused | counter.resumed | counter.closed | counter.created | counter.deleted
+day.opened | day.closed
+panel.updated            { event, payload }   // wrapper genérico de toda atualização
+joinER.denied            { erId }             // falha de autenticação
 ```
 
 ---

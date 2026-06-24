@@ -34,6 +34,7 @@ Pre-approved via `enableAllProjectMcpServers` in `.claude/settings.json`.
 - **render** — backend service on Render (list/deploy/env vars). Authenticates with a static bearer token in `.mcp.json`.
 - **vercel** — frontend deployment on Vercel. OAuth on first connect.
 - **supabase** — managed Postgres (project `vdmais-fila-inteligente-supabase`). OAuth on first connect. Production DB migrations must be applied manually before each release (Render does not run `prisma migrate deploy` on start).
+- **sonarqube** — local SonarQube (code quality/coverage; `compose.sonar.yml` + `npm run sonar:coverage`).
 
 ## Detailed guidelines (loaded on demand by sub-directory CLAUDE.md)
 
