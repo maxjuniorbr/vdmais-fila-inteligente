@@ -23,6 +23,17 @@ describe('ActionMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
+  it('gives the trigger and menu items a 44px touch target (a11y)', () => {
+    render(<ActionMenu label="Ações" items={[{ label: 'Editar', onClick: vi.fn() }]} />)
+    const trigger = screen.getByRole('button', { name: 'Ações' })
+    expect(trigger.style.width).toBe('44px')
+    expect(trigger.style.height).toBe('44px')
+
+    fireEvent.click(trigger)
+    const item = screen.getByRole('menuitem', { name: 'Editar' })
+    expect(item.style.minHeight).toBe('44px')
+  })
+
   it('applies the danger tone and disabled state', () => {
     render(
       <ActionMenu

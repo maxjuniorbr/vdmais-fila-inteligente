@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  PRIORITY_LABEL,
+  PRIORITY_SERVICE_LABEL,
+  PRIORITY_TONE,
   counterStateLabel,
   counterStateTone,
   entryChannelLabel,
@@ -9,9 +12,14 @@ import {
 } from './labels'
 
 describe('labels', () => {
-  it('maps ticket states and falls back for unknown', () => {
+  it('maps every ticket state and falls back for unknown', () => {
     expect(ticketStateLabel('WAITING')).toBe('Aguardando')
+    expect(ticketStateLabel('CALLING')).toBe('Chamando')
     expect(ticketStateLabel('IN_SERVICE')).toBe('Em atendimento')
+    expect(ticketStateLabel('FINISHED')).toBe('Finalizada')
+    expect(ticketStateLabel('NO_SHOW')).toBe('Não compareceu')
+    expect(ticketStateLabel('CANCELLED')).toBe('Cancelada')
+    expect(ticketStateLabel('PAUSED')).toBe('Pausada')
     expect(ticketStateLabel('???')).toBe('Situação desconhecida')
   })
 
@@ -23,14 +31,23 @@ describe('labels', () => {
 
   it('maps entry channels and falls back for unknown', () => {
     expect(entryChannelLabel('QR_CODE')).toBe('QR Code')
+    expect(entryChannelLabel('LINK')).toBe('Link')
     expect(entryChannelLabel('CHECKIN_ASSISTED')).toBe('Check-in assistido')
     expect(entryChannelLabel('???')).toBe('Canal não informado')
   })
 
   it('maps roles and falls back for unknown', () => {
+    expect(roleLabel('ATTENDANT')).toBe('Atendente')
+    expect(roleLabel('MANAGER')).toBe('Gestora')
     expect(roleLabel('ADMIN')).toBe('Administrador')
     expect(roleLabel('OPERATOR')).toBe('Operadora')
     expect(roleLabel('???')).toBe('Perfil não informado')
+  })
+
+  it('exposes centralized priority labels and tone', () => {
+    expect(PRIORITY_LABEL).toBe('Preferencial')
+    expect(PRIORITY_SERVICE_LABEL).toBe('Atendimento preferencial')
+    expect(PRIORITY_TONE).toBe('info')
   })
 
   it('maps counter states to semantic badge tones', () => {

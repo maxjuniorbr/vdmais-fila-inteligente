@@ -51,4 +51,19 @@ describe('Toast', () => {
     render(<Lone />)
     expect(() => fireEvent.click(screen.getByText('Disparar'))).not.toThrow()
   })
+
+  it('renders an accessible <output> inside a polite live region', () => {
+    render(
+      <ToastProvider>
+        <Harness />
+      </ToastProvider>,
+    )
+    fireEvent.click(screen.getByText('Sucesso'))
+    const node = screen.getByText('Salvo com sucesso.')
+    // O toast em si é um <output> (status implícito), aninhado numa região
+    // viva polida — leitores de tela anunciam sem interromper.
+    expect(node.tagName).toBe('OUTPUT')
+    const liveRegion = node.parentElement as HTMLElement
+    expect(liveRegion).toHaveAttribute('aria-live', 'polite')
+  })
 })

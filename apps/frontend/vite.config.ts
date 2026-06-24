@@ -12,7 +12,14 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/vite-env.d.ts', 'src/main.tsx'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/test/**',
+        'src/vite-env.d.ts',
+        'src/main.tsx',
+        // Galeria de componentes só para dev (rota /playground) — sem regra de negócio.
+        'src/pages/PlaygroundPage.tsx',
+      ],
       thresholds: {
         branches: 90,
         functions: 90,

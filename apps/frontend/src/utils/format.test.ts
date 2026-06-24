@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { formatDate, formatTime, formatDuration } from './format'
+import { formatDate, formatTime, formatTimeWithSeconds, formatDuration } from './format'
 
 describe('format utilities — property-based tests', () => {
   /**
@@ -57,5 +57,44 @@ describe('format utilities — property-based tests', () => {
       }),
       { numRuns: 500 }
     )
+  })
+})
+
+describe('format utilities — valores concretos e contrato de hora local', () => {
+  // Strings ISO SEM fuso são lidas como hora LOCAL, então estes valores são
+  // determinísticos em qualquer runner (não dependem do fuso da máquina).
+  it('formatDate retorna DD/MM/AAAA com zero à esquerda', () => {
+    expect(formatDate('2026-03-08T10:45:00')).toBe('08/03/2026')
+    expect(formatDate('2026-12-31T23:59:00')).toBe('31/12/2026')
+  })
+
+  it('formatTime retorna HHhMM com minuto zero-preenchido', () => {
+    expect(formatTime('2026-03-08T10:45:00')).toBe('10h45')
+    expect(formatTime('2026-03-08T09:05:00')).toBe('09h05')
+    expect(formatTime('2026-03-08T00:00:00')).toBe('00h00')
+  })
+
+  it('formatTimeWithSeconds acrescenta :SS', () => {
+    expect(formatTimeWithSeconds('2026-03-08T10:45:07')).toBe('10h45:07')
+  })
+
+  it('formatDuration formata minutos e segundos', () => {
+    expect(formatDuration(3661)).toBe('61m 1s')
+    expect(formatDuration(0)).toBe('0m 0s')
+    expect(formatDuration(59)).toBe('0m 59s')
+  })
+
+  it('formata no fuso LOCAL do usuário (não em UTC)', () => {
+    // Um ISO com `Z` (UTC) é convertido para o relógio LOCAL na exibição. O
+    // esperado é derivado dos componentes locais de new Date(iso) — self-consistente,
+    // sem acoplar a um fuso fixo, mas pinando a invariante "usa hora local".
+    const iso = '2026-03-08T10:45:00Z'
+    const local = new Date(iso)
+    const hh = String(local.getHours()).padStart(2, '0')
+    const mm = String(local.getMinutes()).padStart(2, '0')
+    const dd = String(local.getDate()).padStart(2, '0')
+    const mo = String(local.getMonth() + 1).padStart(2, '0')
+    expect(formatTime(iso)).toBe(`${hh}h${mm}`)
+    expect(formatDate(iso)).toBe(`${dd}/${mo}/${local.getFullYear()}`)
   })
 })
