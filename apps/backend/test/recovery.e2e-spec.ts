@@ -313,4 +313,174 @@ describe('Operational recovery scenarios (e2e)', () => {
     })
     expect(autoNoShow).not.toBeNull()
   })
+
+  it('staff pause frees the counter and staff resume returns the ticket in place', async () => {
+    const { erId, counterId, operatorToken, managerToken } = await provisionER('ER Staff Pause')
+    const rep = await createRepresentative(erId)
+    await request(app.getHttpServer())
+      .post(`/ers/${erId}/open-day`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .expect(201)
+    await request(app.getHttpServer())
+      .post(`/counters/${counterId}/open`)
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(201)
+    const created = await request(app.getHttpServer())
+      .post('/tickets')
+      .set('Authorization', `Bearer ${rep.token}`)
+      .send({ erId, entryChannel: 'QR_CODE' })
+      .expect(201)
+    await request(app.getHttpServer())
+      .post(`/queues/${erId}/call-next`)
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .send({ counterId })
+      .expect(201)
+
+    // staff-pause de uma senha em CHAMADA: a senha vai a PAUSED e o caixa é liberado.
+    await request(app.getHttpServer())
+      .post(`/tickets/${created.body.id}/staff-pause`)
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(201)
+    const paused = await prisma.ticket.findUniqueOrThrow({ where: { id: created.body.id } })
+    expect(paused.state).toBe(TicketState.PAUSED)
+    expect(paused.counterId).toBeNull()
+    const freedCounter = await prisma.counter.findUniqueOrThrow({ where: { id: counterId } })
+    expect(freedCounter.state).toBe(CounterState.ACTIVE)
+
+    // staff-resume: retomada NO LUGAR — mantém o mesmo código (não vai ao fim).
+    await request(app.getHttpServer())
+      .post(`/tickets/${created.body.id}/staff-resume`)
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(201)
+    const resumed = await prisma.ticket.findUniqueOrThrow({ where: { id: created.body.id } })
+    expect(resumed.state).toBe(TicketState.WAITING)
+    expect(resumed.code).toBe(created.body.code)
+    expect(resumed.pausedAt).toBeNull()
+  })
+
+  it('sends a ticket to the end of the queue when its pause times out', async () => {
+    const { erId, counterId, operatorToken, managerToken } = await provisionER('ER Pause Timeout')
+    await request(app.getHttpServer())
+      .post(`/ers/${erId}/open-day`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .expect(201)
+    await request(app.getHttpServer())
+      .post(`/counters/${counterId}/open`)
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(201)
+    // Habilita a tolerância de pausa (>0) para este ER.
+    await prisma.eR.update({ where: { id: erId }, data: { pauseTimeoutSeconds: 300 } })
+
+    const rep1 = await createRepresentative(erId)
+    const rep2 = await createRepresentative(erId)
+    const a1 = await request(app.getHttpServer())
+      .post('/tickets')
+      .set('Authorization', `Bearer ${rep1.token}`)
+      .send({ erId, entryChannel: 'QR_CODE' })
+      .expect(201)
+    await request(app.getHttpServer())
+      .post(`/tickets/${a1.body.id}/pause`)
+      .set('Authorization', `Bearer ${rep1.token}`)
+      .expect(201)
+    // Outra senha entra durante a pausa.
+    const a2 = await request(app.getHttpServer())
+      .post('/tickets')
+      .set('Authorization', `Bearer ${rep2.token}`)
+      .send({ erId, entryChannel: 'QR_CODE' })
+      .expect(201)
+
+    // Força a pausa a estourar a tolerância (pausedAt no passado). A própria RE
+    // consultar sua senha já dispara a expiração no read-time — escopada só a ESTA
+    // senha (sem varredura global que poderia tocar dados de outros ERs).
+    await prisma.ticket.update({
+      where: { id: a1.body.id },
+      data: { pausedAt: new Date(Date.now() - 3600_000) },
+    })
+    await request(app.getHttpServer())
+      .get(`/tickets/my-active?erId=${erId}`)
+      .set('Authorization', `Bearer ${rep1.token}`)
+      .expect(200)
+
+    const a2db = await prisma.ticket.findUniqueOrThrow({ where: { id: a2.body.id } })
+    const expired = await prisma.ticket.findUniqueOrThrow({ where: { id: a1.body.id } })
+    expect(expired.state).toBe(TicketState.WAITING)
+    // Penalidade: NOVO código e posição ao FIM (atrás da a2 que entrou na pausa).
+    expect(expired.code).not.toBe(a1.body.code)
+    expect(expired.queuePosition).toBeGreaterThan(a2db.queuePosition)
+    const event = await prisma.auditEvent.findFirst({
+      where: { erId, ticketId: a1.body.id, eventType: 'ticket_pause_expired' },
+    })
+    expect(event).not.toBeNull()
+  })
+
+  it('accumulates paused time across multiple pause/resume cycles', async () => {
+    const { erId, managerToken } = await provisionER('ER Paused Sum')
+    const rep = await createRepresentative(erId)
+    await request(app.getHttpServer())
+      .post(`/ers/${erId}/open-day`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .expect(201)
+    const created = await request(app.getHttpServer())
+      .post('/tickets')
+      .set('Authorization', `Bearer ${rep.token}`)
+      .send({ erId, entryChannel: 'QR_CODE' })
+      .expect(201)
+
+    const pauseResume = async () => {
+      await request(app.getHttpServer())
+        .post(`/tickets/${created.body.id}/pause`)
+        .set('Authorization', `Bearer ${rep.token}`)
+        .expect(201)
+      await new Promise((resolve) => setTimeout(resolve, 1100))
+      await request(app.getHttpServer())
+        .post(`/tickets/${created.body.id}/resume`)
+        .set('Authorization', `Bearer ${rep.token}`)
+        .expect(201)
+    }
+
+    await pauseResume()
+    const after1 = await prisma.ticket.findUniqueOrThrow({ where: { id: created.body.id } })
+    expect(after1.pausedSeconds).toBeGreaterThan(0)
+
+    await pauseResume()
+    const after2 = await prisma.ticket.findUniqueOrThrow({ where: { id: created.body.id } })
+    // O segundo ciclo SOMA ao tempo do primeiro (increment, não substituição).
+    expect(after2.pausedSeconds).toBeGreaterThan(after1.pausedSeconds)
+  })
+
+  it('rejects a concurrent duplicate ticket for the same representative', async () => {
+    const { erId, managerToken } = await provisionER('ER Create Race')
+    const rep = await createRepresentative(erId)
+    await request(app.getHttpServer())
+      .post(`/ers/${erId}/open-day`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .expect(201)
+
+    const enter = () =>
+      request(app.getHttpServer())
+        .post('/tickets')
+        .set('Authorization', `Bearer ${rep.token}`)
+        .send({ erId, entryChannel: 'QR_CODE' })
+    const [a, b] = await Promise.all([enter(), enter()])
+
+    // Sob concorrência: uma cria (201), a outra é barrada como duplicada (409).
+    expect([a.status, b.status].sort((x, y) => x - y)).toEqual([201, 409])
+
+    // Exatamente UMA senha ativa para a RE — sem colisão de queuePosition/código.
+    const active = await prisma.ticket.findMany({
+      where: {
+        erId,
+        representativeId: rep.id,
+        state: {
+          in: [
+            TicketState.WAITING,
+            TicketState.CALLING,
+            TicketState.IN_SERVICE,
+            TicketState.PAUSED,
+          ],
+        },
+      },
+    })
+    expect(active).toHaveLength(1)
+  })
 })
