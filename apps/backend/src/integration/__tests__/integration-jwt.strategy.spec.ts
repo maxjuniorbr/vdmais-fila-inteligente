@@ -57,6 +57,23 @@ describe('IntegrationJwtStrategy', () => {
     expect(typeof internals(strategy)._secretOrKeyProvider).toBe('function')
   })
 
+  it('prefers the JWKS provider over the dev key when both are configured', () => {
+    // Com JWKS e chave dev presentes ao mesmo tempo, o JWKS (produção) deve vencer —
+    // jamais cair na chave dev. O mock de jwks-rsa resolve 'test-signing-key', então
+    // a chave resolvida prova qual ramo foi escolhido.
+    const strategy = strategyWith({
+      NODE_ENV: 'test',
+      INTEGRATION_JWKS_URI: 'https://idp.example/.well-known/jwks.json',
+      INTEGRATION_JWT_ISSUER: 'issuer',
+      INTEGRATION_JWT_AUDIENCE: 'audience',
+      INTEGRATION_DEV_PUBLIC_KEY: DEV_PUBLIC_KEY,
+    })
+    const { err, key } = resolveKey(strategy)
+    expect(err).toBeNull()
+    expect(key).toBe('test-signing-key')
+    expect(key).not.toBe(DEV_PUBLIC_KEY_PEM)
+  })
+
   it('refuses to boot when JWKS is set without issuer (fail-closed)', () => {
     // Without issuer, jsonwebtoken skips `iss` verification — accepting any RS256
     // token signed by a key in that JWKS. The strategy must throw at construction.

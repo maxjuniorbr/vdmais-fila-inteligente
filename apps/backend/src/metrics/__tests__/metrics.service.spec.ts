@@ -68,6 +68,13 @@ describe('MetricsService', () => {
     mockPrisma.counter.findMany.mockResolvedValue([])
   })
 
+  // Rede de segurança: restaura o relógio real após cada teste, mesmo se um teste
+  // com fake timers falhar antes do seu próprio useRealTimers — evita vazar timers
+  // para os testes seguintes.
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
   it('returns zeros when the daily queue and audit are empty', async () => {
     const result = await service.getDailyMetrics('er-1', manager)
 
@@ -435,5 +442,108 @@ describe('MetricsService', () => {
     // The pause stays open, so it is charged from 12:10 to the business-day end.
     expect(result.pauseSecondsByCounter['Caixa 1']).toBeGreaterThan(0)
     jest.useRealTimers()
+  })
+
+  it('reports every tied hour as a peak, not just one', async () => {
+    mockPrisma.ticket.findMany.mockResolvedValue([
+      makeTicket({ id: 'tk-1' }),
+      makeTicket({ id: 'tk-2' }),
+      makeTicket({ id: 'tk-3' }),
+      makeTicket({ id: 'tk-4' }),
+    ])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      // Two finishes in local hour 9 (12:xx UTC = 09:xx BRT).
+      makeEvent('service_finished', '2026-06-10T12:15:00Z', 'tk-1'),
+      makeEvent('service_finished', '2026-06-10T12:45:00Z', 'tk-2'),
+      // Two finishes in local hour 11 (14:xx UTC = 11:xx BRT) -> ties hour 9.
+      makeEvent('service_finished', '2026-06-10T14:15:00Z', 'tk-3'),
+      makeEvent('service_finished', '2026-06-10T14:45:00Z', 'tk-4'),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.volumeByHour[9]).toBe(2)
+    expect(result.volumeByHour[11]).toBe(2)
+    // The tie must surface BOTH peak hours, not collapse to a single winner.
+    expect([...result.peakHours].sort((a, b) => a - b)).toEqual([9, 11])
+  })
+
+  it('maps the average wait per local business hour', async () => {
+    mockPrisma.ticket.findMany.mockResolvedValue([
+      makeTicket({ id: 'tk-1' }),
+      makeTicket({ id: 'tk-2' }),
+      makeTicket({ id: 'tk-3' }),
+    ])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      // tk-1 + tk-2 wait in local hour 9 (service_started at 12:xx UTC = 09:xx BRT).
+      // Waits of 120s and 240s -> average 180s for hour 9.
+      makeEvent('ticket_created', '2026-06-10T12:00:00Z', 'tk-1'),
+      makeEvent('service_started', '2026-06-10T12:02:00Z', 'tk-1'),
+      makeEvent('ticket_created', '2026-06-10T12:00:00Z', 'tk-2'),
+      makeEvent('service_started', '2026-06-10T12:04:00Z', 'tk-2'),
+      // tk-3 waits in local hour 11 (service_started at 14:xx UTC = 11:xx BRT) -> 600s.
+      makeEvent('ticket_created', '2026-06-10T14:00:00Z', 'tk-3'),
+      makeEvent('service_started', '2026-06-10T14:10:00Z', 'tk-3'),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.waitSecondsByHour[9]).toBe(180)
+    expect(result.waitSecondsByHour[11]).toBe(600)
+  })
+
+  it('buckets an event by its local hour across a UTC day boundary', async () => {
+    // 02:00Z falls on 23:00 of the PREVIOUS local day in America/Sao_Paulo (UTC-3).
+    // The finish must be counted in local hour 23, never in UTC hour 2.
+    mockPrisma.ticket.findMany.mockResolvedValue([makeTicket({ id: 'tk-1' })])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      makeEvent('ticket_created', '2026-06-23T01:50:00Z', 'tk-1'),
+      makeEvent('service_started', '2026-06-23T01:55:00Z', 'tk-1'),
+      makeEvent('service_finished', '2026-06-23T02:00:00Z', 'tk-1'),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.volumeByHour[23]).toBe(1)
+    expect(result.volumeByHour[2]).toBeUndefined()
+    // The matching wait sample (started 01:55Z = 22:55 BRT) lands in local hour 22.
+    expect(result.waitSecondsByHour[22]).toBe(300)
+  })
+
+  it('returns 0 for the missing metric when only service samples exist', async () => {
+    mockPrisma.ticket.findMany.mockResolvedValue([makeTicket({ id: 'tk-1' })])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      // service_started with no preceding ticket_created -> no wait sample at all,
+      // but a complete service flow -> one service sample (300s).
+      makeEvent('service_started', '2026-06-10T12:10:00Z', 'tk-1'),
+      makeEvent('service_finished', '2026-06-10T12:15:00Z', 'tk-1'),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    // No wait samples -> _average/_median must yield 0 without dividing by zero.
+    expect(result.avgWaitSeconds).toBe(0)
+    expect(result.medianWaitSeconds).toBe(0)
+    expect(result.waitSecondsByHour).toEqual({})
+    // Service side still computes normally.
+    expect(result.avgServiceSeconds).toBe(300)
+    expect(result.medianServiceSeconds).toBe(300)
+  })
+
+  it('returns 0 for the missing metric when only wait samples exist', async () => {
+    mockPrisma.ticket.findMany.mockResolvedValue([makeTicket({ id: 'tk-1' })])
+    mockPrisma.auditEvent.findMany.mockResolvedValue([
+      // Wait sample exists (600s) but service never finishes -> no service sample.
+      makeEvent('ticket_created', '2026-06-10T12:00:00Z', 'tk-1'),
+      makeEvent('service_started', '2026-06-10T12:10:00Z', 'tk-1'),
+    ])
+
+    const result = await service.getDailyMetrics('er-1', manager)
+
+    expect(result.avgWaitSeconds).toBe(600)
+    expect(result.medianWaitSeconds).toBe(600)
+    // No service samples -> _average/_median must yield 0, not NaN.
+    expect(result.avgServiceSeconds).toBe(0)
+    expect(result.medianServiceSeconds).toBe(0)
   })
 })
