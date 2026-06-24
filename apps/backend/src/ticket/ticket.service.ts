@@ -168,6 +168,16 @@ export class TicketService {
         if (dto.entryChannel === EntryChannel.CHECKIN_ASSISTED) {
           await tx.auditEvent.create({
             data: {
+              eventType: 'queue_entry_started',
+              erId: dto.erId,
+              ticketId: ticket.id,
+              representativeId,
+              operatorId: checkinAttendantId,
+              metadata: { entryChannel: dto.entryChannel },
+            },
+          })
+          await tx.auditEvent.create({
+            data: {
               eventType: 'manual_checkin_completed',
               erId: dto.erId,
               ticketId: ticket.id,
@@ -459,13 +469,27 @@ export class TicketService {
           metadata: { counterId: ticket.counterId },
         },
       })
-      return tx.ticket.findUniqueOrThrow({
+      const refreshed = await tx.ticket.findUniqueOrThrow({
         where: { id: ticketId },
         include: {
           representative: { select: { fullName: true } },
           counter: { select: { number: true } },
         },
       })
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_call_displayed_on_panel',
+          erId: ticket.erId,
+          ticketId,
+          operatorId: user.userId,
+          metadata: {
+            counterNumber: refreshed.counter?.number ?? 0,
+            code: refreshed.code,
+            via: 'recall',
+          },
+        },
+      })
+      return refreshed
     })
 
     this.panelGateway.emitToER(ticket.erId, 'ticket.called', {

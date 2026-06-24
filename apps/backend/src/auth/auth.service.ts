@@ -40,6 +40,12 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const entry = this._resolveQueueEntry(dto)
     const rep = await this.createRepresentative(dto, { erId: dto.erId })
+    await this.auditLog.logIfERExists({
+      eventType: 'queue_entry_started',
+      erId: entry.erId,
+      representativeId: rep.id,
+      metadata: { entryChannel: entry.entryChannel },
+    })
     return this._sign(
       rep.id,
       Role.REPRESENTATIVE,
@@ -162,6 +168,13 @@ export class AuthService {
         representativeId: rep.id,
       })
     }
+
+    await this.auditLog.logIfERExists({
+      eventType: 'queue_entry_started',
+      erId: entry.erId,
+      representativeId: rep.id,
+      metadata: { entryChannel: entry.entryChannel },
+    })
 
     return this._sign(
       rep.id,

@@ -214,6 +214,13 @@ describe('AuthService', () => {
       expect(jwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({ erId: 'er-1', entryChannel: EntryChannel.QR_CODE }),
       )
+      expect(auditLog.logIfERExists).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'queue_entry_started',
+          erId: 'er-1',
+          metadata: { entryChannel: EntryChannel.QR_CODE },
+        }),
+      )
     })
 
     it('rejects an incomplete queue entry context', async () => {
@@ -266,6 +273,13 @@ describe('AuthService', () => {
       expect(jwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({ erId: 'er-1', entryChannel: EntryChannel.LINK }),
       )
+      expect(auditLog.logIfERExists).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'queue_entry_started',
+          erId: 'er-1',
+          metadata: { entryChannel: EntryChannel.LINK },
+        }),
+      )
     })
 
     it('rejects an unknown credential', async () => {
@@ -299,6 +313,11 @@ describe('AuthService', () => {
           entryChannel: EntryChannel.QR_CODE,
         }),
       ).rejects.toThrow(UnauthorizedException)
+      // queue_entry_started marks a genuine entry — it must not fire on a failed
+      // credential attempt, otherwise wrong-password retries inflate the metric.
+      expect(auditLog.logIfERExists).not.toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: 'queue_entry_started' }),
+      )
     })
 
     it('rejects login without a signed queue entry', async () => {
