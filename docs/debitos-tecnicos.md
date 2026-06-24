@@ -17,6 +17,8 @@
 | [DT-6](#dt-6--major-do-prisma-adiado) | Major do Prisma adiado | Baixa | Não |
 | [DT-7](#dt-7--overrides-de-dependências-para-patches-de-segurança) | Overrides de dependências para patches de segurança | Baixa | Não |
 | [DT-8](#dt-8--complexidade-cognitiva-do-operationpage-acima-do-limite) | Complexidade cognitiva do OperationPage acima do limite | Baixa | Não |
+| [DT-9](#dt-9--jwtauthguard-sem-spec-dedicado) | JwtAuthGuard sem spec dedicado | Baixa | Não |
+| [DT-10](#dt-10--ticketid-opaco-nos-eventos-de-socket-do-painel) | ticketId opaco nos eventos de socket do painel | Baixa | Não |
 
 ---
 
@@ -152,3 +154,47 @@ A tela funciona igual; a função é só mais difícil de ler e manter.
 
 **Encaminhamento.** Decompor o `OperationPage` em subcomponentes (`CounterCard`,
 `CurrentTicketCard`, etc.) num PR dedicado, com testes, até a complexidade ficar ≤ 15.
+
+---
+
+## DT-9 — JwtAuthGuard sem spec dedicado
+
+**Contexto.** O [`JwtAuthGuard`](../apps/backend/src/common/guards/jwt-auth.guard.ts) é
+apenas `extends AuthGuard('jwt')` — não tem lógica própria (nenhum override de
+`canActivate`/`handleRequest`). A proteção real (validação do token, montagem do
+usuário a partir do payload) vive na [`JwtStrategy`](../apps/backend/src/auth/jwt.strategy.ts),
+que **é testada** em [`jwt.strategy.spec.ts`](../apps/backend/src/auth/__tests__/jwt.strategy.spec.ts).
+Um spec do guard só exercitaria o `AuthGuard` do `@nestjs/passport` (código de
+terceiro), não comportamento nosso.
+
+**Impacto.** Apenas cobertura de testes formal — sem efeito em runtime ou segurança.
+A lógica que importa já está coberta pela suíte da estratégia; um teste do guard vazio
+seria redundante e de baixo valor.
+
+**Encaminhamento.** Decisão consciente de **não** criar o spec enquanto o guard
+permanecer sem lógica própria. Se algum dia ganhar um override (ex.: `handleRequest`
+customizado para mensagens de erro ou claims extras), adicionar o teste dedicado nesse
+momento.
+
+---
+
+## DT-10 — ticketId opaco nos eventos de socket do painel
+
+**Contexto.** A TV (`clientType: 'panel'`) e o dashboard do staff entram na **mesma sala**
+`er:${erId}` ([panel.gateway.ts](../apps/backend/src/panel/panel.gateway.ts)). Os eventos de
+tempo real (`ticket.created`, `ticket.called`, `ticket.priority_changed`, etc.) levam o
+`ticketId` (um cuid opaco) à sala, enquanto o payload HTTP `getState`
+([panel.service.ts](../apps/backend/src/panel/panel.service.ts)) o sanitiza. Confirmado por
+teste de contrato: **nenhuma PII real** (CPF, telefone, reCode, nome completo) trafega no
+socket — só `ticketId`, código, nome **abreviado** e número do caixa.
+
+**Impacto.** Baixo. `ticketId` não é PII (não reconstrói identidade) e o dashboard do staff
+usa esse id para reconciliar o estado em tempo real. O acesso à sala é gated por **panel
+token revogável** (hash SHA-256; (re)gerado em `POST /admin/ers/:erId/panel-token`), então a
+audiência não é pública e o link pode ser rotacionado a qualquer momento — conexões novas
+com o token antigo são barradas.
+
+**Encaminhamento.** Decisão consciente de **aceitar** a assimetria por ora; um teste de
+contrato fixa que nenhuma PII real vaza pelo socket. Se a TV precisar ser exposta a uma
+audiência mais ampla, separar a sala pública (TV, eventos sem `ticketId`) da sala do staff
+(payload completo) — mudança que também toca o frontend, a avaliar junto com o frontend.
