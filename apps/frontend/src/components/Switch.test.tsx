@@ -23,4 +23,15 @@ describe('Switch', () => {
     render(<Switch label="Bloqueado" disabled />)
     expect(screen.getByRole('switch', { name: 'Bloqueado' })).toBeDisabled()
   })
+
+  it('stays controlled: click fires onChange but does not flip checked on its own', () => {
+    const onChange = vi.fn()
+    render(<Switch label="Controlado" checked={false} onChange={onChange} />)
+    const control = screen.getByRole('switch', { name: 'Controlado' })
+    expect(control).not.toBeChecked()
+    fireEvent.click(control)
+    expect(onChange).toHaveBeenCalledOnce()
+    // Sem novo prop `checked`, o componente controlado permanece desmarcado.
+    expect(control).not.toBeChecked()
+  })
 })
