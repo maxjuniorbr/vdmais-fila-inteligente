@@ -41,6 +41,10 @@ menos 32 bytes e rotacione-o conforme a política do ambiente.
   Define de qual posição do `X-Forwarded-For` o `req.ip` (base do rate-limit) é extraído.
   Render = `1`; CDN + load balancer = `2`. Um valor maior que o real torna o IP
   **falsificável** (burla o rate-limit); menor agrupa clientes distintos no mesmo balde.
+- `QUEUE_ENTRY_QR_CODE_TTL_SECONDS` e `QUEUE_ENTRY_LINK_TTL_SECONDS` (default `86400` = 24h
+  cada) — validade dos tokens de entrada por canal (QR Code / link). A sessão da
+  representante expira sempre no fim do dia útil, independente desses valores; o QR digital
+  é regenerado a cada dia (manual hoje; automático no DT-12).
 
 ### Integração M2M (quando habilitada)
 
@@ -90,8 +94,8 @@ HTTPS.
 - O admin entrega duas URLs por ER: QR Code presencial e link alternativo.
 - O token fica em `#entry=...`, não na query string, para não ser enviado em
   referrers ou logs HTTP comuns.
-- O QR Code expira em 30 dias; o link alternativo expira em 24 horas. A validade
-  aparece na administração.
+- QR Code e link expiram em 24h por padrão (configurável por env, ver acima). A
+  validade aparece na administração. Como o QR é digital (TV), regenere-o a cada dia.
 - Ao expirar, abra **Gerenciar ER**, copie a URL atual e regenere o QR Code ou
   redistribua o link.
 - Links antigos sem `#entry=` deixam de funcionar. Regere os QR Codes existentes

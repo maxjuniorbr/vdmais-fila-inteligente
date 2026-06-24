@@ -287,12 +287,17 @@ Se OTP/SMS for caro ou complexo para o piloto, usar telefone + senha.
 O acesso público começa por uma URL assinada emitida na administração:
 
 - QR Code: token JWT derivado do segredo da aplicação, vinculado ao ER e ao canal
-  `QR_CODE`, com validade de 30 dias;
-- link alternativo: mesmo vínculo, canal `LINK` e validade de 24 horas;
+  `QR_CODE`, com validade de 24h (QR digital regenerado a cada dia);
+- link alternativo: mesmo vínculo, canal `LINK` e validade de 24h;
 - o token viaja no fragmento `#entry=...`, é enviado ao backend no header
   `x-entry-token` e nos DTOs de login/cadastro;
 - o JWT da representante replica `erId` e `entryChannel`; a criação da senha
-  rejeita troca de ER ou canal;
+  rejeita troca de ER ou canal. A sessão da representante expira no **fim do dia
+  útil** (a fila é diária), nunca além do token de entrada — não usa o
+  `JWT_EXPIRES_IN` global da equipe;
+- as validades dos tokens de entrada são configuráveis por env, por canal
+  (`QUEUE_ENTRY_QR_CODE_TTL_SECONDS` / `QUEUE_ENTRY_LINK_TTL_SECONDS`), com default
+  de 24h no código;
 - autenticação e criação de senha são limitadas por IP (anti-enxurrada grosseiro,
   tolerante a IP compartilhado de Wi-Fi/4G), e o login tem uma trava adicional por
   credencial — a defesa real contra brute-force, imune a NAT e rotação de IP.

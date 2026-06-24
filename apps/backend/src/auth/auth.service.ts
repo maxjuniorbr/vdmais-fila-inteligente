@@ -9,10 +9,15 @@ import { StaffLoginDto } from './dto/staff-login.dto'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { normalizeReCode, onlyDigits } from '../common/representative-identifiers'
+import { getBusinessDayRange } from '../common/business-date'
 import { QueueEntryTokenService } from './queue-entry-token.service'
 import { LoginThrottleService } from './login-throttle.service'
 
 const BCRYPT_ROUNDS = 12
+
+// Floor for the representative session so a login moments before midnight still
+// yields a usable (if short) token instead of an already-expired one.
+const MIN_RE_SESSION_SECONDS = 60
 
 // Compared against on the "account not found" path so a missing account costs the
 // same time as a wrong password — without it, the timing gap (no bcrypt run when
@@ -53,6 +58,7 @@ export class AuthService {
       undefined,
       undefined,
       entry.entryChannel,
+      this._entrySessionTtlSeconds(entry),
     )
   }
 
@@ -183,6 +189,7 @@ export class AuthService {
       undefined,
       undefined,
       entry.entryChannel,
+      this._entrySessionTtlSeconds(entry),
     )
   }
 
@@ -251,6 +258,19 @@ export class AuthService {
     return this.queueEntryTokens.verify(dto.entryToken, dto.erId, dto.entryChannel)
   }
 
+  // The RE session is scoped to the current business day: the queue, its tickets
+  // and the day's operation all reset at rollover (day_rollover force-closes
+  // pending tickets), so a session is useless past midnight. We expire it at the
+  // end of the business day, capped by the entry token, with a small floor so a
+  // near-midnight login still gets a usable session (the floor may push the token
+  // up to MIN_RE_SESSION_SECONDS past those bounds — a deliberate, benign window).
+  private _entrySessionTtlSeconds(entry: { exp: number }): number {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const endOfDaySeconds = Math.floor(getBusinessDayRange().end.getTime() / 1000)
+    const sessionExpiry = Math.min(endOfDaySeconds, entry.exp)
+    return Math.max(MIN_RE_SESSION_SECONDS, sessionExpiry - nowSeconds)
+  }
+
   private _sign(
     userId: string,
     role: Role,
@@ -258,17 +278,15 @@ export class AuthService {
     name?: string,
     sessionVersion?: number,
     entryChannel?: EntryChannel,
+    expiresInSeconds?: number,
   ) {
-    return {
-      access_token: this.jwt.sign({
-        sub: userId,
-        userId,
-        role,
-        erId,
-        sv: sessionVersion,
-        entryChannel,
-      }),
-      user: { id: userId, role, erId, name, entryChannel },
-    }
+    const payload = { sub: userId, userId, role, erId, sv: sessionVersion, entryChannel }
+    // Representative tokens are day-scoped (see _entrySessionTtlSeconds); staff
+    // tokens keep the global JWT_EXPIRES_IN.
+    const access_token =
+      expiresInSeconds === undefined
+        ? this.jwt.sign(payload)
+        : this.jwt.sign(payload, { expiresIn: expiresInSeconds })
+    return { access_token, user: { id: userId, role, erId, name, entryChannel } }
   }
 }

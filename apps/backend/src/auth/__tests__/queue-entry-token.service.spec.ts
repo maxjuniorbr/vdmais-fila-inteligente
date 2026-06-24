@@ -3,12 +3,12 @@ import { JwtService } from '@nestjs/jwt'
 import { EntryChannel } from '@prisma/client'
 import { QueueEntryTokenService } from '../queue-entry-token.service'
 
-function createService(secret = 'queue-entry-test-secret') {
+function createService(secret = 'queue-entry-test-secret', env: Record<string, string> = {}) {
   const config = {
     get: (key: string) => {
       if (key === 'JWT_SECRET') return secret
       if (key === 'NODE_ENV') return 'test'
-      return undefined
+      return env[key]
     },
   } as unknown as ConfigService
   return new QueueEntryTokenService(new JwtService(), config)
@@ -28,6 +28,48 @@ describe('QueueEntryTokenService', () => {
         entryChannel,
       })
       expect(new Date(access.expiresAt).getTime()).toBeGreaterThan(Date.now())
+    },
+  )
+
+  it.each([EntryChannel.QR_CODE, EntryChannel.LINK] as const)(
+    'falls back to a 24h exp for the %s channel when the env is unset',
+    (entryChannel) => {
+      jest.useFakeTimers({ now: new Date('2026-06-12T12:00:00.000Z') })
+      const service = createService()
+      const { token } = service.issue('er-1', entryChannel)
+
+      const verified = service.verify(token, 'er-1', entryChannel)
+
+      expect(verified.exp).toBe(Math.floor(Date.now() / 1000) + 24 * 60 * 60)
+    },
+  )
+
+  it('derives the TTL env key from the channel and honors an override', () => {
+    jest.useFakeTimers({ now: new Date('2026-06-12T12:00:00.000Z') })
+    const service = createService('queue-entry-test-secret', {
+      QUEUE_ENTRY_QR_CODE_TTL_SECONDS: '3600',
+    })
+
+    const { token } = service.issue('er-1', EntryChannel.QR_CODE)
+
+    expect(service.verify(token, 'er-1', EntryChannel.QR_CODE).exp).toBe(
+      Math.floor(Date.now() / 1000) + 3600,
+    )
+  })
+
+  it.each(['not-a-number', '0x10', '1e3', '12.5', '-5', '0', ''])(
+    'falls back to 24h when the env value %p is not a positive decimal',
+    (value) => {
+      jest.useFakeTimers({ now: new Date('2026-06-12T12:00:00.000Z') })
+      const service = createService('queue-entry-test-secret', {
+        QUEUE_ENTRY_LINK_TTL_SECONDS: value,
+      })
+
+      const { token } = service.issue('er-1', EntryChannel.LINK)
+
+      expect(service.verify(token, 'er-1', EntryChannel.LINK).exp).toBe(
+        Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+      )
     },
   )
 
