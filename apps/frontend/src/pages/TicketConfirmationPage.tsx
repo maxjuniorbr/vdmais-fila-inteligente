@@ -466,8 +466,11 @@ export function TicketConfirmationPage() {
         <div style={styles.brandRow}>
           <BrandMark size={36} />
         </div>
-        {ticket.representative?.fullName && (
-          <p style={styles.repName}>{ticket.representative.fullName}</p>
+        {ticket.representative?.fullName?.trim() && (
+          // Confirmação no próprio dispositivo da RE: saudação pelo PRIMEIRO nome
+          // (minimalista/amigável). A conferência de identidade por staff exibe o
+          // nome completo. O `.trim()` na guarda evita um <p> vazio para nome só-espaços.
+          <p style={styles.repName}>{ticket.representative.fullName.trim().split(/\s+/)[0]}</p>
         )}
 
         <p style={styles.label}>Sua senha</p>

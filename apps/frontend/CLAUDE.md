@@ -116,7 +116,10 @@ code and are the source of truth — do not restate hex/size literals here:
   returns these identifiers masked (e.g. `***.***.344-**`, `(**) *****-0000`) — display
   the masked value as-is and never reconstruct or request the full value for display.
 - Show only what the operator needs to confirm identity (name + masked last digits).
-  Keep success/confirmation screens minimal (ticket code, first name, position).
+  Keep the representative's own success/confirmation screen minimal — greet by **first
+  name** (ticket code, first name, position). Staff identity-confirmation screens (e.g.
+  the assisted check-in search) may show the full name, since the attendant needs it to
+  confirm the right person.
 
 ## Writing and tone of voice
 
