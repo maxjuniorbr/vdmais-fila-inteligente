@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
 import { seedStaffSession } from '../test/staffToken'
+import { notifySessionExpired } from '../auth/session'
 import { ManagerPage } from './ManagerPage'
 
 vi.mock('../api/client', () => ({
@@ -156,6 +157,17 @@ describe('ManagerPage', () => {
     expect(screen.getByText('A001')).toBeInTheDocument()
   })
 
+  it('drops back to the central login when the session expires mid-use', async () => {
+    renderManager()
+    expect(await screen.findByText('Caixas')).toBeInTheDocument()
+
+    // 401 do servidor → notifySessionExpired derruba a tela protegida.
+    act(() => notifySessionExpired())
+
+    expect(await screen.findByText('central-login')).toBeInTheDocument()
+    expect(screen.queryByText('Caixas')).not.toBeInTheDocument()
+  })
+
   it('shows the live active/paused counters tile while the day is open', async () => {
     renderManager()
     const tile = (await screen.findByText('Caixas ativos/pausados')).closest('article')!
@@ -301,6 +313,90 @@ describe('ManagerPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Marcar preferencial' }))
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/w1/mark-priority'))
+  })
+
+  it('lets the manager remove the preferential flag from a waiting ticket', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    // A senha aguardando já é preferencial: o menu oferece "Remover preferencial",
+    // que chama o endpoint de desmarcação.
+    const waiting = [
+      {
+        id: 'wp',
+        code: 'A010',
+        state: 'WAITING',
+        isPriority: true,
+        entryChannel: 'QR_CODE',
+        createdAt: minutesAgo(5),
+      },
+    ]
+    vi.mocked(api.get).mockImplementation((path: string) => {
+      if (path.includes('/overview')) return Promise.resolve({ ...overview, waiting })
+      if (path.includes('/daily')) return Promise.resolve(metrics)
+      if (path.startsWith('/ers/')) return Promise.resolve(er)
+      return Promise.resolve([])
+    })
+    renderManager()
+    await screen.findByText('Fila ativa')
+
+    fireEvent.click(screen.getByRole('button', { name: /Ações da senha A010/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remover preferencial' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/wp/unmark-priority'))
+  })
+
+  it('hides the preferential toggle for a ticket already in service', async () => {
+    renderManager()
+    const queueHeading = await screen.findByText('Fila ativa')
+    const queueSection = queueHeading.closest('section') as HTMLElement
+
+    // A002 está em atendimento (IN_SERVICE): o toggle de preferencial só existe
+    // para senhas aguardando, então o menu traz apenas "Cancelar senha". (A002
+    // também aparece em "Atendimentos prolongados", por isso buscamos na fila ativa.)
+    fireEvent.click(within(queueSection).getByRole('button', { name: /Ações da senha A002/ }))
+    expect(screen.getByRole('menuitem', { name: 'Cancelar senha' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('menuitem', { name: /preferencial/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('freezes a cancelled ticket wait minus the paused time', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      // Criada há 12min e cancelada há 3min, sem ter sido chamada: a espera bruta
+      // é de 9min e desconta 90s de pausa → 7m30s, fixo. Antes da correção a coluna
+      // contaria (agora − criação) e seguiria subindo a cada tick de 1s.
+      const recent = [
+        {
+          id: 'rc',
+          code: 'A011',
+          state: 'CANCELLED',
+          entryChannel: 'LINK',
+          createdAt: minutesAgo(12),
+          cancelledAt: minutesAgo(3),
+          pausedSeconds: 90,
+        },
+      ]
+      vi.mocked(api.get).mockImplementation((path: string) => {
+        if (path.includes('/overview')) return Promise.resolve({ ...overview, recent })
+        if (path.includes('/daily')) return Promise.resolve(metrics)
+        if (path.startsWith('/ers/')) return Promise.resolve(er)
+        return Promise.resolve([])
+      })
+      renderManager()
+      const cancelledWait = () =>
+        within(screen.getByText('A011').closest('tr')!).getByText('7m 30s')
+      expect(await screen.findByText('A011')).toBeInTheDocument()
+      expect(cancelledWait()).toBeInTheDocument()
+
+      // A senha saiu da fila ao ser cancelada: avançar o relógio não move a espera.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+      expect(cancelledWait()).toBeInTheDocument()
+    } finally {
+      vi.runOnlyPendingTimers()
+      vi.useRealTimers()
+    }
   })
 
   it('cancels a ticket with a reason through the confirm dialog', async () => {

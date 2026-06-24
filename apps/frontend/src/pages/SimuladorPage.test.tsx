@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
+import { brand } from '../styles/brand'
 import { seedStaffSession } from '../test/staffToken'
 import { SimuladorPage } from './SimuladorPage'
 
@@ -80,6 +81,43 @@ function renderPage() {
   )
 }
 
+// O Toast renderiza a mensagem num <output> (role "status") e codifica o tom só
+// pela cor de fundo (sem atributo). Achamos o toast pelo texto e traduzimos a cor
+// de volta para o nome do tom, comparando com os tokens — resiliente a mudança de
+// valor dos tokens.
+const TONE_SOFT: Record<'success' | 'info' | 'error' | 'warning', string> = {
+  success: brand.successSoft,
+  info: brand.infoSoft,
+  error: brand.dangerSoft,
+  warning: brand.warningSoft,
+}
+
+function hexToRgb(hex: string): string {
+  const value = hex.replace('#', '')
+  const r = parseInt(value.slice(0, 2), 16)
+  const g = parseInt(value.slice(2, 4), 16)
+  const b = parseInt(value.slice(4, 6), 16)
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+async function findToast(message: string): Promise<HTMLElement> {
+  // A mensagem é renderizada dentro do <output> que carrega o estilo de tom. O
+  // <output> tem role implícito "status"; subimos até ele (ou usamos o próprio
+  // nó casado, que já é o <output>).
+  const node = await screen.findByText(message)
+  return (node.closest('output') ?? node) as HTMLElement
+}
+
+function toneOf(toast: HTMLElement): 'success' | 'info' | 'error' | 'warning' | 'unknown' {
+  const background = toast.style.backgroundColor
+  for (const [tone, hex] of Object.entries(TONE_SOFT)) {
+    if (background === hexToRgb(hex) || background === hex) {
+      return tone as 'success' | 'info' | 'error' | 'warning'
+    }
+  }
+  return 'unknown'
+}
+
 describe('SimuladorPage', () => {
   beforeEach(() => {
     vi.mocked(api.get).mockReset()
@@ -154,7 +192,7 @@ describe('SimuladorPage', () => {
       expect(await screen.findByRole('button', { name: 'Abrir' })).toBeInTheDocument()
     })
 
-    it('calls open API and shows toast on success', async () => {
+    it('calls open API and shows the success toast with success tone', async () => {
       authenticate()
       mockRefreshReturning(OVERVIEW_OPEN, COUNTERS_FREE)
       vi.mocked(api.post).mockResolvedValue({
@@ -165,6 +203,9 @@ describe('SimuladorPage', () => {
       renderPage()
       await userEvent.click(await screen.findByRole('button', { name: 'Abrir' }))
       await waitFor(() => expect(api.post).toHaveBeenCalledWith('/simulation/counters/open', expect.objectContaining({ counterIds: ['c-1'] })))
+      // Sucesso: mensagem afirmativa ("Caixa N aberto") em tom de sucesso, não info.
+      const toast = await findToast('Caixa 1 aberto · Operadora 1.')
+      expect(toneOf(toast)).toBe('success')
     })
 
     it('shows Chamar próxima and Fechar for an active counter', async () => {
@@ -193,7 +234,7 @@ describe('SimuladorPage', () => {
       await waitFor(() => expect(api.post).toHaveBeenCalledWith('/simulation/counters/close', expect.objectContaining({ counterId: 'c-1' })))
     })
 
-    it('shows info tone when opening fails (no free operator)', async () => {
+    it('shows the reason in info tone when opening fails (no free operator)', async () => {
       authenticate()
       mockRefreshReturning(OVERVIEW_OPEN, COUNTERS_FREE)
       vi.mocked(api.post).mockResolvedValue({
@@ -204,6 +245,43 @@ describe('SimuladorPage', () => {
       renderPage()
       await userEvent.click(await screen.findByRole('button', { name: 'Abrir' }))
       await waitFor(() => expect(api.post).toHaveBeenCalled())
+      // opened:false é um "não deu, mas tudo bem": informa o motivo em tom info,
+      // nunca em tom de erro/sucesso.
+      const toast = await findToast('Sem operadora livre disponível')
+      expect(toneOf(toast)).toBe('info')
+    })
+  })
+
+  describe('day-closed gating', () => {
+    // Dois caixas para que "Abrir" (caixa livre) e "Chamar próxima" (caixa ativo)
+    // existam ao mesmo tempo; uma RE sem senha rende "Colocar na fila".
+    const COUNTERS_FREE_AND_ACTIVE: MockCounter[] = [
+      { id: 'c-free', number: 1, state: 'UNAVAILABLE', operator: null, isFree: true },
+      { id: 'c-active', number: 2, state: 'ACTIVE', operator: { id: 'op-1', name: 'Operadora 1' }, isFree: false },
+    ]
+
+    it('disables Abrir, Chamar próxima and Colocar na fila and shows the hint when the day is closed', async () => {
+      authenticate()
+      // overview.isDayOpen=false manda em dayOpen mesmo se o ER vier aberto.
+      mockRefreshReturning(OVERVIEW_CLOSED, COUNTERS_FREE_AND_ACTIVE)
+      renderPage()
+
+      expect(await screen.findByRole('button', { name: 'Abrir' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Chamar próxima' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Colocar na fila' })).toBeDisabled()
+      // A dica orienta a abrir o dia no app real antes de simular.
+      expect(screen.getByText('Abra a operação do dia no app real antes de simular.')).toBeInTheDocument()
+    })
+
+    it('enables those actions and hides the hint when the day is open', async () => {
+      authenticate()
+      mockRefreshReturning(OVERVIEW_OPEN, COUNTERS_FREE_AND_ACTIVE)
+      renderPage()
+
+      expect(await screen.findByRole('button', { name: 'Abrir' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Chamar próxima' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Colocar na fila' })).toBeEnabled()
+      expect(screen.queryByText('Abra a operação do dia no app real antes de simular.')).not.toBeInTheDocument()
     })
   })
 
@@ -389,6 +467,74 @@ describe('SimuladorPage', () => {
       renderPage()
       await userEvent.click(await screen.findByRole('button', { name: 'Encerrar atendimento' }))
       await waitFor(() => expect(api.post).toHaveBeenCalledWith('/simulation/attendance/finish', { ticketId: 't-svc' }))
+    })
+  })
+
+  describe('ER race condition (currentErRef)', () => {
+    // Controla a ordem de resolução das respostas por ER. Cada chamada de api.get
+    // com erId fica pendente até liberarmos aquele ER, devolvendo as cargas
+    // próprias dele — permitindo a resposta de er-1 chegar DEPOIS da de er-2.
+    function controllableByEr() {
+      const release: Record<string, () => void> = {}
+      const gate: Record<string, Promise<void>> = {}
+      for (const id of ['er-1', 'er-2']) {
+        gate[id] = new Promise<void>((resolve) => {
+          release[id] = resolve
+        })
+      }
+
+      const payloadFor = (er: string, url: string) => {
+        if (url.includes('/simulation/state')) return OVERVIEW_OPEN
+        if (url.includes('/simulation/operators')) return OPERATORS
+        if (url.includes('/simulation/counters')) {
+          // Número do caixa distinto por ER para identificar a origem dos dados.
+          return er === 'er-1'
+            ? [{ id: 'c-1', number: 1, state: 'UNAVAILABLE', operator: null, isFree: true }]
+            : [{ id: 'c-9', number: 9, state: 'UNAVAILABLE', operator: null, isFree: true }]
+        }
+        if (url.includes('/simulation/representatives')) {
+          return er === 'er-1'
+            ? [{ id: 're-1', fullName: 'RE Um', reCode: 'RE0001', ticket: null }]
+            : [{ id: 're-9', fullName: 'RE Nove', reCode: 'RE0009', ticket: null }]
+        }
+        return []
+      }
+
+      vi.mocked(api.get).mockImplementation(async (url: string) => {
+        // Lista de ERs (mount) resolve de imediato — não pertence a nenhum ER.
+        if (url.startsWith('/simulation/ers')) return ERS as never
+        const er = url.includes('erId=er-2') ? 'er-2' : 'er-1'
+        await gate[er]
+        return payloadFor(er, url) as never
+      })
+
+      return { release }
+    }
+
+    it('discards the late response of a previous ER after switching ERs', async () => {
+      authenticate()
+      const { release } = controllableByEr()
+      renderPage()
+
+      // Mount auto-seleciona er-1 e dispara refresh(er-1), que fica pendente.
+      const select = await screen.findByLabelText('ER ativo')
+      // Troca para er-2 antes de er-1 resolver: currentErRef passa a apontar er-2.
+      await userEvent.selectOptions(select, 'er-2')
+
+      // er-2 resolve primeiro e aplica seus dados (Caixa 9 / RE0009).
+      release['er-2']()
+      expect(await screen.findByText('Caixa 9')).toBeInTheDocument()
+      expect(screen.getByText('RE0009')).toBeInTheDocument()
+
+      // er-1 resolve DEPOIS: como o ref aponta er-2, a resposta tardia é descartada.
+      release['er-1']()
+      await waitFor(() => expect(api.get).toHaveBeenCalledWith('/simulation/counters?erId=er-1'))
+
+      // A tela continua mostrando er-2; nada de er-1 vaza.
+      expect(screen.getByText('Caixa 9')).toBeInTheDocument()
+      expect(screen.getByText('RE0009')).toBeInTheDocument()
+      expect(screen.queryByText('Caixa 1')).not.toBeInTheDocument()
+      expect(screen.queryByText('RE0001')).not.toBeInTheDocument()
     })
   })
 

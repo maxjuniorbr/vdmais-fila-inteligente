@@ -64,7 +64,7 @@ describe('CheckinAttendantPage', () => {
         if (url.includes('/representatives/search')) {
           return new Response(
             JSON.stringify([
-              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+              { id: 're-1', fullName: 'Ana Souza', cpf: '***.***.344-**', phone: '(**) *****-0000', reCode: 'RE0001' },
             ]),
             { status: 200 },
           )
@@ -85,6 +85,14 @@ describe('CheckinAttendantPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
 
     const createButton = await screen.findByRole('button', { name: 'Criar senha' })
+
+    // The backend already masks CPF/phone in /representatives/search; the results
+    // list must show that masked value verbatim and never the full digits.
+    expect(screen.getByText(/\*\*\*\.\*\*\*\.344-\*\*/)).toBeInTheDocument()
+    // Nenhum identificador com dígitos completos (11 dígitos seguidos) aparece no DOM —
+    // guarda genérica que subsume valores crus específicos.
+    expect(screen.queryByText(/\b\d{11}\b/)).not.toBeInTheDocument()
+
     fireEvent.click(createButton)
 
     expect(await screen.findByText('Check-in realizado')).toBeInTheDocument()
@@ -105,7 +113,7 @@ describe('CheckinAttendantPage', () => {
         if (url.includes('/representatives/search')) {
           return new Response(
             JSON.stringify([
-              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+              { id: 're-1', fullName: 'Ana Souza', cpf: '***.***.344-**', phone: '(**) *****-0000', reCode: 'RE0001' },
             ]),
             { status: 200 },
           )
@@ -279,7 +287,7 @@ describe('CheckinAttendantPage', () => {
         if (url.includes('/representatives/search')) {
           return new Response(
             JSON.stringify([
-              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+              { id: 're-1', fullName: 'Ana Souza', cpf: '***.***.344-**', phone: '(**) *****-0000', reCode: 'RE0001' },
             ]),
             { status: 200 },
           )
@@ -367,7 +375,7 @@ describe('CheckinAttendantPage', () => {
         if (url.includes('/representatives/search')) {
           return new Response(
             JSON.stringify([
-              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+              { id: 're-1', fullName: 'Ana Souza', cpf: '***.***.344-**', phone: '(**) *****-0000', reCode: 'RE0001' },
             ]),
             { status: 200 },
           )
@@ -434,7 +442,7 @@ describe('CheckinAttendantPage', () => {
         if (url.includes('/representatives/search')) {
           return new Response(
             JSON.stringify([
-              { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+              { id: 're-1', fullName: 'Ana Souza', cpf: '***.***.344-**', phone: '(**) *****-0000', reCode: 'RE0001' },
             ]),
             { status: 200 },
           )
