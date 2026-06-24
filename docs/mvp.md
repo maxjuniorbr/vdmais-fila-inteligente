@@ -95,7 +95,8 @@ A RE poderá entrar na fila por três canais:
 1. **QR Code no ER**  
     
     Canal preferencial. A RE escaneia o QR Code assinado dentro da unidade e
-    acessa a fila daquele ER. O acesso expira em 30 dias.
+    acessa a fila daquele ER. O acesso expira em 24 horas (QR digital, regenerado
+    a cada dia).
     
 2. **Link do site**  
     

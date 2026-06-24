@@ -201,7 +201,7 @@ pode administrar vários.
    - cadastra os **caixas** físicos;
    - cria as contas de **gestora**, **operadoras** e (se usar) **atendente**;
    - copia/testa os acessos do ER:
-     - **QR Code presencial** — URL assinada válida por 30 dias;
+     - **QR Code presencial** — URL assinada válida por 24 horas (QR digital, regerado a cada dia);
      - **Link alternativo** — URL assinada válida por 24 horas e com confirmação
        do ER;
      - **Painel de TV** — gera o **token de acesso** e copia a URL com o token

@@ -8,8 +8,6 @@ import { getJwtSecret } from './jwt.config'
 const TOKEN_KIND = 'queue-entry'
 const TOKEN_AUDIENCE = 'queue-entry'
 const TOKEN_ISSUER = 'vdmais-fila-inteligente'
-const QR_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60
-const LINK_TOKEN_TTL_SECONDS = 24 * 60 * 60
 const PUBLIC_ENTRY_CHANNELS: ReadonlySet<EntryChannel> = new Set([
   EntryChannel.QR_CODE,
   EntryChannel.LINK,
@@ -17,11 +15,34 @@ const PUBLIC_ENTRY_CHANNELS: ReadonlySet<EntryChannel> = new Set([
 
 type PublicEntryChannel = (typeof EntryChannel)['QR_CODE' | 'LINK']
 
+// Per-channel entry-token TTL: overridable via env, falling back to 24h. The key
+// is derived from the EntryChannel value — QUEUE_ENTRY_QR_CODE_TTL_SECONDS and
+// QUEUE_ENTRY_LINK_TTL_SECONDS — so it stays 1:1 with the channel enum.
+const DEFAULT_ENTRY_TTL_SECONDS = 24 * 60 * 60
+
+function ttlEnvKey(entryChannel: PublicEntryChannel): string {
+  return `QUEUE_ENTRY_${entryChannel}_TTL_SECONDS`
+}
+
+function readTtlSeconds(config: ConfigService, entryChannel: PublicEntryChannel): number {
+  const raw = config.get<string>(ttlEnvKey(entryChannel))?.trim()
+  // Strict positive decimal only — reject hex/scientific/float (e.g. "0x10", "1e3")
+  // so a typo falls back to the default instead of a surprising magnitude.
+  if (raw && /^\d+$/.test(raw) && Number(raw) > 0) {
+    return Number(raw)
+  }
+  return DEFAULT_ENTRY_TTL_SECONDS
+}
+
 interface QueueEntryTokenPayload {
   kind: typeof TOKEN_KIND
   erId: string
   entryChannel: PublicEntryChannel
 }
+
+// verify() also surfaces the token's own `exp` (JWT claim, seconds since epoch) so
+// the session can be bounded to the entry channel's validity.
+export type VerifiedQueueEntry = QueueEntryTokenPayload & { exp: number }
 
 export interface QueueEntryAccess {
   token: string
@@ -31,6 +52,7 @@ export interface QueueEntryAccess {
 @Injectable()
 export class QueueEntryTokenService {
   private readonly signingSecret: Buffer
+  private readonly ttlSecondsByChannel: Record<PublicEntryChannel, number>
 
   constructor(
     private readonly jwt: JwtService,
@@ -39,11 +61,14 @@ export class QueueEntryTokenService {
     this.signingSecret = createHmac('sha256', getJwtSecret(config))
       .update('queue-entry-token-v1')
       .digest()
+    this.ttlSecondsByChannel = {
+      [EntryChannel.QR_CODE]: readTtlSeconds(config, EntryChannel.QR_CODE),
+      [EntryChannel.LINK]: readTtlSeconds(config, EntryChannel.LINK),
+    }
   }
 
   issue(erId: string, entryChannel: PublicEntryChannel): QueueEntryAccess {
-    const ttlSeconds =
-      entryChannel === EntryChannel.QR_CODE ? QR_TOKEN_TTL_SECONDS : LINK_TOKEN_TTL_SECONDS
+    const ttlSeconds = this.ttlSecondsByChannel[entryChannel]
     const token = this.jwt.sign(
       { kind: TOKEN_KIND, erId, entryChannel } satisfies QueueEntryTokenPayload,
       {
@@ -64,9 +89,9 @@ export class QueueEntryTokenService {
     token: string,
     expectedErId: string,
     expectedChannel?: EntryChannel,
-  ): QueueEntryTokenPayload {
+  ): VerifiedQueueEntry {
     try {
-      const payload = this.jwt.verify<QueueEntryTokenPayload>(token, {
+      const payload = this.jwt.verify<VerifiedQueueEntry>(token, {
         secret: this.signingSecret,
         audience: TOKEN_AUDIENCE,
         issuer: TOKEN_ISSUER,
