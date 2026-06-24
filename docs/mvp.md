@@ -66,7 +66,9 @@ Dentro do MVP:
 Fora do MVP:
 
 - integração com base oficial de REs;
-- integração com PDV;
+- integração com PDV (a integração comercial completa segue fora; uma API M2M de
+  início/fim de atendimento — ERP legado, OAuth2 — foi entregue à parte como
+  extensão, ver [arquitetura-backend.md](./arquitetura-backend.md));
 - validação de status oficial da RE;
 - validação de elegibilidade comercial;
 - Pedido Expresso;
@@ -342,7 +344,10 @@ Regra crítica:
 
 Observação:
 
-> Como não há integração com PDV, a finalização no SaaS depende de ação manual da operadora.
+> Não há integração comercial completa com PDV, então a finalização no SaaS é, por
+> padrão, ação manual da operadora. Existe uma API M2M opcional (ERP legado) que
+> também pode iniciar/encerrar o atendimento — ver
+> [arquitetura-backend.md](./arquitetura-backend.md).
 > 
 
 Mitigações para esquecimento:
