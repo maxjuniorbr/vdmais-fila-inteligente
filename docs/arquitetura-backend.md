@@ -229,7 +229,7 @@ WAITING → (call-next) → CALLING → (start-service) → IN_SERVICE → (fini
 |---|---|---|---|
 | `GET` | `/counters` | OPERATOR, MANAGER, ATTENDANT | Lista caixas do ER do operador |
 | `POST` | `/counters/:id/open` | OPERATOR | Abre caixa e atribui operador |
-| `POST` | `/counters/:id/pause` | OPERATOR | Pausa caixa |
+| `POST` | `/counters/:id/pause` | OPERATOR | Pausa caixa; `reason` de uma lista fixa (§9.4) + `detail` livre obrigatório quando `reason='outro'` |
 | `POST` | `/counters/:id/resume` | OPERATOR | Retoma caixa pausado |
 | `POST` | `/counters/:id/close` | OPERATOR | Fecha caixa e libera operador |
 | `POST` | `/counters/:id/force-release` | MANAGER | Libera caixa órfão |
