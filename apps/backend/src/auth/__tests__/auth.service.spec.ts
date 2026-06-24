@@ -25,7 +25,7 @@ const queueEntryTokens = {
 
 const registerDto = {
   fullName: '  Ana  Souza ',
-  cpf: '111.222.333-44',
+  cpf: '529.982.247-25',
   phone: '(11) 99999-0000',
   birthDate: '1990-01-01',
   reCode: 're0001',
@@ -63,7 +63,7 @@ describe('AuthService', () => {
       prisma.representative.create.mockResolvedValue({
         id: 're-1',
         fullName: 'Ana Souza',
-        cpf: '11122233344',
+        cpf: '52998224725',
         phone: '11999990000',
         reCode: 'RE0001',
       })
@@ -74,7 +74,7 @@ describe('AuthService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             fullName: 'Ana Souza',
-            cpf: '11122233344',
+            cpf: '52998224725',
             phone: '11999990000',
             reCode: 'RE0001',
           }),
@@ -87,7 +87,7 @@ describe('AuthService', () => {
     })
 
     it('rejects a duplicated CPF', async () => {
-      prisma.representative.findFirst.mockResolvedValue({ cpf: '11122233344' })
+      prisma.representative.findFirst.mockResolvedValue({ cpf: '52998224725' })
       await expect(service.createRepresentative(registerDto)).rejects.toThrow(
         'Não foi possível concluir o cadastro com os dados informados',
       )
@@ -102,7 +102,7 @@ describe('AuthService', () => {
 
     it('keeps the specific message on the assisted (staff) flow', async () => {
       const actor = { userId: 'att-1', role: Role.ATTENDANT, erId: 'er-1' }
-      prisma.representative.findFirst.mockResolvedValue({ cpf: '11122233344' })
+      prisma.representative.findFirst.mockResolvedValue({ cpf: '52998224725' })
       await expect(
         service.createRepresentative(registerDto, { erId: 'er-1', actor }),
       ).rejects.toThrow('CPF já cadastrado')
@@ -124,7 +124,7 @@ describe('AuthService', () => {
       prisma.representative.create.mockResolvedValue({
         id: 're-1',
         fullName: 'Ana Souza',
-        cpf: '11122233344',
+        cpf: '52998224725',
         phone: '11999990000',
         reCode: 'RE0001',
       })
@@ -145,7 +145,7 @@ describe('AuthService', () => {
       prisma.representative.create.mockResolvedValue({
         id: 're-1',
         fullName: 'Ana Souza',
-        cpf: '11122233344',
+        cpf: '52998224725',
         phone: '11999990000',
         reCode: 'RE0001',
       })
@@ -180,7 +180,7 @@ describe('AuthService', () => {
       prisma.representative.create.mockResolvedValue({
         id: 're-1',
         fullName: 'Ana Souza',
-        cpf: '11122233344',
+        cpf: '52998224725',
         phone: '11999990000',
         reCode: 'RE0001',
       })
@@ -195,7 +195,7 @@ describe('AuthService', () => {
       prisma.representative.create.mockResolvedValue({
         id: 're-1',
         fullName: 'Ana Souza',
-        cpf: '11122233344',
+        cpf: '52998224725',
         phone: '11999990000',
         reCode: 'RE0001',
       })
@@ -344,10 +344,10 @@ describe('AuthService', () => {
 
       // Same CPF, alternating formatting, must accumulate on a single bucket.
       for (let i = 0; i < 10; i += 1) {
-        const credential = i % 2 === 0 ? '111.222.333-44' : '11122233344'
+        const credential = i % 2 === 0 ? '529.982.247-25' : '52998224725'
         await expect(fail(credential)).rejects.toThrow(UnauthorizedException)
       }
-      await expect(fail('111.222.333-44')).rejects.toThrow('Muitas tentativas')
+      await expect(fail('529.982.247-25')).rejects.toThrow('Muitas tentativas')
     })
 
     it('clears the lock after a successful login', async () => {
