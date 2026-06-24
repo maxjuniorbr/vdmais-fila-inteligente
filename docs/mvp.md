@@ -481,10 +481,10 @@ Motivos possíveis de pausa:
 
 ### 9.5.1 Pausa da senha pela operação
 
-A operação (operadora; o atendente de check-in é previsto, com UI futura) pode
-pausar a senha de um RE com **o mesmo tempo e a mesma experiência** da pausa feita
-pela própria RE. Ela é usada, por exemplo, quando a RE pede uma pausa
-presencialmente ou saiu no meio.
+A operação (operadora e gestora; o atendente de check-in é previsto, com UI
+futura) pode pausar a senha de um RE com **o mesmo tempo e a mesma experiência**
+da pausa feita pela própria RE. Ela é usada, por exemplo, quando a RE pede uma
+pausa presencialmente ou saiu no meio.
 
 1. A operadora pausa a senha pela tela de Operação: **Pausar senha** na lista
    **Aguardando** (senha da fila) ou no card **Senha atual** (a senha em chamada
@@ -506,7 +506,8 @@ presencialmente ou saiu no meio.
   pausar/retomar somem;
 - a operadora pausa senhas da **fila** (Aguardando) e a senha do **próprio caixa**;
   pausar a senha **em atendimento de outra operadora** (outro caixa) não é
-  permitido — fica restrito à gestora. (Admin não tem essas restrições.)
+  permitido — fica restrito à gestora. (Gestora e Admin não têm essas restrições
+  de caixa: não operam um caixa e podem pausar/retomar qualquer senha do ER.)
 
 > Eventos: `ticket_paused` (com `byStaff: true`) ao pausar; `ticket_resumed` ao
 > retomar (manual ou por expiração).
@@ -715,6 +716,7 @@ Permissões sugeridas:
 
 - restaurar senha;
 - cancelar qualquer senha;
+- pausar/retomar a senha de um RE, inclusive em atendimento em outro caixa (ver 9.5.1);
 - visualizar todos os caixas;
 - liberar caixa (forçado) quando a operadora abandona o caixa;
 - corrigir atendimento em aberto;

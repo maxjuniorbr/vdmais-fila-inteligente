@@ -1480,8 +1480,8 @@ export class TicketService {
   // Uma OPERADORA só gerencia a fila a partir do seu caixa aberto e não-pausado.
   // Com o caixa pausado (em pausa) ou sem caixa, ela não pausa/retoma senhas. E
   // não pode pausar uma senha que está em OUTRO caixa (atendimento de outra
-  // operadora) — isso fica restrito à gestora. Atendente/admin não operam caixa,
-  // então não passam por esta checagem.
+  // operadora) — isso fica restrito à gestora. Atendente/gestora/admin não operam
+  // caixa, então não passam por esta checagem (a gestora pode pausar cross-caixa).
   private async _assertOperatorActiveCounter(
     erId: string,
     user: AuthenticatedUser,

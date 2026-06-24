@@ -1095,6 +1095,32 @@ describe('TicketService', () => {
       await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(ForbiddenException)
     })
 
+    it('lets a MANAGER pause a ticket parked at another operator counter (cross-counter)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.IN_SERVICE,
+        counterId: 'counter-2',
+        operatorId: 'op-1',
+        serviceStartedAt: new Date(),
+      })
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.counter.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.PAUSED,
+        representative: { fullName: 'Maria Teste' },
+        er: { pauseTimeoutSeconds: 300 },
+      })
+
+      await expect(service.staffPauseTicket('ticket-1', manager)).resolves.toBeTruthy()
+      // A gestora não opera caixa: não passa pela checagem de posse de caixa.
+      expect(prisma.counter.findFirst).not.toHaveBeenCalled()
+      expect(tx.counter.updateMany).toHaveBeenCalledWith({
+        where: { id: 'counter-2', state: { in: [CounterState.CALLING, CounterState.IN_SERVICE] } },
+        data: { state: CounterState.ACTIVE },
+      })
+    })
+
     it('rejects pausing when the daily operation is closed', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
       prisma.eR.findUnique.mockResolvedValue({ isDayOpen: false })
@@ -1155,6 +1181,29 @@ describe('TicketService', () => {
       expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.created', expect.objectContaining({ ticketId: 'ticket-1' }))
       expect(result.state).toBe(TicketState.WAITING)
       expect(result.queuePosition).toBe(1)
+    })
+
+    it('lets a MANAGER resume a paused ticket without owning a counter', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.PAUSED,
+        representativeId: 'rep-other',
+        pausedAt: new Date(Date.now() - 60_000),
+      })
+      // No active counter for the actor: an OPERATOR would be rejected here, so a
+      // successful resume proves the MANAGER skips the counter-ownership check.
+      prisma.counter.findFirst.mockResolvedValue(null)
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.ticket.findUniqueOrThrow.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        pausedAt: null,
+        representative: { fullName: 'Maria Teste' },
+      })
+      prisma.ticket.count.mockResolvedValue(2)
+
+      await expect(service.staffResumeTicket('ticket-1', manager)).resolves.toBeTruthy()
+      expect(prisma.counter.findFirst).not.toHaveBeenCalled()
     })
 
     // Senha PREFERENCIAL retomada mantém a prioridade e a posição original.

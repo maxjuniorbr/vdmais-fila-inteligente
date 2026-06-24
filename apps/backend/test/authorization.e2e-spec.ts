@@ -94,8 +94,6 @@ describe('Endpoint authorization matrix (e2e)', () => {
     await post(`/tickets/${DUMMY}/start-service`, managerToken).expect(403)
     await post(`/tickets/${DUMMY}/finish-service`, managerToken).expect(403)
     await post(`/tickets/${DUMMY}/no-show`, managerToken).expect(403)
-    // staff-pause é OPERATOR/ATTENDANT/ADMIN — a gestora NÃO está na lista.
-    await post(`/tickets/${DUMMY}/staff-pause`, managerToken).expect(403)
   })
 
   it('denies an OPERATOR from manager-only ticket endpoints (403)', async () => {
@@ -122,5 +120,10 @@ describe('Endpoint authorization matrix (e2e)', () => {
     expect(recall.status).toBe(404)
     const markPriority = await post(`/tickets/${DUMMY}/mark-priority`, operatorToken)
     expect(markPriority.status).toBe(404)
+    // A gestora pode pausar/retomar a senha de um RE (§9.5.1, caso cross-caixa).
+    const staffPause = await post(`/tickets/${DUMMY}/staff-pause`, managerToken)
+    expect(staffPause.status).toBe(404)
+    const staffResume = await post(`/tickets/${DUMMY}/staff-resume`, managerToken)
+    expect(staffResume.status).toBe(404)
   })
 })
