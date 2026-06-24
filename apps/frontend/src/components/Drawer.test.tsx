@@ -26,6 +26,17 @@ describe('Drawer', () => {
     expect(onClose).toHaveBeenCalledTimes(3)
   })
 
+  it('gives the close button a 44px touch target (a11y)', () => {
+    render(
+      <Drawer title="Menu" onClose={vi.fn()}>
+        conteúdo
+      </Drawer>,
+    )
+    const close = screen.getByRole('button', { name: 'Fechar menu' })
+    expect(close.style.width).toBe('44px')
+    expect(close.style.height).toBe('44px')
+  })
+
   it('ignores keys other than Escape', () => {
     const onClose = vi.fn()
     render(

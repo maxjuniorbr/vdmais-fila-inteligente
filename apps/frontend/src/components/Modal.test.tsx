@@ -50,6 +50,17 @@ describe('Modal', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('gives the close button a 44px touch target (a11y)', () => {
+    render(
+      <Modal title="X" onClose={vi.fn()}>
+        c
+      </Modal>,
+    )
+    const close = screen.getByRole('button', { name: 'Fechar' })
+    expect(close.style.width).toBe('44px')
+    expect(close.style.height).toBe('44px')
+  })
+
   it('closes the dialog and restores focus to the opener on unmount', () => {
     const opener = document.createElement('button')
     document.body.appendChild(opener)
