@@ -305,11 +305,14 @@ describe('Integration M2M endpoints (e2e)', () => {
       .expect(401)
   })
 
-  it('rejects an expired or wrong-issuer integration token (401)', async () => {
+  it('rejects an expired, wrong-issuer or wrong-audience integration token (401)', async () => {
     const { reCode } = await seedTicket(TicketState.CALLING)
     const expired = integrationToken('tickets:start', { expiresIn: -10 })
     const wrongIssuer = integrationToken('tickets:start', { issuer: 'https://evil/' })
-    for (const token of [expired, wrongIssuer]) {
+    // Audience errado: token legítimo de OUTRA audiência do mesmo IdP deve ser
+    // rejeitado (é exatamente o que o issuer+audience obrigatórios protegem).
+    const wrongAudience = integrationToken('tickets:start', { audience: 'outra-api' })
+    for (const token of [expired, wrongIssuer, wrongAudience]) {
       await request(app.getHttpServer())
         .post('/integration/v1/atendimentos/iniciar')
         .set('Authorization', `Bearer ${token}`)

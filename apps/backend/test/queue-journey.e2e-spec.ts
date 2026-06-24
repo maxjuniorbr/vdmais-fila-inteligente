@@ -640,6 +640,9 @@ describe('Full queue journey and concurrency (e2e)', () => {
       .expect(201)
     expect(paused.body.state).toBe(TicketState.PAUSED)
 
+    // Espera determinística > 1s para a retomada acumular pausedSeconds (floor por segundo).
+    await new Promise((resolve) => setTimeout(resolve, 1100))
+
     // Panel state should NOT list the paused ticket in "waiting"
     const panelAfterPause = await request(app.getHttpServer())
       .get(`/panel/${erId}/state`)
@@ -658,9 +661,9 @@ describe('Full queue journey and concurrency (e2e)', () => {
     expect(resumed.body.state).toBe(TicketState.WAITING)
     expect(resumed.body.code).toBe(originalCode)
 
-    // pausedSeconds must be > 0 (at least 1 s elapsed between pause and resume)
+    // pausedSeconds deve ser > 0 (passou ~1s entre pausar e retomar).
     const dbTicket = await prisma.ticket.findUniqueOrThrow({ where: { id: pauseTicketId } })
-    expect(dbTicket.pausedSeconds).toBeGreaterThanOrEqual(0)
+    expect(dbTicket.pausedSeconds).toBeGreaterThan(0)
     expect(dbTicket.pausedAt).toBeNull()
 
     // Panel waiting list should include the resumed ticket
