@@ -7,8 +7,20 @@ describe('ObservabilityService', () => {
     service = new ObservabilityService()
   })
 
-  it('tracks uptime in seconds', () => {
-    expect(service.uptimeSeconds()).toBeGreaterThanOrEqual(0)
+  it('grows uptime as wall-clock time advances', () => {
+    // The service captures its start time in the constructor, so freeze the clock
+    // before instantiating to pin the baseline, then advance it deterministically.
+    jest.useFakeTimers()
+    try {
+      jest.setSystemTime(new Date('2026-06-23T00:00:00.000Z'))
+      const fixedService = new ObservabilityService()
+      expect(fixedService.uptimeSeconds()).toBe(0)
+
+      jest.setSystemTime(new Date('2026-06-23T00:00:05.000Z'))
+      expect(fixedService.uptimeSeconds()).toBe(5)
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it('accumulates request totals and durations into Prometheus output', () => {
