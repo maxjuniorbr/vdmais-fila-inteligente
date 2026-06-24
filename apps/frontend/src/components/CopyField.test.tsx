@@ -44,6 +44,13 @@ describe('CopyField', () => {
     expect(field?.compareDocumentPosition(helper)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
+  it('gives the copy button a 44px touch target (a11y)', () => {
+    render(<CopyField label="Link" value="https://exemplo.com" />)
+    const button = screen.getByRole('button', { name: 'Copiar Link' })
+    expect(button.style.width).toBe('44px')
+    expect(button.style.height).toBe('44px')
+  })
+
   it('copies the value and shows confirmation feedback', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     stubClipboard(writeText)

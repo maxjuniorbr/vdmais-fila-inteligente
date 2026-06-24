@@ -17,6 +17,17 @@ describe('Input', () => {
     render(<Input aria-label="Busca" />)
     expect(screen.getByLabelText('Busca')).toBeInTheDocument()
   })
+
+  it('stays controlled: change fires onChange and value stays pinned to the prop', () => {
+    const onChange = vi.fn()
+    render(<Input label="Nome" value="Ana" onChange={onChange} />)
+    const field = screen.getByLabelText('Nome') as HTMLInputElement
+    expect(field.value).toBe('Ana')
+    fireEvent.change(field, { target: { value: 'Bia' } })
+    expect(onChange).toHaveBeenCalledOnce()
+    // Componente controlado: sem novo prop `value`, o campo permanece em 'Ana'.
+    expect(field.value).toBe('Ana')
+  })
 })
 
 describe('Select', () => {
@@ -36,6 +47,22 @@ describe('Select', () => {
       </Select>,
     )
     expect(screen.getByLabelText('Estado')).toBeInTheDocument()
+  })
+
+  it('stays controlled: change fires onChange and value stays pinned to the prop', () => {
+    const onChange = vi.fn()
+    render(
+      <Select label="Perfil" value="ADMIN" onChange={onChange}>
+        <option value="ADMIN">Administrador</option>
+        <option value="ATTENDANT">Atendente</option>
+      </Select>,
+    )
+    const field = screen.getByLabelText('Perfil') as HTMLSelectElement
+    expect(field.value).toBe('ADMIN')
+    fireEvent.change(field, { target: { value: 'ATTENDANT' } })
+    expect(onChange).toHaveBeenCalledOnce()
+    // Componente controlado: sem novo prop `value`, a seleção volta para 'ADMIN'.
+    expect(field.value).toBe('ADMIN')
   })
 })
 

@@ -60,6 +60,40 @@ describe('useSocket', () => {
     expect(socket.disconnect).toHaveBeenCalledTimes(1)
   })
 
+  it('re-emits joinER on every connect (socket.io reconnection)', () => {
+    const socket = makeSocket()
+    ioMock.mockReturnValue(socket)
+
+    renderHook(() => useSocket('er-1', 'panel', 'display-token'))
+    const connectHandler = socket.on.mock.calls.find(([event]) => event === 'connect')?.[1]
+    expect(connectHandler).toBeTypeOf('function')
+
+    // socket.io re-dispara 'connect' a cada reconexão; cada uma deve re-entrar na sala.
+    connectHandler()
+    connectHandler()
+    expect(socket.emit).toHaveBeenCalledTimes(2)
+    expect(socket.emit).toHaveBeenNthCalledWith(2, 'joinER', {
+      erId: 'er-1',
+      clientType: 'panel',
+      token: 'display-token',
+    })
+  })
+
+  it('joins with token undefined when no display token is given (dashboard)', () => {
+    const socket = makeSocket()
+    ioMock.mockReturnValue(socket)
+
+    renderHook(() => useSocket('er-1')) // clientType 'dashboard' default, sem authToken
+    const connectHandler = socket.on.mock.calls.find(([event]) => event === 'connect')?.[1]
+    connectHandler()
+
+    expect(socket.emit).toHaveBeenCalledWith('joinER', {
+      erId: 'er-1',
+      clientType: 'dashboard',
+      token: undefined,
+    })
+  })
+
   it('reconnects with a new socket when the erId changes', () => {
     const first = makeSocket()
     const second = makeSocket()

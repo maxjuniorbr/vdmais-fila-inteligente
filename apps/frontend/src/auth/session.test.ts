@@ -8,6 +8,8 @@ import {
   getQueueEntryToken,
   getManagementERId,
   markQueueEntryPending,
+  getSessionERId,
+  getStaffRole,
   getStaffSessionProfile,
   hasStaffSession,
   logoutStaffSession,
@@ -35,6 +37,18 @@ function login(overrides: ProfileOverrides = {}, expiresInSeconds?: number) {
   )
   return merged
 }
+
+// Token cru com payload arbitrário — o makeStaffToken sempre emite sub+userId+role,
+// então este builder permite cobrir o fallback de id e tokens malformados.
+function rawToken(payload: object): string {
+  const body = btoa(JSON.stringify(payload))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
+  return `header.${body}.signature`
+}
+
+const futureExp = () => Math.floor(Date.now() / 1000) + 3600
 
 describe('staff session', () => {
   it('derives identity from the token and replaces stale staff context', () => {
@@ -85,6 +99,42 @@ describe('staff session', () => {
     expect(sessionStorage.getItem('token')).toBeNull()
   })
 
+  it('exposes role and ER id directly from the token', () => {
+    login({ role: 'MANAGER', erId: 'er-9' })
+    expect(getStaffRole()).toBe('MANAGER')
+    expect(getSessionERId()).toBe('er-9')
+  })
+
+  it('returns an empty ER id and null role without a session', () => {
+    expect(getSessionERId()).toBe('')
+    expect(getStaffRole()).toBeNull()
+  })
+
+  it('returns an empty string (not undefined) for a staff without an ER', () => {
+    login({ role: 'ADMIN', erId: undefined })
+    expect(getSessionERId()).toBe('')
+  })
+
+  it('treats a malformed token as no session and never throws while decoding', () => {
+    const broken = ['abc', 'header.@@@not-base64@@@.sig', `header.${btoa('{ not json')}.sig`]
+    for (const bad of broken) {
+      sessionStorage.setItem('token', bad)
+      expect(() => hasStaffSession(['OPERATOR'])).not.toThrow()
+      expect(hasStaffSession(['OPERATOR'])).toBe(false)
+      expect(getStaffSessionProfile()).toBeNull()
+    }
+  })
+
+  it('falls back to sub for the id when userId is absent', () => {
+    sessionStorage.setItem('token', rawToken({ sub: 'only-sub', role: 'OPERATOR', exp: futureExp() }))
+    expect(getStaffSessionProfile()?.id).toBe('only-sub')
+  })
+
+  it('rejects a token with neither userId nor sub', () => {
+    sessionStorage.setItem('token', rawToken({ role: 'OPERATOR', exp: futureExp() }))
+    expect(getStaffSessionProfile()).toBeNull()
+  })
+
   it('sets and clears the selected management ER', () => {
     setManagementERId('er-2')
     expect(getManagementERId()).toBe('er-2')
@@ -104,7 +154,7 @@ describe('staff session', () => {
   })
 
   it('records logout telemetry before clearing the session', async () => {
-    const merged = login()
+    login()
     const token = sessionStorage.getItem('token')
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -115,7 +165,6 @@ describe('staff session', () => {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     })
-    expect(merged.role).toBe('OPERATOR')
     expect(sessionStorage.length).toBe(0)
   })
 
