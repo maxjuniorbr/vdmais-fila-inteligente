@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
+import { notifySessionExpired } from '../auth/session'
 import { seedStaffSession } from '../test/staffToken'
 import { OperationPage } from './OperationPage'
 
@@ -98,6 +99,25 @@ describe('OperationPage coverage', () => {
     )
 
     expect(screen.getByText('central-login')).toBeInTheDocument()
+    expect(screen.queryByText('Painel da Operadora')).not.toBeInTheDocument()
+  })
+
+  it('drops back to the central login when the session expires mid-use', async () => {
+    setOverview({ counters: [] })
+    render(
+      <MemoryRouter initialEntries={['/operacao']}>
+        <Routes>
+          <Route path="/" element={<div>central-login</div>} />
+          <Route path="/operacao" element={<OperationPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Painel da Operadora')).toBeInTheDocument()
+
+    // 401 do servidor → notifySessionExpired derruba a tela protegida.
+    act(() => notifySessionExpired())
+
+    expect(await screen.findByText('central-login')).toBeInTheDocument()
     expect(screen.queryByText('Painel da Operadora')).not.toBeInTheDocument()
   })
 
@@ -282,7 +302,10 @@ describe('OperationPage coverage', () => {
     render(<OperationPage />)
 
     await screen.findByText('A010')
-    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3)
+    // O fallback "—" aparece como NOME da senha sem representante; checamos na própria
+    // linha da A010 (em vez de só contar "—" soltos pela tela, que era tautológico).
+    const waitingRow = screen.getByText('A010').closest('span')!
+    expect(within(waitingRow).getByText('—')).toBeInTheDocument()
   })
 
   it('closes the confirmation modal with the back button without closing the counter', async () => {
