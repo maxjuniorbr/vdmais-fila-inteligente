@@ -740,7 +740,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
     await request(app.getHttpServer())
       .post(`/counters/${counter1Id}/pause`)
       .set('Authorization', `Bearer ${operator1Token}`)
-      .send({ reason: 'Pausa de validação' })
+      .send({ reason: 'intervalo' })
       .expect(201)
     await request(app.getHttpServer())
       .post(`/counters/${counter1Id}/resume`)

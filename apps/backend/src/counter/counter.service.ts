@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { CounterState, Prisma, Role, TicketState } from '@prisma/client'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { PanelGateway } from '../panel/panel.gateway'
+import { CounterPauseReason } from './dto/pause-counter.dto'
 
 @Injectable()
 export class CounterService {
@@ -102,8 +103,18 @@ export class CounterService {
     }
   }
 
-  async pauseCounter(counterId: string, user: AuthenticatedUser, reason: string) {
+  async pauseCounter(
+    counterId: string,
+    user: AuthenticatedUser,
+    reason: CounterPauseReason,
+    detail?: string,
+  ) {
     this._assertOperator(user)
+    // "outro" exige um detalhe livre; os demais motivos são autoexplicativos.
+    const trimmedDetail = detail?.trim()
+    if (reason === 'outro' && !trimmedDetail) {
+      throw new BadRequestException('Descreva o motivo da pausa.')
+    }
     const counter = await this._getCounter(counterId)
     this._assertERAccess(counter.erId, user)
     if (counter.operatorId !== user.userId) {
@@ -128,7 +139,12 @@ export class CounterService {
           eventType: 'counter_paused',
           erId: counter.erId,
           operatorId: user.userId,
-          metadata: { counterId, counterNumber: counter.number, reason },
+          metadata: {
+            counterId,
+            counterNumber: counter.number,
+            reason,
+            ...(trimmedDetail ? { detail: trimmedDetail } : {}),
+          },
         },
       })
       return tx.counter.findUniqueOrThrow({ where: { id: counterId } })
@@ -138,6 +154,7 @@ export class CounterService {
       counterId,
       number: counter.number,
       reason,
+      ...(trimmedDetail ? { detail: trimmedDetail } : {}),
     })
     return updated
   }

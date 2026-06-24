@@ -13,17 +13,92 @@ import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
-import { Input } from '../components/Input'
 import { Modal } from '../components/Modal'
 import { SectionPanel } from '../components/SectionPanel'
 import { Select } from '../components/Select'
 import { StatusDot } from '../components/StatusDot'
+import { Textarea } from '../components/Textarea'
 import { useToast } from '../components/Toast'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
 import { formatDuration } from '../utils/format'
 import { counterStateLabel, PRIORITY_LABEL, PRIORITY_TONE, ticketStateLabel } from '../utils/labels'
+
+// Motivos canônicos de pausa do caixa (§9.4); "outro" exige um detalhe livre.
+// Os valores devem casar com COUNTER_PAUSE_REASONS no backend.
+const PAUSE_REASONS = [
+  { value: 'intervalo', label: 'Intervalo' },
+  { value: 'suporte operacional', label: 'Suporte operacional' },
+  { value: 'problema técnico', label: 'Problema técnico' },
+  { value: 'fechamento de caixa', label: 'Fechamento de caixa' },
+  { value: 'outro', label: 'Outro' },
+] as const
+
+// Controles de pausa do caixa: motivo (lista fixa do §9.4) + detalhe livre quando
+// "outro". Fora do OperationPage para não somar à sua complexidade cognitiva.
+function PauseCounterControls({
+  counterId,
+  loading,
+  act,
+}: Readonly<{
+  counterId: string
+  loading: boolean
+  act: (action: () => Promise<unknown>, successMessage?: string) => Promise<boolean>
+}>) {
+  const [reason, setReason] = useState('')
+  const [detail, setDetail] = useState('')
+  const canPause = reason !== '' && (reason !== 'outro' || detail.trim() !== '')
+
+  return (
+    <div style={styles.pauseBlock}>
+      {/* Select (não radio): pausar o caixa é uma ação secundária e compacta no
+          card. O DS reserva Select para >5 opções, mas aqui priorizamos a
+          compactação dessa ação rápida; "Outro" revela o detalhe. */}
+      <Select
+        label="Motivo da pausa"
+        value={reason}
+        onChange={(event) => setReason(event.target.value)}
+      >
+        <option value="">Selecione o motivo</option>
+        {PAUSE_REASONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+      {reason === 'outro' && (
+        <Textarea
+          label="Detalhe"
+          placeholder="Descreva o motivo"
+          value={detail}
+          onChange={(event) => setDetail(event.target.value)}
+        />
+      )}
+      <Button
+        variant="secondary"
+        onClick={() =>
+          act(
+            () =>
+              api.post(`/counters/${counterId}/pause`, {
+                reason,
+                detail: reason === 'outro' ? detail.trim() : undefined,
+              }),
+            'Caixa pausado.',
+          ).then((ok) => {
+            if (ok) {
+              setReason('')
+              setDetail('')
+            }
+          })
+        }
+        disabled={loading || !canPause}
+      >
+        Pausar
+      </Button>
+    </div>
+  )
+}
 
 interface Ticket {
   id: string
@@ -138,7 +213,6 @@ export function OperationPage() {
   const [overview, setOverview] = useState<QueueOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [pauseReason, setPauseReason] = useState('')
   const [confirmingClose, setConfirmingClose] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -356,30 +430,7 @@ export function OperationPage() {
                   <p style={styles.callHint}>{callNextHint}</p>
                   <div style={styles.counterActions}>
                   {currentCounter.state === 'ACTIVE' && (
-                    <>
-                      <Input
-                        label="Motivo da pausa"
-                        containerStyle={{ flex: 1, minWidth: 160, marginBottom: 0 }}
-                        style={{ flex: 1, minWidth: 160, borderRadius: brand.radius.medium }}
-                        placeholder="Motivo da pausa"
-                        value={pauseReason}
-                        onChange={(event) => setPauseReason(event.target.value)}
-                      />
-                      <Button
-                        variant="secondary"
-                        onClick={() =>
-                          act(
-                            () => api.post(`/counters/${counterId}/pause`, { reason: pauseReason }),
-                            'Caixa pausado.',
-                          ).then((ok) => {
-                            if (ok) setPauseReason('')
-                          })
-                        }
-                        disabled={loading || !pauseReason.trim()}
-                      >
-                        Pausar
-                      </Button>
-                    </>
+                    <PauseCounterControls counterId={counterId} loading={loading} act={act} />
                   )}
                   {currentCounter.state === 'PAUSED' && (
                     <Button
@@ -678,6 +729,12 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
     alignItems: 'flex-end',
     marginTop: `${brand.spacing[16]}px`,
+  },
+  pauseBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: `${brand.spacing[12]}px`,
+    width: '100%',
   },
   ticketActions: {
     display: 'flex',

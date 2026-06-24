@@ -31,8 +31,13 @@ describe('CounterController', () => {
   })
 
   it('pauses a counter with a reason', () => {
-    controller.pause('c-1', { reason: 'almoço' }, req)
-    expect(service.pauseCounter).toHaveBeenCalledWith('c-1', req.user, 'almoço')
+    controller.pause('c-1', { reason: 'intervalo' }, req)
+    expect(service.pauseCounter).toHaveBeenCalledWith('c-1', req.user, 'intervalo', undefined)
+  })
+
+  it('forwards the detail when pausing with "outro"', () => {
+    controller.pause('c-1', { reason: 'outro', detail: 'reunião rápida' }, req)
+    expect(service.pauseCounter).toHaveBeenCalledWith('c-1', req.user, 'outro', 'reunião rápida')
   })
 
   it('resumes a counter', () => {

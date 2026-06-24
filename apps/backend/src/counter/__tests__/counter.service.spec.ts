@@ -179,11 +179,17 @@ describe('CounterService', () => {
     tx.counter.updateMany.mockResolvedValue({ count: 1 })
     tx.counter.findUniqueOrThrow.mockResolvedValue({ ...counterBase, state: CounterState.PAUSED })
 
-    const result = await service.pauseCounter('counter-1', operator, 'Intervalo')
+    const result = await service.pauseCounter('counter-1', operator, 'intervalo')
 
     expect(tx.counter.updateMany).toHaveBeenCalledWith({
       where: { id: 'counter-1', operatorId: 'op-1', state: CounterState.ACTIVE },
       data: { state: CounterState.PAUSED },
+    })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'counter_paused',
+        metadata: expect.objectContaining({ reason: 'intervalo' }),
+      }),
     })
     expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'counter.paused', expect.any(Object))
     expect(result.state).toBe(CounterState.PAUSED)
@@ -196,7 +202,7 @@ describe('CounterService', () => {
       operatorId: 'other-op',
     })
 
-    await expect(service.pauseCounter('counter-1', operator, 'x')).rejects.toThrow(BadRequestException)
+    await expect(service.pauseCounter('counter-1', operator, 'intervalo')).rejects.toThrow(BadRequestException)
   })
 
   it('rejects pauseCounter if counter is not ACTIVE', async () => {
@@ -206,7 +212,7 @@ describe('CounterService', () => {
       operatorId: 'op-1',
     })
 
-    await expect(service.pauseCounter('counter-1', operator, 'x')).rejects.toThrow(BadRequestException)
+    await expect(service.pauseCounter('counter-1', operator, 'intervalo')).rejects.toThrow(BadRequestException)
   })
 
   it('rejects pauseCounter if a concurrent transition changed the counter (CAS lost)', async () => {
@@ -217,9 +223,38 @@ describe('CounterService', () => {
     })
     tx.counter.updateMany.mockResolvedValue({ count: 0 })
 
-    await expect(service.pauseCounter('counter-1', operator, 'x')).rejects.toThrow(BadRequestException)
+    await expect(service.pauseCounter('counter-1', operator, 'intervalo')).rejects.toThrow(BadRequestException)
     expect(tx.auditEvent.create).not.toHaveBeenCalled()
     expect(panel.emitToER).not.toHaveBeenCalled()
+  })
+
+  it('rejects pausing with "outro" and no detail', async () => {
+    await expect(service.pauseCounter('counter-1', operator, 'outro')).rejects.toThrow(
+      BadRequestException,
+    )
+  })
+
+  it('stores the trimmed detail when pausing with "outro"', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.ACTIVE,
+      operatorId: 'op-1',
+    })
+    tx.counter.updateMany.mockResolvedValue({ count: 1 })
+    tx.counter.findUniqueOrThrow.mockResolvedValue({ ...counterBase, state: CounterState.PAUSED })
+
+    await service.pauseCounter('counter-1', operator, 'outro', '  reforma elétrica  ')
+
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({ reason: 'outro', detail: 'reforma elétrica' }),
+      }),
+    })
+    expect(panel.emitToER).toHaveBeenCalledWith(
+      'er-1',
+      'counter.paused',
+      expect.objectContaining({ detail: 'reforma elétrica' }),
+    )
   })
 
   it('resumes a PAUSED counter owned by the operator', async () => {

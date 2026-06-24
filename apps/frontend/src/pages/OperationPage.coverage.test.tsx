@@ -156,9 +156,12 @@ describe('OperationPage coverage', () => {
     })
     render(<OperationPage />)
 
-    const reason = await screen.findByLabelText('Motivo da pausa')
-    reason.focus()
-    fireEvent.keyDown(reason, { key: 'Enter' })
+    fireEvent.change(await screen.findByLabelText('Motivo da pausa'), {
+      target: { value: 'outro' },
+    })
+    const detail = screen.getByLabelText('Detalhe')
+    detail.focus()
+    fireEvent.keyDown(detail, { key: 'Enter' })
 
     expect(api.post).not.toHaveBeenCalledWith('/queues/er-1/call-next', expect.anything())
   })
