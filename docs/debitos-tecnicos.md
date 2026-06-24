@@ -22,6 +22,7 @@
 | [DT-11](#dt-11--pausaretoma-de-senha-pela-gestora-sem-ui) | Pausa/retoma de senha pela gestora sem UI | Baixa | Não |
 | [DT-12](#dt-12--qr-code-digital-sem-rotação-automática) | QR Code digital sem rotação automática | Baixa | Não |
 | [DT-13](#dt-13--mensagem-de-sessão-expirada-genérica-para-a-re) | Mensagem de sessão expirada genérica para a RE | Baixa | Não |
+| [DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado) | Cadastro mínimo da RE será descontinuado | Baixa | Não |
 
 ---
 
@@ -257,3 +258,21 @@ já trata o `401` corretamente.
 **Encaminhamento.** Adicionar, na tela da RE, uma mensagem amigável quando a sessão do dia
 expira (ex.: aviso contextual antes de reabrir o login). Toca frontend — avaliar junto com
 o frontend. Relacionado a [DT-12](#dt-12--qr-code-digital-sem-rotação-automática).
+
+---
+
+## DT-14 — Cadastro mínimo da RE será descontinuado
+
+**Contexto.** Hoje há um cadastro mínimo da representante
+([auth.service.ts](../apps/backend/src/auth/auth.service.ts) `createRepresentative`), conforme
+§5 do [mvp.md](./mvp.md). A direção de produto é **eliminar essa fricção** num momento
+futuro: usar a autenticação do próprio app via API, ou — no cenário de ER com **QR Code
+rotativo** — operar **sem cadastro**.
+
+**Impacto.** Decisão de produto, sem efeito atual. A consequência prática agora é **não
+investir** no cadastro que será descontinuado: os campos opcionais do §5 (e-mail, aceite de
+termos/uso de dados, observação de check-in) **não serão adicionados**.
+
+**Encaminhamento.** Em momento futuro, substituir o cadastro mínimo pela autenticação via
+API do app / fluxo sem cadastro com QR rotativo, e então reavaliar §5 (cadastro) e §6
+(jornadas) do [mvp.md](./mvp.md). Toca backend (auth) e frontend.
