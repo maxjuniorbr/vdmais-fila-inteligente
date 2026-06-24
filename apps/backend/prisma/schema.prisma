@@ -70,7 +70,7 @@ model ER {
   dayClosedAt DateTime?
 
   // Tempo máximo (em segundos) que uma senha pode ficar pausada ("não estou
-  // pronta"). Ao estourar, a senha é cancelada automaticamente. 0 desativa.
+  // pronta"). Ao estourar, a senha volta ao FIM da fila (não é cancelada). 0 desativa.
   pauseTimeoutSeconds Int @default(300)
 
   // Tempo máximo (em segundos) que uma senha pode ficar em chamada antes de
@@ -195,6 +195,10 @@ model Ticket {
 
   auditEvents AuditEvent[]
 
+  // A regra "uma senha ativa por RE por ER" é garantida por um índice ÚNICO PARCIAL
+  // (WHERE state IN WAITING/CALLING/IN_SERVICE/PAUSED) criado em migração SQL bruta —
+  // o Prisma não consegue declará-lo aqui. Ver a migração
+  // 20260610220000_include_paused_in_active_ticket_index. Não confiar só neste schema.
   @@unique([queueId, queuePosition])
   @@index([erId, state, isPriority, queuePosition])
   @@map("tickets")
