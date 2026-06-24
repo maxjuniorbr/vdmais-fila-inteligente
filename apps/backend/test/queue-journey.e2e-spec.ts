@@ -766,6 +766,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
     const eventTypes = new Set(events.map((event) => event.eventType))
     expect([...eventTypes]).toEqual(
       expect.arrayContaining([
+        'queue_entry_started',
         'representative_login_started',
         'representative_authenticated',
         'representative_created_or_updated',
@@ -782,6 +783,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
         'next_ticket_requested',
         'ticket_locked_for_call',
         'ticket_called',
+        'ticket_call_displayed_on_panel',
         'service_started',
         'service_finished',
         'ticket_marked_no_show',

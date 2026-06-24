@@ -133,6 +133,18 @@ export class QueueService {
           },
         },
       })
+      await tx.auditEvent.create({
+        data: {
+          eventType: 'ticket_call_displayed_on_panel',
+          erId,
+          ticketId: called.id,
+          operatorId: user.userId,
+          metadata: {
+            counterNumber: called.counter?.number ?? 0,
+            code: called.code,
+          },
+        },
+      })
       return called
     })
 

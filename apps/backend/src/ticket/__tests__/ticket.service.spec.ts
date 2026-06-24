@@ -214,6 +214,15 @@ describe('TicketService', () => {
         checkinAttendantId: 'att-1',
       }),
     })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'queue_entry_started',
+        erId: 'er-1',
+        representativeId: 'rep-2',
+        operatorId: 'att-1',
+        metadata: { entryChannel: EntryChannel.CHECKIN_ASSISTED },
+      }),
+    })
   })
 
   it('honors isPriority from a staff assisted check-in and counts position priority-aware', async () => {
@@ -752,6 +761,14 @@ describe('TicketService', () => {
         'ticket.called',
         expect.objectContaining({ ticketId: 'ticket-1', counterNumber: 1 }),
       )
+      expect(tx.auditEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          eventType: 'ticket_call_displayed_on_panel',
+          erId: 'er-1',
+          ticketId: 'ticket-1',
+          metadata: expect.objectContaining({ counterNumber: 1, via: 'recall' }),
+        }),
+      })
     })
 
     it('rejects recall of a ticket that is not CALLING', async () => {
