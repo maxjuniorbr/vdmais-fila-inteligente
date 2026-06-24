@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api/client'
+import { notifySessionExpired } from '../auth/session'
 import { seedStaffSession } from '../test/staffToken'
 import { AdminPage } from './AdminPage'
 
@@ -44,6 +45,19 @@ describe('AdminPage', () => {
     vi.mocked(api.get).mockResolvedValue([])
     renderPage()
     expect(screen.getByText('central-login')).toBeInTheDocument()
+    expect(screen.queryByText('Cadastrar ER')).not.toBeInTheDocument()
+  })
+
+  it('drops back to the central login when the session expires mid-use', async () => {
+    authenticate()
+    vi.mocked(api.get).mockResolvedValue([])
+    renderPage()
+    expect(await screen.findByText('Cadastrar ER')).toBeInTheDocument()
+
+    // 401 do servidor → notifySessionExpired limpa a sessão e derruba a tela.
+    act(() => notifySessionExpired())
+
+    expect(await screen.findByText('central-login')).toBeInTheDocument()
     expect(screen.queryByText('Cadastrar ER')).not.toBeInTheDocument()
   })
 
@@ -275,6 +289,36 @@ describe('AdminPage — ER management', () => {
       expect(api.post).toHaveBeenCalledWith('/admin/ers/er-1/panel-token'),
     )
     expect(await screen.findByText(/\?token=tv-secret/)).toBeInTheDocument()
+  })
+
+  it('hides the panel token URL after the ER detail reloads, never reshowing the secret', async () => {
+    vi.mocked(api.post).mockResolvedValue({ token: 'tv-secret' })
+    await openManagement()
+
+    // Gerar o token: a URL com o segredo aparece neste render.
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar token de acesso' }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/ers/er-1/panel-token'))
+    expect(await screen.findByText(/\?token=tv-secret/)).toBeInTheDocument()
+
+    // O servidor agora reporta o ER com acesso configurado; em qualquer recarga
+    // do detalhe do ER o backend NÃO devolve o segredo — só a flag.
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      Promise.resolve(path === '/admin/ers' ? [erSummary] : { ...erDetail, hasPanelToken: true }),
+    )
+
+    // Recarregar o ER: fechar e reabrir o gerenciamento força um novo fetch do
+    // detalhe e remonta o PanelAccessManager (o gatilho que a tela usa após
+    // gerar/rotacionar — o estado local com a URL não sobrevive ao reload).
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar gerenciamento' }))
+    await waitFor(() => expect(screen.queryByText('Acessos do ER')).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Gerenciar ER' }))
+    await screen.findByText('Acessos do ER')
+
+    // O segredo desapareceu do DOM e o status volta a indicar acesso configurado
+    // sem reexibir a URL com o token.
+    expect(screen.queryByText(/tv-secret/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\?token=tv-secret/)).not.toBeInTheDocument()
+    expect(screen.getByText('Acesso configurado')).toBeInTheDocument()
   })
 
   it('revokes the panel access token', async () => {
