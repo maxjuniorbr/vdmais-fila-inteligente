@@ -98,7 +98,12 @@ describe('AuthService uniqueness', () => {
   }
   const jwt = { sign: jest.fn() }
   const auditLog = { logIfERExists: jest.fn() }
-  const queueEntryTokens = { verify: jest.fn() }
+  const queueEntryTokens = {
+    verify: jest.fn((_token: string, erId: string, entryChannel: unknown) => ({
+      erId,
+      entryChannel,
+    })),
+  }
   const service = new AuthService(
     prisma as unknown as PrismaService,
     jwt as unknown as JwtService,

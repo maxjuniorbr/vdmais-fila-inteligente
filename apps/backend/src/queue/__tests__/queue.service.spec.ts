@@ -369,6 +369,14 @@ describe('QueueService', () => {
         eventType: 'ticket_locked_for_call',
       }),
     })
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'ticket_call_displayed_on_panel',
+        erId: 'er-1',
+        ticketId: 'ticket-1',
+        metadata: expect.objectContaining({ counterNumber: 1, code: 'A001' }),
+      }),
+    })
   })
 
   it('falls back to counter number zero when the called ticket has no counter', async () => {
