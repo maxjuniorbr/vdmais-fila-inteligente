@@ -433,7 +433,10 @@ describe('TicketConfirmationPage', () => {
     expect(await screen.findByText('Tela de entrada')).toBeInTheDocument()
   })
 
-  it('resumes a paused ticket back to waiting', async () => {
+  it('pauses then resumes, preserving the ticket code through the round trip', async () => {
+    // Fluxo real: a senha nasce WAITING (POST /api/tickets), a RE pausa (POST /pause →
+    // PAUSED) e depois retoma (POST /resume → WAITING). O invariante "retoma no lugar" é
+    // verificado pela preservação do mesmo `code` da senha em todo o trajeto.
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString()
       if (url.endsWith('/api/tickets') && init?.method === 'POST') {
@@ -442,11 +445,26 @@ describe('TicketConfirmationPage', () => {
             id: 't-1',
             code: 'A001',
             queuePosition: 1,
-            currentPosition: 0,
-            state: 'PAUSED',
+            currentPosition: 3,
+            state: 'WAITING',
             erId: 'er-1',
           }),
           { status: 201 },
+        )
+      }
+      if (url.includes('/tickets/t-1/pause')) {
+        return new Response(
+          JSON.stringify({
+            id: 't-1',
+            code: 'A001',
+            queuePosition: 1,
+            currentPosition: 0,
+            state: 'PAUSED',
+            erId: 'er-1',
+            pausedAt: new Date().toISOString(),
+            pauseTimeoutSeconds: 300,
+          }),
+          { status: 200 },
         )
       }
       if (url.includes('/tickets/t-1/resume')) {
@@ -455,7 +473,7 @@ describe('TicketConfirmationPage', () => {
             id: 't-1',
             code: 'A001',
             queuePosition: 1,
-            currentPosition: 4,
+            currentPosition: 3,
             state: 'WAITING',
             erId: 'er-1',
           }),
@@ -467,8 +485,30 @@ describe('TicketConfirmationPage', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Estou pronta — retomar senha' }))
-    expect(await screen.findByText('#4')).toBeInTheDocument()
+
+    // Nasce aguardando, na posição #3.
+    expect(await screen.findByText('A001')).toBeInTheDocument()
+    expect(screen.getByText('#3')).toBeInTheDocument()
+
+    // Pausar: a RE não está pronta.
+    fireEvent.click(screen.getByRole('button', { name: 'Não estou pronta — pausar' }))
+    expect(await screen.findByText('Pausada')).toBeInTheDocument()
+
+    // Retomar: volta para a fila com o MESMO code e a MESMA posição (#3).
+    fireEvent.click(screen.getByRole('button', { name: 'Estou pronta — retomar senha' }))
+    expect(await screen.findByText('#3')).toBeInTheDocument()
+    // A mesma senha atravessa pausar→retomar sem ser reemitida.
+    expect(screen.getByText('A001')).toBeInTheDocument()
+
+    // O backend foi exercitado nos dois sentidos, na ordem pause → resume.
+    const pauseCalled = fetchMock.mock.calls.some(([url, init]) =>
+      url.toString().includes('/tickets/t-1/pause') && (init as RequestInit)?.method === 'POST',
+    )
+    const resumeCalled = fetchMock.mock.calls.some(([url, init]) =>
+      url.toString().includes('/tickets/t-1/resume') && (init as RequestInit)?.method === 'POST',
+    )
+    expect(pauseCalled).toBe(true)
+    expect(resumeCalled).toBe(true)
   })
 
   it('shows an error when leaving the queue fails', async () => {
@@ -520,7 +560,7 @@ describe('TicketConfirmationPage', () => {
     expect(await screen.findByText('Em chamada')).toBeInTheDocument()
   })
 
-  it('shows the representative name above the ticket when present', async () => {
+  it('greets the representative by first name only (not the full name)', async () => {
     stubJoinWith({
       id: 't-1',
       code: 'A001',
@@ -528,17 +568,203 @@ describe('TicketConfirmationPage', () => {
       currentPosition: 2,
       state: 'WAITING',
       erId: 'er-1',
-      representative: { fullName: 'Maria Souza' },
+      representative: { fullName: 'Maria Souza Lima' },
     })
     renderPage()
-    expect(await screen.findByText('Maria Souza')).toBeInTheDocument()
+    // Confirmação no dispositivo da própria RE: só o primeiro nome (amigável/minimalista).
+    expect(await screen.findByText('Maria')).toBeInTheDocument()
+    expect(screen.queryByText('Maria Souza Lima')).not.toBeInTheDocument()
   })
 
-  it('falls back to a generic message when joining fails without a message', async () => {
-    stubJoinWith({}, 400)
+  it('never self-prioritizes: the join body omits isPriority on the QR path', async () => {
+    // Default beforeEach uses the QR_CODE channel. A RE must not be able to flag her
+    // own ticket as priority, so the create payload carries only erId + entryChannel.
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (input.toString().endsWith('/api/tickets') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            id: 't-1',
+            code: 'A001',
+            queuePosition: 1,
+            currentPosition: 1,
+            state: 'WAITING',
+            erId: 'er-1',
+          }),
+          { status: 201 },
+        )
+      }
+      return new Response(null, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
     renderPage()
-    expect(await screen.findByText('Erro ao entrar na fila')).toBeInTheDocument()
+    await screen.findByText('A001')
+
+    const createCall = fetchMock.mock.calls.find(
+      ([input, init]) => input.toString().endsWith('/api/tickets') && init?.method === 'POST',
+    )
+    const body = JSON.parse(String(createCall?.[1]?.body))
+    expect(body).not.toHaveProperty('isPriority')
+    expect(body).toEqual({ erId: 'er-1', entryChannel: 'QR_CODE' })
   })
+
+  it('never self-prioritizes: the join body omits isPriority on the LINK path', async () => {
+    sessionStorage.setItem('queue-entry:er-1', 'LINK')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (input.toString().endsWith('/api/tickets') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            id: 't-1',
+            code: 'A001',
+            queuePosition: 1,
+            currentPosition: 1,
+            state: 'WAITING',
+            erId: 'er-1',
+          }),
+          { status: 201 },
+        )
+      }
+      return new Response(null, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    await screen.findByText('A001')
+
+    const createCall = fetchMock.mock.calls.find(
+      ([input, init]) => input.toString().endsWith('/api/tickets') && init?.method === 'POST',
+    )
+    const body = JSON.parse(String(createCall?.[1]?.body))
+    expect(body).not.toHaveProperty('isPriority')
+    expect(body).toEqual({ erId: 'er-1', entryChannel: 'LINK' })
+  })
+
+  it('exposes no priority toggle on the confirmation screen', async () => {
+    stubJoinWith({
+      id: 't-1',
+      code: 'A001',
+      queuePosition: 1,
+      currentPosition: 2,
+      state: 'WAITING',
+      erId: 'er-1',
+    })
+    renderPage()
+    await screen.findByText('A001')
+
+    // The RE cannot self-prioritize: no switch/checkbox/control for "preferencial".
+    expect(screen.queryByText(/preferencial/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/preferencial/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('hides the leave and pause actions while the ticket is being called', async () => {
+    stubJoinWith({
+      id: 't-1',
+      code: 'B010',
+      queuePosition: 0,
+      currentPosition: 0,
+      state: 'CALLING',
+      erId: 'er-1',
+    })
+    renderPage()
+    await screen.findByText('Chamada! Dirija-se ao caixa')
+
+    // Protects the counter flow: once called, the RE can't leave or pause and slip
+    // out from under the attendant.
+    expect(screen.queryByText('Sair da fila')).not.toBeInTheDocument()
+    expect(screen.queryByText('Não estou pronta — pausar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Estou pronta — retomar senha')).not.toBeInTheDocument()
+  })
+
+  it('hides the leave and pause actions while the ticket is in service', async () => {
+    stubJoinWith({
+      id: 't-1',
+      code: 'B011',
+      queuePosition: 0,
+      currentPosition: 0,
+      state: 'IN_SERVICE',
+      erId: 'er-1',
+    })
+    renderPage()
+    await screen.findByText('Em atendimento')
+
+    expect(screen.queryByText('Sair da fila')).not.toBeInTheDocument()
+    expect(screen.queryByText('Não estou pronta — pausar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Estou pronta — retomar senha')).not.toBeInTheDocument()
+  })
+
+  // The three mutating actions (join/pause/leave) share a "no message body" branch:
+  // each falls back to its own default copy via `?? '<generic>'` when the failing
+  // response carries no `message`. One it.each per action keeps that branch covered
+  // without three near-identical bodies.
+  const waitingTicket = {
+    id: 't-1',
+    code: 'A001',
+    queuePosition: 1,
+    currentPosition: 3,
+    state: 'WAITING',
+    erId: 'er-1',
+  } as const
+
+  async function clickLeaveConfirm() {
+    fireEvent.click(screen.getByRole('button', { name: 'Sair da fila' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sair da fila' }))
+  }
+
+  it.each([
+    {
+      label: 'joining',
+      // POST /api/tickets fails with an empty JSON body → no `message` to surface.
+      fetchImpl: (url: string, init?: RequestInit) =>
+        url.endsWith('/api/tickets') && init?.method === 'POST'
+          ? new Response(JSON.stringify({}), { status: 400 })
+          : null,
+      act: async () => {},
+      expected: 'Erro ao entrar na fila',
+    },
+    {
+      label: 'pausing',
+      fetchImpl: (url: string) =>
+        url.includes('/tickets/t-1/pause')
+          ? new Response(JSON.stringify({}), { status: 400 })
+          : null,
+      act: async () =>
+        fireEvent.click(
+          await screen.findByRole('button', { name: 'Não estou pronta — pausar' }),
+        ),
+      expected: 'Erro',
+    },
+    {
+      label: 'leaving',
+      // Non-JSON body forces the `.catch(() => ({}))` fallback in handleLeaveQueue.
+      fetchImpl: (url: string) =>
+        url.includes('/self-cancel') ? new Response('not json', { status: 500 }) : null,
+      act: async () => {
+        await screen.findByText('A001')
+        await clickLeaveConfirm()
+      },
+      expected: 'Erro ao cancelar senha',
+    },
+  ])(
+    'falls back to a generic message when $label fails without a message body',
+    async ({ label, fetchImpl, act, expected }) => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString()
+        // The join itself succeeds for the pause/leave cases so the screen renders.
+        if (label !== 'joining' && url.endsWith('/api/tickets') && init?.method === 'POST') {
+          return new Response(JSON.stringify(waitingTicket), { status: 201 })
+        }
+        return fetchImpl(url, init) ?? new Response(null, { status: 200 })
+      })
+      vi.stubGlobal('fetch', fetchMock)
+
+      renderPage()
+      await act()
+      expect(await screen.findByText(expected)).toBeInTheDocument()
+    },
+  )
 
   it('surfaces an error when the 409 fallback cannot fetch the active ticket', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -560,138 +786,56 @@ describe('TicketConfirmationPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('uses a generic message when pausing fails without a message body', async () => {
+  // Same three actions, but here the request itself rejects with a non-Error value,
+  // so the `err instanceof Error ? err.message : '<generic>'` guard takes its fallback
+  // branch. One it.each per action covers all three guards.
+  it.each([
+    {
+      label: 'joining',
+      fetchImpl: (url: string, init?: RequestInit) =>
+        url.endsWith('/api/tickets') && init?.method === 'POST' ? Promise.reject('boom') : null,
+      act: async () => {},
+      expected: 'Erro inesperado',
+    },
+    {
+      label: 'the pause request',
+      fetchImpl: (url: string) =>
+        url.includes('/tickets/t-1/pause') ? Promise.reject('boom') : null,
+      act: async () =>
+        fireEvent.click(
+          await screen.findByRole('button', { name: 'Não estou pronta — pausar' }),
+        ),
+      expected: 'Erro ao atualizar senha',
+    },
+    {
+      label: 'leaving',
+      fetchImpl: (url: string) =>
+        url.includes('/self-cancel') ? Promise.reject('boom') : null,
+      act: async () => {
+        await screen.findByText('A001')
+        await clickLeaveConfirm()
+      },
+      expected: 'Erro ao cancelar senha',
+    },
+  ])('shows a generic message when $label rejects with a non-error', async ({
+    label,
+    fetchImpl,
+    act,
+    expected,
+  }) => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString()
-      if (url.endsWith('/api/tickets') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({
-            id: 't-1',
-            code: 'A001',
-            queuePosition: 1,
-            currentPosition: 3,
-            state: 'WAITING',
-            erId: 'er-1',
-          }),
-          { status: 201 },
-        )
+      // The join succeeds for the pause/leave cases so the screen renders first.
+      if (label !== 'joining' && url.endsWith('/api/tickets') && init?.method === 'POST') {
+        return new Response(JSON.stringify(waitingTicket), { status: 201 })
       }
-      if (url.includes('/tickets/t-1/pause')) {
-        return new Response(JSON.stringify({}), { status: 400 })
-      }
-      return new Response(null, { status: 200 })
+      return fetchImpl(url, init) ?? new Response(null, { status: 200 })
     })
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronta — pausar' }))
-    expect(await screen.findByText('Erro')).toBeInTheDocument()
-  })
-
-  it('falls back to a generic message when leaving fails without a message body', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = input.toString()
-      if (url.endsWith('/api/tickets') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({
-            id: 't-1',
-            code: 'A001',
-            queuePosition: 1,
-            currentPosition: 1,
-            state: 'WAITING',
-            erId: 'er-1',
-          }),
-          { status: 201 },
-        )
-      }
-      if (url.includes('/self-cancel')) {
-        // Non-JSON body forces the .catch(() => ({})) fallback in handleLeaveQueue.
-        return new Response('not json', { status: 500 })
-      }
-      return new Response(null, { status: 200 })
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    renderPage()
-    await screen.findByText('A001')
-    fireEvent.click(screen.getByRole('button', { name: 'Sair da fila' }))
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Sair da fila' }))
-    expect(await screen.findByText('Erro ao cancelar senha')).toBeInTheDocument()
-  })
-
-  it('shows an unexpected error when joining rejects with a non-error value', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (input.toString().endsWith('/api/tickets') && init?.method === 'POST') {
-          // Reject with a non-Error so the `instanceof Error` guard takes its fallback.
-          return Promise.reject('boom')
-        }
-        return new Response(null, { status: 200 })
-      }),
-    )
-    renderPage()
-    expect(await screen.findByText('Erro inesperado')).toBeInTheDocument()
-  })
-
-  it('shows a generic message when the pause request rejects with a non-error', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = input.toString()
-      if (url.endsWith('/api/tickets') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({
-            id: 't-1',
-            code: 'A001',
-            queuePosition: 1,
-            currentPosition: 3,
-            state: 'WAITING',
-            erId: 'er-1',
-          }),
-          { status: 201 },
-        )
-      }
-      if (url.includes('/tickets/t-1/pause')) {
-        return Promise.reject('boom')
-      }
-      return new Response(null, { status: 200 })
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronta — pausar' }))
-    expect(await screen.findByText('Erro ao atualizar senha')).toBeInTheDocument()
-  })
-
-  it('shows a generic message when leaving rejects with a non-error', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = input.toString()
-      if (url.endsWith('/api/tickets') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({
-            id: 't-1',
-            code: 'A001',
-            queuePosition: 1,
-            currentPosition: 1,
-            state: 'WAITING',
-            erId: 'er-1',
-          }),
-          { status: 201 },
-        )
-      }
-      if (url.includes('/self-cancel')) {
-        return Promise.reject('boom')
-      }
-      return new Response(null, { status: 200 })
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    renderPage()
-    await screen.findByText('A001')
-    fireEvent.click(screen.getByRole('button', { name: 'Sair da fila' }))
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Sair da fila' }))
-    expect(await screen.findByText('Erro ao cancelar senha')).toBeInTheDocument()
+    await act()
+    expect(await screen.findByText(expected)).toBeInTheDocument()
   })
 
   it('shows the pause action without a countdown when no timeout is configured', async () => {
