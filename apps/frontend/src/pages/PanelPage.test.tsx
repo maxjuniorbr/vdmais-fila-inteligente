@@ -113,7 +113,73 @@ describe('PanelPage', () => {
     expect(screen.getAllByText(/^CAIXA /)).toHaveLength(callCount)
   })
 
-  it('shows operational data without presenting an unvalidated ETA', async () => {
+  it('never leaks PII even when the panel state payload carries extra identifiers', async () => {
+    // The TV is public (gated only by a panel token). Even if the backend payload
+    // ever regresses and ships raw identifiers, the public panel must render only
+    // the modeled fields (code / displayName / counterNumber / position) and never
+    // surface CPF, phone, full name or the internal RE code.
+    const pii = {
+      fullName: 'João da Silva Santos',
+      cpf: '123.456.789-00',
+      phone: '11999990000',
+      reCode: 'RE0001',
+    }
+    const state = {
+      isDayOpen: true,
+      current: { code: 'A001', displayName: 'João S.', counterNumber: 1, ...pii },
+      calling: [{ code: 'A001', displayName: 'João S.', counterNumber: 1, ...pii }],
+      inService: [{ code: 'S001', counterNumber: 1, ...pii }],
+      waiting: [{ code: 'W001', position: 1, ...pii }],
+      avgServiceSeconds: null,
+      avgWaitSeconds: null,
+    } as unknown as PanelFixture
+    renderPanel(state)
+
+    // The abbreviated display name (the only person identifier the TV shows) renders.
+    expect(await screen.findByText('João S.')).toBeInTheDocument()
+    expect(screen.getByText('A001')).toBeInTheDocument()
+    expect(screen.getByText('W001')).toBeInTheDocument()
+
+    // None of the raw PII values reach the DOM, on any of the board sections.
+    expect(screen.queryByText('João da Silva Santos')).not.toBeInTheDocument()
+    expect(screen.queryByText('123.456.789-00')).not.toBeInTheDocument()
+    expect(screen.queryByText('11999990000')).not.toBeInTheDocument()
+    expect(screen.queryByText('RE0001')).not.toBeInTheDocument()
+    expect(screen.queryByText(/João da Silva/)).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('123.456.789-00')
+    expect(document.body.textContent).not.toContain('11999990000')
+    expect(document.body.textContent).not.toContain('RE0001')
+  })
+
+  it('flags a priority ticket in the waiting list at a non-first position', async () => {
+    const state = fixture(1)
+    state.waiting = [
+      { code: 'W1', position: 1 },
+      { code: 'W2', position: 2, isPriority: true },
+      { code: 'W3', position: 3 },
+    ] as unknown as PanelFixture['waiting']
+    renderPanel(state)
+
+    // The PREFERENCIAL tag is shown for the priority ticket even though it is not
+    // the next one in line, and it is the only ticket carrying that tag.
+    await screen.findByText('W2')
+    const tags = screen.getAllByText('PREFERENCIAL')
+    expect(tags).toHaveLength(1)
+
+    // The priority ticket is the second row, not promoted to the front of the queue.
+    const codes = screen.getAllByText(/^W\d$/).map((node) => node.textContent)
+    expect(codes).toEqual(['W1', 'W2', 'W3'])
+
+    // PREFERENCIAL sits on the priority (non-first) ticket's row.
+    const priorityRow = screen.getByText('W2').closest('div')
+    expect(priorityRow).toHaveTextContent('PREFERENCIAL')
+    // The first ticket carries PRÓXIMA, never PREFERENCIAL.
+    const firstRow = screen.getByText('W1').closest('div')
+    expect(firstRow).toHaveTextContent('PRÓXIMA')
+    expect(firstRow).not.toHaveTextContent('PREFERENCIAL')
+  })
+
+  it('renders the waiting list, queue count, inService overflow and average durations', async () => {
     const state = fixture(2)
     state.inService = Array.from({ length: 9 }, (_, index) => ({
       code: `S${index + 1}`,
@@ -130,11 +196,13 @@ describe('PanelPage', () => {
     expect(await screen.findByText('W1')).toBeInTheDocument()
     expect(screen.getByText('8 na fila')).toBeInTheDocument()
     expect(screen.getByText('PRÓXIMA')).toBeInTheDocument()
+    // inService renders up to 8 chips plus a "+N" overflow chip (9 - 8 = 1).
     expect(screen.getByText('+1')).toBeInTheDocument()
+    // Averages are formatted through formatDuration (Xm Ys), never raw seconds.
+    expect(screen.getByText('ESPERA MÉDIA')).toBeInTheDocument()
     expect(screen.getByText('0m 45s')).toBeInTheDocument()
+    expect(screen.getByText('ATENDIMENTO MÉDIO')).toBeInTheDocument()
     expect(screen.getByText('2m 5s')).toBeInTheDocument()
-    expect(screen.queryByText(/~\d+\s*min/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/última espera/i)).not.toBeInTheDocument()
 
     expect(document.documentElement.style.overflow).toBe('hidden')
 

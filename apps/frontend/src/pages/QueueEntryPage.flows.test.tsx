@@ -190,6 +190,23 @@ describe('QueueEntryPage flows', () => {
     expect(screen.getByRole('button', { name: 'Entrar na fila' })).toBeEnabled()
   })
 
+  it('offers no priority toggle on the entry screen', async () => {
+    stubFetch()
+    renderPage()
+    await screen.findByText('ER Teste')
+
+    // The RE cannot self-prioritize: the entry screen exposes no "preferencial"
+    // switch/control on either tab.
+    expect(screen.queryByText(/preferencial/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/preferencial/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Criar cadastro' }))
+    expect(screen.queryByText(/preferencial/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/preferencial/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+  })
+
   it('shows an inline error when registration is rejected', async () => {
     stubFetch({ authStatus: 400, authBody: { message: 'CPF já cadastrado' } })
     renderPage()
