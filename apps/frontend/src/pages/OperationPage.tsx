@@ -267,9 +267,14 @@ export function OperationPage() {
   const isCalling = currentTicket?.state === 'CALLING'
   const counterIsActive = currentCounter?.state === 'ACTIVE'
   const isOwnCounter = currentCounter?.operator?.id === operatorId
+  // Dia fechado: o backend recusa abrir caixa / chamar senha. Desabilitamos as ações
+  // (prevenção de erro) em vez de deixar clicar e falhar; o Alert acima explica o motivo.
+  // Enquanto o overview não carregou, assume aberto (otimista) para não exibir um botão
+  // desabilitado sem explicação durante o load.
+  const isDayOpen = overview?.isDayOpen ?? true
 
   // "Chamar próximo" é a ação principal do caixa ativo (mora no card Caixa).
-  const canCallNext = isOwnCounter && counterIsActive && !currentTicket && !loading
+  const canCallNext = isOwnCounter && counterIsActive && !currentTicket && !loading && isDayOpen
   // A operadora só gerencia a fila (pausar/retomar senhas) com o caixa aberto e
   // NÃO pausado. Em pausa ou sem caixa, some as ações.
   const canManageQueue = isOwnCounter && currentCounter?.state !== 'PAUSED'
@@ -332,7 +337,7 @@ export function OperationPage() {
                 <Button
                   style={{ marginTop: brand.spacing[12] }}
                   onClick={() => act(() => api.post(`/counters/${counterId}/open`), 'Caixa assumido.')}
-                  disabled={loading}
+                  disabled={loading || !isDayOpen}
                 >
                   Assumir e abrir caixa
                 </Button>
