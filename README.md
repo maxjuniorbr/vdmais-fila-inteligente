@@ -121,6 +121,11 @@ OBSERVABILITY_TOKEN="replace-with-a-random-monitoring-token"
 # Nº de proxies confiáveis à frente do backend (load balancer). Default 1.
 # Define de qual posição do X-Forwarded-For o req.ip é extraído — base do rate-limit.
 TRUST_PROXY_HOPS=1
+# Validade dos tokens de entrada por canal (segundos). Opcionais: default 24h no código,
+# a env apenas sobrescreve. A sessão da representante expira sempre no fim do dia útil,
+# independente destes valores.
+QUEUE_ENTRY_QR_CODE_TTL_SECONDS=86400
+QUEUE_ENTRY_LINK_TTL_SECONDS=86400
 ```
 
 > **Importante:** fora de `development` e `test`, o backend rejeita a inicialização se `JWT_SECRET` for um valor fraco ou tiver menos de 32 caracteres. Em produção, use um segredo aleatório forte — por exemplo `openssl rand -base64 48`.

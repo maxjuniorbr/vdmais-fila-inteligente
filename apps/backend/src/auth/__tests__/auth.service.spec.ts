@@ -4,6 +4,7 @@ import { EntryChannel, Prisma, Role } from '@prisma/client'
 import * as bcrypt from 'bcrypt'
 import { AuditLogService } from '../../audit-log/audit-log.service'
 import { PrismaService } from '../../prisma/prisma.service'
+import { getBusinessDayRange } from '../../common/business-date'
 import { AuthService } from '../auth.service'
 import { QueueEntryTokenService } from '../queue-entry-token.service'
 import { LoginThrottleService } from '../login-throttle.service'
@@ -17,10 +18,22 @@ const prisma = {
   operator: { findUnique: jest.fn() },
 }
 
-const jwt = { sign: jest.fn(() => 'signed-token') }
+const jwt = {
+  sign: jest.fn((_payload?: unknown, _options?: { expiresIn?: number }) => 'signed-token'),
+}
 const auditLog = { log: jest.fn(), logIfERExists: jest.fn() }
+// Entry tokens are valid 24h on both channels; the mock returns a future exp so
+// the day-scoped session (end of business day) is always the binding limit.
+const ENTRY_TOKEN_TTL_SECONDS = 24 * 60 * 60
+const entryTokenExp = () => Math.floor(Date.now() / 1000) + ENTRY_TOKEN_TTL_SECONDS
+
 const queueEntryTokens = {
-  verify: jest.fn((token, erId, entryChannel) => ({ token, erId, entryChannel })),
+  verify: jest.fn((token, erId, entryChannel) => ({
+    token,
+    erId,
+    entryChannel,
+    exp: entryTokenExp(),
+  })),
 }
 
 const registerDto = {
@@ -54,6 +67,7 @@ describe('AuthService', () => {
       token,
       erId,
       entryChannel,
+      exp: entryTokenExp(),
     }))
   })
 
@@ -211,9 +225,16 @@ describe('AuthService', () => {
         'er-1',
         EntryChannel.QR_CODE,
       )
+      // The QR session is day-scoped (expires at end of the business day), well
+      // under the entry token's life and the global JWT default.
       expect(jwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({ erId: 'er-1', entryChannel: EntryChannel.QR_CODE }),
+        expect.objectContaining({ expiresIn: expect.any(Number) }),
       )
+      const qrCalls = jwt.sign.mock.calls
+      const qrExpiresIn = qrCalls[qrCalls.length - 1]?.[1]?.expiresIn
+      expect(qrExpiresIn).toBeGreaterThan(0)
+      expect(qrExpiresIn).toBeLessThanOrEqual(24 * 60 * 60)
       expect(auditLog.logIfERExists).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: 'queue_entry_started',
@@ -227,6 +248,62 @@ describe('AuthService', () => {
       await expect(
         service.register({ ...registerDto, entryChannel: undefined }),
       ).rejects.toThrow(UnauthorizedException)
+    })
+
+    it('expires the representative session at the end of the business day', async () => {
+      jest.useFakeTimers({ now: new Date('2026-06-24T15:00:00.000Z') })
+      try {
+        prisma.representative.findFirst.mockResolvedValue(null)
+        prisma.representative.create.mockResolvedValue({
+          id: 're-1',
+          fullName: 'Ana Souza',
+          cpf: '52998224725',
+          phone: '11999990000',
+          reCode: 'RE0001',
+        })
+
+        await service.register({ ...registerDto, entryChannel: EntryChannel.QR_CODE })
+
+        const calls = jwt.sign.mock.calls
+        const expiresIn = calls[calls.length - 1]?.[1]?.expiresIn
+        const expected =
+          Math.floor(getBusinessDayRange().end.getTime() / 1000) - Math.floor(Date.now() / 1000)
+        // End of the business day binds here (sooner than the entry token's 24h).
+        expect(expiresIn).toBe(expected)
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
+    it('caps the representative session at the entry token when it expires before end of day', async () => {
+      jest.useFakeTimers({ now: new Date('2026-06-24T15:00:00.000Z') })
+      try {
+        prisma.representative.findFirst.mockResolvedValue(null)
+        prisma.representative.create.mockResolvedValue({
+          id: 're-1',
+          fullName: 'Ana Souza',
+          cpf: '52998224725',
+          phone: '11999990000',
+          reCode: 'RE0001',
+        })
+        // Entry token expires in 1h — sooner than the end of the business day
+        // (~12h away at this instant), so the entry token is the binding limit.
+        const nowSeconds = Math.floor(Date.now() / 1000)
+        queueEntryTokens.verify.mockReturnValue({
+          token: 'entry-token',
+          erId: 'er-1',
+          entryChannel: EntryChannel.QR_CODE,
+          exp: nowSeconds + 3600,
+        })
+
+        await service.register({ ...registerDto, entryChannel: EntryChannel.QR_CODE })
+
+        const calls = jwt.sign.mock.calls
+        const expiresIn = calls[calls.length - 1]?.[1]?.expiresIn
+        expect(expiresIn).toBe(3600)
+      } finally {
+        jest.useRealTimers()
+      }
     })
   })
 
@@ -270,9 +347,16 @@ describe('AuthService', () => {
         'er-1',
         EntryChannel.LINK,
       )
+      // The LINK session is day-scoped (expires at end of the business day), not
+      // the global 7-day JWT default.
       expect(jwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({ erId: 'er-1', entryChannel: EntryChannel.LINK }),
+        expect.objectContaining({ expiresIn: expect.any(Number) }),
       )
+      const linkCalls = jwt.sign.mock.calls
+      const linkExpiresIn = linkCalls[linkCalls.length - 1]?.[1]?.expiresIn
+      expect(linkExpiresIn).toBeGreaterThan(0)
+      expect(linkExpiresIn).toBeLessThanOrEqual(24 * 60 * 60)
       expect(auditLog.logIfERExists).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: 'queue_entry_started',
@@ -414,6 +498,9 @@ describe('AuthService', () => {
       const result = await service.staffLogin({ email: 'OP@x.com', password: 'Teste@123' })
       expect(result.user.name).toBe('Operadora')
       expect(jwt.sign).toHaveBeenCalledWith(expect.objectContaining({ sv: 3 }))
+      // Staff tokens keep the global JWT_EXPIRES_IN — no per-call expiresIn override.
+      const staffCalls = jwt.sign.mock.calls
+      expect(staffCalls[staffCalls.length - 1]).toHaveLength(1)
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'operator_logged_in' }),
       )

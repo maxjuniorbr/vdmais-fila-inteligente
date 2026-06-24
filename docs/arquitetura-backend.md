@@ -341,7 +341,8 @@ Console interno de simulação para desenvolvimento e demonstração. **Bloquead
 - **JWT forte:** rejeita inicialização se `JWT_SECRET` < 32 caracteres fora de `development`/`test`
 - **Session versioning:** `sessionVersion` no token; rotacionado em logout ou revogação; validado pelo `JwtStrategy` a cada chamada
 - **PII:** CPF e telefone mascarados nas respostas (`***.***.344-**`), com fallback total para valores malformados; o `panelTokenHash` nunca sai em respostas de staff (`GET /ers/:id` expõe só `hasPanelToken`)
-- **Tokens de entrada:** assinados com chave separada, carregam `erId`, `entryChannel` e expiração
+- **Tokens de entrada:** assinados com chave separada, carregam `erId`, `entryChannel` e expiração. O TTL por canal é configurável via env (default 24h): `QUEUE_ENTRY_QR_CODE_TTL_SECONDS` e `QUEUE_ENTRY_LINK_TTL_SECONDS`
+- **Sessão da RE por dia:** o JWT da representante expira no **fim do dia útil** (meia-noite, fuso de São Paulo), nunca além do token de entrada — a fila é diária (senhas pendentes viram `day_rollover` na virada), então a sessão não sobrevive ao dia. Tokens de staff seguem o `JWT_EXPIRES_IN` global + `sessionVersion`
 - **CORS:** apenas a origem declarada em `FRONTEND_URL` é aceita
 
 ---

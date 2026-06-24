@@ -20,6 +20,8 @@
 | [DT-9](#dt-9--jwtauthguard-sem-spec-dedicado) | JwtAuthGuard sem spec dedicado | Baixa | Não |
 | [DT-10](#dt-10--ticketid-opaco-nos-eventos-de-socket-do-painel) | ticketId opaco nos eventos de socket do painel | Baixa | Não |
 | [DT-11](#dt-11--pausaretoma-de-senha-pela-gestora-sem-ui) | Pausa/retoma de senha pela gestora sem UI | Baixa | Não |
+| [DT-12](#dt-12--qr-code-digital-sem-rotação-automática) | QR Code digital sem rotação automática | Baixa | Não |
+| [DT-13](#dt-13--mensagem-de-sessão-expirada-genérica-para-a-re) | Mensagem de sessão expirada genérica para a RE | Baixa | Não |
 
 ---
 
@@ -218,3 +220,40 @@ mas é inacessível à gestora até a tela ser construída. Sem efeito em runtim
 **Encaminhamento.** Adicionar a ação de pausar/retomar senha à `ManagerPage` num PR de
 frontend dedicado, com testes. Análogo ao "atendente de check-in é previsto, com UI futura"
 da própria §9.5.1.
+
+---
+
+## DT-12 — QR Code digital sem rotação automática
+
+**Contexto.** O QR Code de entrada será exibido em **mídia digital** (a própria TV/painel),
+não impresso. O token do QR já vale só **24h** (`QUEUE_ENTRY_QR_CODE_TTL_SECONDS`), e a
+sessão da representante expira no dia corrente
+([auth.service.ts](../apps/backend/src/auth/auth.service.ts)). Porém **nada regenera o QR
+exibido automaticamente**: ao expirar, alguém precisa abrir **Gerenciar ER** e regenerar a
+URL **manualmente** a cada dia.
+
+**Impacto.** Operacional: depende de uma ação manual diária; se esquecida, o QR exibido para
+de funcionar até ser regenerado. Sem brecha de segurança — o token é assinado/vinculado ao
+ER/canal, a sessão dura só o dia, e há limite por IP + trava por credencial.
+
+**Encaminhamento.** Automatizar a rotação diária do QR digital (a TV/admin regenera/serve um
+token novo a cada dia útil), eliminando o passo manual. Toca frontend (TV/admin) — avaliar
+junto com o frontend.
+
+---
+
+## DT-13 — Mensagem de sessão expirada genérica para a RE
+
+**Contexto.** A sessão da representante agora expira no fim do dia útil
+([auth.service.ts](../apps/backend/src/auth/auth.service.ts)). Quando isso acontece (ou o
+token de entrada expira), a próxima chamada recebe `401` e o frontend cai no fluxo genérico
+de sessão expirada — limpa a sessão e volta ao formulário de entrada/login, sem uma
+mensagem contextual ("sua sessão do dia expirou, entre novamente").
+
+**Impacto.** Apenas UX: a RE vê a tela de entrada padrão em vez de um aviso amigável. Sem
+efeito funcional ou de segurança — o fluxo `notifySessionExpired()`/`SESSION_EXPIRED_EVENT`
+já trata o `401` corretamente.
+
+**Encaminhamento.** Adicionar, na tela da RE, uma mensagem amigável quando a sessão do dia
+expira (ex.: aviso contextual antes de reabrir o login). Toca frontend — avaliar junto com
+o frontend. Relacionado a [DT-12](#dt-12--qr-code-digital-sem-rotação-automática).
