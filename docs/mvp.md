@@ -716,6 +716,7 @@ Permissões sugeridas:
 - incluir RE na fila (podendo já marcar como preferencial);
 - consultar cadastro;
 - cancelar senha com motivo;
+- pausar/retomar a senha de um RE (ver 9.5.1);
 - marcar/remover atendimento preferencial (ver 13.5).
 
 **Gestora**
