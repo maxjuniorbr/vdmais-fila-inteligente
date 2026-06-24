@@ -94,7 +94,7 @@ metadata (JSON) / createdAt
 | `REPRESENTATIVE` | Auto | Entrar na fila, pausar/retomar/cancelar própria senha |
 | `OPERATOR` | ER | Abrir caixa, chamar próximo, iniciar/finalizar atendimento, marcar preferencial |
 | `ATTENDANT` | ER | Check-in assistido (pode já entrar preferencial), criar representantes, cancelar senhas, marcar preferencial |
-| `MANAGER` | ER | Abrir/fechar dia, métricas, correções, liberar caixas órfãos, marcar preferencial |
+| `MANAGER` | ER | Abrir/fechar dia, métricas, correções, liberar caixas órfãos, pausar/retomar senha (inclusive cross-caixa), marcar preferencial |
 | `ADMIN` | Global | Criar ERs, caixas, contas de equipe, rotacionar token do painel |
 
 ---
@@ -202,8 +202,8 @@ Endpoints centrais para operação e integração.
 | `POST` | `/tickets/:id/recall` | OPERATOR | — | Segunda chamada (rechamada) |
 | `POST` | `/tickets/:id/pause` | REPRESENTATIVE | — | Pausar senha (a retomada mantém a posição original; só o timeout vai ao fim) |
 | `POST` | `/tickets/:id/resume` | REPRESENTATIVE | — | Retomar senha pausada na posição original (atrás de preferenciais que entraram na pausa) |
-| `POST` | `/tickets/:id/staff-pause` | OPERATOR, ATTENDANT, ADMIN | — | Pausar senha de um RE pela operação (aceita WAITING/CALLING/IN_SERVICE; libera o caixa se estava em uso) |
-| `POST` | `/tickets/:id/staff-resume` | OPERATOR, ATTENDANT, ADMIN | — | Retomar senha pausada pela operação |
+| `POST` | `/tickets/:id/staff-pause` | OPERATOR, ATTENDANT, MANAGER, ADMIN | — | Pausar senha de um RE pela operação (aceita WAITING/CALLING/IN_SERVICE; libera o caixa se estava em uso). A gestora pode pausar cross-caixa (§9.5.1) |
+| `POST` | `/tickets/:id/staff-resume` | OPERATOR, ATTENDANT, MANAGER, ADMIN | — | Retomar senha pausada pela operação |
 | `POST` | `/tickets/:id/mark-priority` | OPERATOR, ATTENDANT, MANAGER | — | Marcar atendimento preferencial (Lei 10.048); só senha WAITING/PAUSED |
 | `POST` | `/tickets/:id/unmark-priority` | OPERATOR, ATTENDANT, MANAGER | — | Remover atendimento preferencial; só senha WAITING/PAUSED |
 | `POST` | `/tickets/:id/self-cancel` | REPRESENTATIVE | — | Cancelamento próprio da RE |
