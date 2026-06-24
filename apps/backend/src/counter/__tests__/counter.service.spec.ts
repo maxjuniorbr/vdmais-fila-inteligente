@@ -209,6 +209,19 @@ describe('CounterService', () => {
     await expect(service.pauseCounter('counter-1', operator, 'x')).rejects.toThrow(BadRequestException)
   })
 
+  it('rejects pauseCounter if a concurrent transition changed the counter (CAS lost)', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.ACTIVE,
+      operatorId: 'op-1',
+    })
+    tx.counter.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(service.pauseCounter('counter-1', operator, 'x')).rejects.toThrow(BadRequestException)
+    expect(tx.auditEvent.create).not.toHaveBeenCalled()
+    expect(panel.emitToER).not.toHaveBeenCalled()
+  })
+
   it('resumes a PAUSED counter owned by the operator', async () => {
     prisma.counter.findUnique.mockResolvedValue({
       ...counterBase,
@@ -246,6 +259,19 @@ describe('CounterService', () => {
     })
 
     await expect(service.resumeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+  })
+
+  it('rejects resumeCounter if a concurrent transition changed the counter (CAS lost)', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.PAUSED,
+      operatorId: 'op-1',
+    })
+    tx.counter.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(service.resumeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+    expect(tx.auditEvent.create).not.toHaveBeenCalled()
+    expect(panel.emitToER).not.toHaveBeenCalled()
   })
 
   it('closes an ACTIVE counter with no open tickets', async () => {
@@ -305,6 +331,42 @@ describe('CounterService', () => {
     })
 
     await expect(service.closeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+  })
+
+  it('rejects closeCounter if counter is in IN_SERVICE state', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.IN_SERVICE,
+      operatorId: 'op-1',
+    })
+
+    await expect(service.closeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects closeCounter if counter is already UNAVAILABLE', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.UNAVAILABLE,
+      operatorId: 'op-1',
+    })
+
+    await expect(service.closeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects closeCounter if a concurrent transition changed the counter (CAS lost)', async () => {
+    prisma.counter.findUnique.mockResolvedValue({
+      ...counterBase,
+      state: CounterState.ACTIVE,
+      operatorId: 'op-1',
+    })
+    tx.ticket.findFirst.mockResolvedValue(null)
+    tx.counter.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(service.closeCounter('counter-1', operator)).rejects.toThrow(BadRequestException)
+    expect(tx.auditEvent.create).not.toHaveBeenCalled()
+    expect(panel.emitToER).not.toHaveBeenCalled()
   })
 
   it('force-releases a counter and marks a CALLING ticket as no-show', async () => {

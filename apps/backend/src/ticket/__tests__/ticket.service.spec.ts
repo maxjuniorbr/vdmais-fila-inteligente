@@ -606,6 +606,16 @@ describe('TicketService', () => {
       expect(err.getResponse()).toMatchObject({ code: 'TICKET_ALREADY_CLOSED' })
     })
 
+    it('completeService rejects an IN_SERVICE ticket without a counter as TICKET_NOT_IN_SERVICE', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.IN_SERVICE,
+        counterId: null,
+      })
+      const err = await service.completeService('ticket-1', {}).catch((e) => e)
+      expect(err.getResponse()).toMatchObject({ code: 'TICKET_NOT_IN_SERVICE' })
+    })
+
     it('advanceToInService is idempotent when a concurrent call wins the transition (race)', async () => {
       prisma.ticket.findUnique
         .mockResolvedValueOnce({ ...ticketBase, state: TicketState.CALLING, counterId: 'counter-1', operatorId: 'op-9' })
@@ -665,6 +675,23 @@ describe('TicketService', () => {
       data: expect.objectContaining({ eventType: 'ticket_cancelled' }),
     })
     expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.cancelled', expect.any(Object))
+  })
+
+  it('frees the counter when cancelling a ticket parked at one', async () => {
+    prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.IN_SERVICE })
+    tx.ticket.findUnique.mockResolvedValue({
+      ...ticketBase,
+      state: TicketState.IN_SERVICE,
+      counterId: 'counter-1',
+    })
+    tx.ticket.update.mockResolvedValue({ ...ticketBase, state: TicketState.CANCELLED })
+
+    await service.cancel('ticket-1', 'duplicata', manager)
+
+    expect(tx.counter.update).toHaveBeenCalledWith({
+      where: { id: 'counter-1' },
+      data: { state: CounterState.ACTIVE },
+    })
   })
 
   it('restores a NO_SHOW ticket to WAITING at the end of the queue', async () => {
@@ -1072,6 +1099,12 @@ describe('TicketService', () => {
       await expect(service.staffPauseTicket('ticket-1', admin)).resolves.toBeTruthy()
       expect(prisma.counter.findFirst).not.toHaveBeenCalled()
     })
+
+    it('rejects staff-pause when the ticket already moved (CAS finds no row)', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
+      tx.ticket.updateMany.mockResolvedValue({ count: 0 })
+      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+    })
   })
 
   describe('staffResumeTicket', () => {
@@ -1169,6 +1202,19 @@ describe('TicketService', () => {
     it('rejects an operator from another ER', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED, erId: 'er-2' })
       await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(ForbiddenException)
+    })
+
+    it('rejects resuming when the daily operation is closed', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED })
+      prisma.eR.findUnique.mockResolvedValue({ isDayOpen: false })
+      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+    })
+
+    it('rejects an operator without an active counter', async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED })
+      prisma.eR.findUnique.mockResolvedValue({ isDayOpen: true })
+      prisma.counter.findFirst.mockResolvedValue(null)
+      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
     })
   })
 
@@ -1904,6 +1950,11 @@ describe('TicketService', () => {
         where: { id: 'ticket-1', state: TicketState.PAUSED },
         data: expect.objectContaining({ state: TicketState.WAITING, pausedAt: null }),
       })
+      // Penalidade da expiração: NOVO slot ao FIM da fila (nextSequence) e NOVO
+      // código — ao contrário da retomada manual, que preserva queuePosition/code.
+      const expiredData = tx.ticket.updateMany.mock.calls[0][0].data
+      expect(expiredData.queuePosition).toBe(9)
+      expect(expiredData.code).toBe('A009')
       expect(tx.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ eventType: 'ticket_pause_expired' }),
       })
@@ -1939,6 +1990,57 @@ describe('TicketService', () => {
 
       expect(tx.ticket.updateMany).toHaveBeenCalledTimes(1)
       expect(panel.emitToER).not.toHaveBeenCalled()
+    })
+
+    it('only scans PAUSED tickets of ERs whose pause timeout is enabled', async () => {
+      prisma.ticket.findMany.mockResolvedValue([])
+
+      await service.expireStalePauses()
+
+      // O filtro `pauseTimeoutSeconds > 0` é o que desliga a expiração num ER com
+      // timeout 0: essas senhas nem entram na varredura.
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            state: TicketState.PAUSED,
+            pausedAt: { not: null },
+            er: { pauseTimeoutSeconds: { gt: 0 } },
+          },
+        }),
+      )
+    })
+
+    it('expires exactly at the timeout boundary but not one second before', async () => {
+      jest.useFakeTimers()
+      jest.setSystemTime(new Date('2026-06-23T15:00:00Z'))
+      try {
+        tx.queue.upsert.mockResolvedValue({ id: 'queue-1', nextSequence: 9 })
+        tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+        tx.ticket.findUniqueOrThrow.mockResolvedValue({
+          ...ticketBase,
+          state: TicketState.WAITING,
+          code: 'A009',
+          queuePosition: 9,
+          representative: { fullName: 'Maria Teste' },
+        })
+        prisma.ticket.count.mockResolvedValue(9)
+
+        // 1s antes do limite (timeout 300s) → NÃO expira.
+        prisma.ticket.findMany.mockResolvedValue([
+          { ...stale, pausedAt: new Date(Date.now() - 299_000) },
+        ])
+        await service.expireStalePauses()
+        expect(tx.ticket.updateMany).not.toHaveBeenCalled()
+
+        // Exatamente no limite (300s; comparação `>=`) → expira.
+        prisma.ticket.findMany.mockResolvedValue([
+          { ...stale, pausedAt: new Date(Date.now() - 300_000) },
+        ])
+        await service.expireStalePauses()
+        expect(tx.ticket.updateMany).toHaveBeenCalled()
+      } finally {
+        jest.useRealTimers()
+      }
     })
   })
 })
