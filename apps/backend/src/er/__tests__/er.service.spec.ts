@@ -61,12 +61,54 @@ describe('ERService', () => {
     const result = await service.closeDay('er-1', manager)
 
     expect(result.isDayOpen).toBe(false)
-    expect(tx.queue.updateMany).toHaveBeenCalled()
+    // O fechamento marca closedAt apenas nas filas do ER/dia ainda abertas
+    // (closedAt: null) — não reabre nem rebate filas já fechadas.
+    expect(tx.queue.updateMany).toHaveBeenCalledWith({
+      where: { erId: 'er-1', businessDate: expect.any(Date), closedAt: null },
+      data: { closedAt: expect.any(Date) },
+    })
     expect(panel.emitToER).toHaveBeenCalledWith(
       'er-1',
       'day.closed',
       expect.objectContaining({ closedAt: expect.any(Date) }),
     )
+  })
+
+  it('does not block closing on IN_SERVICE tickets and auto-finishes them', async () => {
+    // Comportamento INTENCIONAL: a contagem de bloqueio considera apenas
+    // WAITING/CALLING/PAUSED. Senhas IN_SERVICE NÃO impedem o fechamento — são
+    // auto-finalizadas (service_force_finished) para não ficarem órfãs e para
+    // preservarem os números de atendimentos concluídos.
+    tx.ticket.count.mockResolvedValue(0)
+    tx.ticket.findMany.mockResolvedValue([{ id: 'svc-9', counterId: 'c9' }])
+    tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+
+    const result = await service.closeDay('er-1', manager)
+
+    // O dia FECHA mesmo com IN_SERVICE presente (sem ConflictException).
+    expect(result.isDayOpen).toBe(false)
+    expect(tx.eR.update).toHaveBeenCalledWith({
+      where: { id: 'er-1' },
+      data: { isDayOpen: false, dayClosedAt: expect.any(Date) },
+    })
+    // A contagem de bloqueio não inclui IN_SERVICE.
+    expect(tx.ticket.count).toHaveBeenCalledWith({
+      where: {
+        erId: 'er-1',
+        queue: { businessDate: expect.any(Date) },
+        state: {
+          in: [TicketState.WAITING, TicketState.CALLING, TicketState.PAUSED],
+        },
+      },
+    })
+    // E o IN_SERVICE remanescente é auto-finalizado.
+    expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['svc-9'] } },
+      data: { state: TicketState.FINISHED, serviceFinishedAt: expect.any(Date) },
+    })
+    expect(tx.auditEvent.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ eventType: 'service_force_finished', ticketId: 'svc-9' })],
+    })
   })
 
   it('auto-finishes in-service tickets and releases their counter when closing the day', async () => {
@@ -234,7 +276,13 @@ describe('ERService', () => {
 
       expect(result.isDayOpen).toBe(true)
       expect(tx.ticket.updateMany).not.toHaveBeenCalled()
-      expect(tx.queue.upsert).toHaveBeenCalled()
+      // O upsert da fila do dia: cria a fila já aberta (openedAt) ou reabre uma
+      // fila existente do mesmo businessDate, sempre limpando closedAt.
+      expect(tx.queue.upsert).toHaveBeenCalledWith({
+        where: { erId_businessDate: { erId: 'er-1', businessDate: expect.any(Date) } },
+        create: { erId: 'er-1', businessDate: expect.any(Date), openedAt: expect.any(Date) },
+        update: { openedAt: expect.any(Date), closedAt: null },
+      })
       expect(tx.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           eventType: 'daily_queue_opened',
@@ -282,6 +330,62 @@ describe('ERService', () => {
           eventType: 'daily_queue_opened',
           metadata: { forcedClosedCount: 2, releasedCounters: 1 },
         }),
+      })
+    })
+
+    it('sweeps PAUSED/IN_SERVICE leftovers from previous days with rollover audit', async () => {
+      // Saneamento de virada de dia: senhas PENDENTES (incluindo PAUSED) de dias
+      // ANTERIORES (businessDate < hoje) viram NO_SHOW. Este teste blinda o filtro
+      // (lt, não lte/equals), a inclusão de PAUSED/IN_SERVICE na constante de estados
+      // e a metadata de auditoria — coisas que o teste acima não afirma.
+      tx.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: true })
+      tx.queue.findUnique.mockResolvedValue(null)
+      tx.ticket.findMany.mockResolvedValue([
+        { id: 't9', counterId: 'c9', state: TicketState.PAUSED },
+      ])
+      tx.ticket.updateMany.mockResolvedValue({ count: 1 })
+      tx.counter.updateMany.mockResolvedValue({ count: 0 })
+      tx.eR.update.mockResolvedValue({ id: 'er-1', isDayOpen: true })
+
+      await service.openDay('er-1', manager)
+
+      // Filtro: só estados pendentes (incl. IN_SERVICE e PAUSED) de dias anteriores.
+      expect(tx.ticket.findMany).toHaveBeenCalledWith({
+        where: {
+          erId: 'er-1',
+          state: {
+            in: [
+              TicketState.WAITING,
+              TicketState.CALLING,
+              TicketState.IN_SERVICE,
+              TicketState.PAUSED,
+            ],
+          },
+          queue: { businessDate: { lt: expect.any(Date) } },
+        },
+        select: { id: true, counterId: true, state: true },
+      })
+
+      // A senha PAUSED é encerrada como NO_SHOW...
+      expect(tx.ticket.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['t9'] } },
+        data: { state: TicketState.NO_SHOW, noShowAt: expect.any(Date) },
+      })
+
+      // ...e a auditoria carrega reason/previousState/counterId para preservar os indicadores.
+      expect(tx.auditEvent.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            eventType: 'ticket_force_closed',
+            ticketId: 't9',
+            metadata: expect.objectContaining({
+              forcedClose: true,
+              reason: 'day_rollover',
+              previousState: TicketState.PAUSED,
+              counterId: 'c9',
+            }),
+          }),
+        ],
       })
     })
 
