@@ -30,7 +30,7 @@ export class CounterController {
     @Body() dto: PauseCounterDto,
     @Request() req: { user: AuthenticatedUser },
   ) {
-    return this.counterService.pauseCounter(id, req.user, dto.reason)
+    return this.counterService.pauseCounter(id, req.user, dto.reason, dto.detail)
   }
 
   @Post(':id/resume')

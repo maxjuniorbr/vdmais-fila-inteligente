@@ -47,11 +47,33 @@ describe('OperationPage flows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Não compareceu' }))
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/t1/no-show'))
 
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('Motivo da pausa'), 'almoço')
+    fireEvent.change(screen.getByLabelText('Motivo da pausa'), { target: { value: 'intervalo' } })
     fireEvent.click(screen.getByRole('button', { name: 'Pausar' }))
     await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/counters/c1/pause', { reason: 'almoço' }),
+      expect(api.post).toHaveBeenCalledWith('/counters/c1/pause', {
+        reason: 'intervalo',
+        detail: undefined,
+      }),
+    )
+  })
+
+  it('pauses the counter with "outro" and a free-text detail', async () => {
+    setOverview({
+      counters: [{ id: 'c1', number: 1, state: 'ACTIVE', operator: { id: 'op-1', name: 'Eu' } }],
+    })
+    renderPage()
+
+    fireEvent.change(await screen.findByLabelText('Motivo da pausa'), {
+      target: { value: 'outro' },
+    })
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Detalhe'), 'reunião rápida')
+    fireEvent.click(screen.getByRole('button', { name: 'Pausar' }))
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/counters/c1/pause', {
+        reason: 'outro',
+        detail: 'reunião rápida',
+      }),
     )
   })
 
@@ -99,15 +121,19 @@ describe('OperationPage flows', () => {
     vi.mocked(api.post).mockRejectedValue(new Error('Não foi possível pausar'))
     renderPage()
 
-    const user = userEvent.setup()
-    await user.type(await screen.findByLabelText('Motivo da pausa'), 'almoço')
+    fireEvent.change(await screen.findByLabelText('Motivo da pausa'), {
+      target: { value: 'intervalo' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Pausar' }))
 
     await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/counters/c1/pause', { reason: 'almoço' }),
+      expect(api.post).toHaveBeenCalledWith('/counters/c1/pause', {
+        reason: 'intervalo',
+        detail: undefined,
+      }),
     )
-    // The pause failed, so the typed reason must be preserved for a retry.
-    expect(screen.getByLabelText('Motivo da pausa')).toHaveValue('almoço')
+    // The pause failed, so the chosen reason must stay selected for a retry.
+    expect(screen.getByLabelText('Motivo da pausa')).toHaveValue('intervalo')
   })
 
   it('lets an operator assume an available counter', async () => {
