@@ -19,6 +19,7 @@
 | [DT-8](#dt-8--complexidade-cognitiva-do-operationpage-acima-do-limite) | Complexidade cognitiva do OperationPage acima do limite | Baixa | Não |
 | [DT-9](#dt-9--jwtauthguard-sem-spec-dedicado) | JwtAuthGuard sem spec dedicado | Baixa | Não |
 | [DT-10](#dt-10--ticketid-opaco-nos-eventos-de-socket-do-painel) | ticketId opaco nos eventos de socket do painel | Baixa | Não |
+| [DT-11](#dt-11--pausaretoma-de-senha-pela-gestora-sem-ui) | Pausa/retoma de senha pela gestora sem UI | Baixa | Não |
 
 ---
 
@@ -198,3 +199,22 @@ com o token antigo são barradas.
 contrato fixa que nenhuma PII real vaza pelo socket. Se a TV precisar ser exposta a uma
 audiência mais ampla, separar a sala pública (TV, eventos sem `ticketId`) da sala do staff
 (payload completo) — mudança que também toca o frontend, a avaliar junto com o frontend.
+
+---
+
+## DT-11 — Pausa/retoma de senha pela gestora sem UI
+
+**Contexto.** O backend agora aceita `MANAGER` em `POST /tickets/:id/staff-pause` e
+`/staff-resume` ([ticket.controller.ts](../apps/backend/src/ticket/ticket.controller.ts)),
+cobrindo o caso cross-caixa que a [§9.5.1 do mvp.md](./mvp.md) reserva à gestora. A UI da
+gestora ([`ManagerPage`](../apps/frontend/src/pages/ManagerPage.tsx)) ainda **não** expõe a
+ação — os botões de pausar/retomar senha vivem só na tela da operadora
+([`OperationPage`](../apps/frontend/src/pages/OperationPage.tsx), perfil `OPERATOR`).
+
+**Impacto.** Apenas funcional/UX: a capacidade existe no backend (e é coberta por testes)
+mas é inacessível à gestora até a tela ser construída. Sem efeito em runtime ou segurança
+— o endpoint segue protegido por `@Roles` + `_assertStaffER`.
+
+**Encaminhamento.** Adicionar a ação de pausar/retomar senha à `ManagerPage` num PR de
+frontend dedicado, com testes. Análogo ao "atendente de check-in é previsto, com UI futura"
+da própria §9.5.1.
