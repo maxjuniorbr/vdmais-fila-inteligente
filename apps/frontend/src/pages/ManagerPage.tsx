@@ -10,7 +10,7 @@ import {
   setManagementERId,
 } from '../auth/session'
 import { useStaffSession } from '../auth/useStaffSession'
-import { ActionMenu } from '../components/ActionMenu'
+import { ActionMenu, type ActionMenuItem } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { AppHeader } from '../components/AppHeader'
 import { Badge } from '../components/Badge'
@@ -161,17 +161,34 @@ function CancelTicketAction({
           },
         ]
       : []
+  // Uma senha EM ATENDIMENTO não é resolvida por /cancel: isso a marcaria CANCELLED de
+  // forma irreversível (o restore recusa cancelada com serviceStartedAt) e contaria um
+  // atendimento real como cancelamento, distorcendo as métricas. A resolução de um
+  // atendimento em aberto passa por /correct (finalizar ou cancelar o atendimento).
+  const resolutionItems: ActionMenuItem[] =
+    ticket.state === 'IN_SERVICE'
+      ? [
+          {
+            label: 'Finalizar atendimento',
+            onClick: () => onSelect({ kind: 'correct-finish', ticket }),
+          },
+          {
+            label: 'Cancelar atendimento',
+            tone: 'danger',
+            onClick: () => onSelect({ kind: 'correct-cancel', ticket }),
+          },
+        ]
+      : [
+          {
+            label: 'Cancelar senha',
+            tone: 'danger',
+            onClick: () => onSelect({ kind: 'cancel', ticket }),
+          },
+        ]
   return (
     <ActionMenu
       label={`Ações da senha ${ticket.code}`}
-      items={[
-        ...priorityItems,
-        {
-          label: 'Cancelar senha',
-          tone: 'danger',
-          onClick: () => onSelect({ kind: 'cancel', ticket }),
-        },
-      ]}
+      items={[...priorityItems, ...resolutionItems]}
     />
   )
 }
