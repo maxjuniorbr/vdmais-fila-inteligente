@@ -23,6 +23,7 @@
 | [DT-12](#dt-12--qr-code-digital-sem-rotação-automática) | QR Code digital sem rotação automática | Baixa | Não |
 | [DT-13](#dt-13--mensagem-de-sessão-expirada-genérica-para-a-re) | Mensagem de sessão expirada genérica para a RE | Baixa | Não |
 | [DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado) | Cadastro mínimo da RE será descontinuado | Baixa | Não |
+| [DT-15](#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção) | Volume do AuditEvent em escala (particionamento/retenção) | Média | Não |
 
 ---
 
@@ -45,6 +46,10 @@ storage do `@nestjs/throttler` em Redis e `LoginThrottleService` reescrito sobre
 mesmo Redis (com TTL nativo, dispensando a poda manual). Relacionado a [DT-2](#dt-2--websocket-socketio-sem-adaptador-compartilhado)
 (mesma causa raiz: suposições de instância única). Ver [stack-mvp.md → Redis](./stack-mvp.md).
 
+No [alvo corporativo](./deployment-mvp.md#perfil-de-carga-e-capacidade-entrega-corporativa)
+(5.000 ERs / ~100k pedidos/dia), isso deixa de ser endurecimento adiável e vira
+**pré-requisito de capacidade no go-live**: o volume já exige múltiplas instâncias.
+
 ---
 
 ## DT-2 — WebSocket (Socket.IO) sem adaptador compartilhado
@@ -59,6 +64,11 @@ roda em **instância única** justamente por isso ([deployment-mvp.md](./deploym
 
 **Encaminhamento.** Adotar o adaptador Redis do Socket.IO (pub/sub) ao escalar
 horizontalmente, ou manter sticky sessions como paliativo. Decidir junto de [DT-1](#dt-1--estado-de-rate-limit-e-trava-de-brute-force-em-memória).
+
+No [alvo corporativo](./deployment-mvp.md#perfil-de-carga-e-capacidade-entrega-corporativa)
+(~15–25 mil WebSockets simultâneos no pico nacional), o adaptador Redis é **pré-requisito
+de capacidade no go-live**, não opcional. Sticky sessions **não serve** aqui: clientes do
+mesmo ER caem em instâncias diferentes e o fan-out da sala `er:<erId>` dessincroniza.
 
 ---
 
@@ -75,7 +85,8 @@ mascaramento, amostragem ou política de retenção explícita.
 
 **Encaminhamento.** Decisão de produto/SI: manter como está (justificado por segurança),
 **hashear/truncar** o IP no log, ou amostrar. Reavaliar na revisão de LGPD/SI da entrega
-corporativa.
+corporativa. A retenção do `AuditEvent` em escala — tema próximo, pelo ângulo do banco —
+está em [DT-15](#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção).
 
 ---
 
@@ -128,15 +139,25 @@ de breaking changes e rodando a suíte completa (unit + e2e) antes de promover.
 ## DT-7 — Overrides de dependências para patches de segurança
 
 **Contexto.** Algumas dependências de runtime ainda fixam transitivos vulneráveis não
-corrigidos upstream: `@nestjs/platform-express` fixa o `multer` (DoS) e a stack do
-Socket.IO arrasta o `ws` (DoS). Como `npm audit --audit-level=high` é gate de CI
+corrigidos upstream: `@nestjs/platform-express` fixa o `multer` (DoS), a stack do
+Socket.IO arrasta o `ws` (DoS), e `cosmiconfig` (via `@nestjs/cli`) + `@nestjs/swagger`
+arrastam o `js-yaml` < 4.2.0 (DoS quadrático em merge keys — GHSA-h67p-54hq-rp68). Como
+`npm audit --audit-level=high` é gate de CI
 ([README → CI e segurança](../README.md#integração-contínua-e-segurança)), o `package.json`
-raiz usa `overrides` para forçar versões corrigidas (`multer`, `ws`, `form-data`) sem
-subir o major do NestJS — que `npm audit fix --force` faria, rebaixando-o.
+raiz usa `overrides` para forçar versões corrigidas (`multer`, `ws`, `form-data`,
+`js-yaml ^4.2.0`) sem subir o major do NestJS — que `npm audit fix --force` faria,
+rebaixando-o.
 
 **Impacto.** Os overrides são uma trava manual: o Dependabot não os atualiza sozinho e
 podem mascarar incompatibilidades se um pacote pai passar a exigir uma faixa diferente.
 Risco baixo — patches dentro do mesmo major, validados por unit + e2e.
+
+**Resíduo conhecido (js-yaml 3.x).** O `@istanbuljs/load-nyc-config` (transitivo de
+**dev**, via babel-plugin-istanbul/jest) fixa `js-yaml` **3.x**, que não tem patch para
+a GHSA-h67p-54hq-rp68 (a correção é a linha 4.x) e quebraria se forçado a 4.x (`safeLoad`
+removido). Por isso há um override aninhado mantendo-o em `^3.14.2`. É **dev-only**, sem
+superfície real (só parseia configs de cobertura nossas, não entrada não confiável) e
+abaixo do gate `high`; aceito até o `load-nyc-config` (sem manutenção) sair da árvore.
 
 **Encaminhamento.** Remover cada override quando o pacote pai subir para uma versão que já
 traga o transitivo corrigido; revisar na rotina do Dependabot. Relacionado a
@@ -276,3 +297,25 @@ termos/uso de dados, observação de check-in) **não serão adicionados**.
 **Encaminhamento.** Em momento futuro, substituir o cadastro mínimo pela autenticação via
 API do app / fluxo sem cadastro com QR rotativo, e então reavaliar §5 (cadastro) e §6
 (jornadas) do [mvp.md](./mvp.md). Toca backend (auth) e frontend.
+
+---
+
+## DT-15 — Volume do AuditEvent em escala (particionamento e retenção)
+
+**Contexto.** Cada atendimento gera ~5–7 eventos de ciclo de vida em `AuditEvent`
+(criação, chamada, início, fim/não comparecimento/cancelamento), além dos eventos de caixa
+e de abertura/fechamento de dia. A tabela é **append-only** e é a fonte das métricas
+históricas — não pode ser truncada sem perder evidência operacional
+([deployment-mvp.md → Backup e rollback](./deployment-mvp.md)).
+
+**Impacto (escala/volume).** No [alvo corporativo](./deployment-mvp.md#perfil-de-carga-e-capacidade-entrega-corporativa)
+(~100k pedidos/dia), a tabela cresce **~180–255M de linhas/ano** (estimativa). Em tabela
+única sem particionamento, isso degrada escrita, índices, vacuum e o custo de storage do
+banco gerenciado ao longo do tempo. Soma-se a ausência de **política de retenção** explícita
+— também levantada, pelo ângulo dos logs, na [DT-3](#dt-3--log-de-ip-por-requisição-lgpd).
+
+**Encaminhamento.** Na entrega corporativa, **particionar `AuditEvent` por data**
+(mensal/diária) e definir uma **política de retenção/arquivamento** (ex.: dados quentes no
+Postgres, frios em storage de objeto/data lake), alinhada à revisão de LGPD/SI. Decidir os
+alvos de retenção junto com RPO/RTO ([deployment-mvp.md → Backup e rollback](./deployment-mvp.md)).
+Sem impacto em runtime hoje; é dimensionamento e governança de dados para o volume-alvo.
