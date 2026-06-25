@@ -25,6 +25,50 @@ e a trava de brute-force também guardam estado em memória por processo. Esses 
 pontos estão registrados em [Débitos técnicos → DT-1 e DT-2](./debitos-tecnicos.md);
 Redis permanece fora do escopo do MVP e é o caminho para ambos ao escalar.
 
+## Perfil de carga e capacidade (entrega corporativa)
+
+> Base de dimensionamento para o **go-live corporativo** (não para a validação do MVP).
+> Os números do alvo valem **desde o go-live**, não como horizonte futuro: o
+> provisionamento inicial na nuvem corporativa já deve sustentá-los.
+
+| Dimensão | Linha de base (hoje) | Alvo mínimo (go-live) |
+|---|---|---|
+| ERs | 1.800+ | 5.000 |
+| Pedidos/dia | ~50 mil | ~100 mil |
+| Distribuição | Nacional (Brasil) | Nacional (Brasil) |
+
+> "Pedido" é a transação de negócio; "atendimento" é a senha na fila deste sistema. Para
+> capacidade são da mesma ordem de grandeza — atendimentos podem ser um pouco maiores (há
+> não comparecimento/cancelamento sem pedido). Refine com a medição de campo do piloto.
+
+**Perfil derivado do alvo** — estimativas, com os pressupostos: ~10h de operação/dia,
+fator de pico ~3× e ~5–7 eventos de auditoria por atendimento.
+
+- **Throughput HTTP:** ~80–170 req/s no pico do ciclo de atendimento. Compute não é o
+  gargalo; ≥2 instâncias justificam-se por folga e disponibilidade, não por CPU.
+- **Conexões WebSocket simultâneas:** ordem de **15–25 mil no pico nacional** (≈1 TV por ER
+  mais as telas de operadora e gestora). **É o dimensionamento dominante**, acima do req/s.
+- **Crescimento de dados:** ~36M de tickets/ano e **~180–255M de eventos de `AuditEvent`/ano**
+  (ver [Débitos técnicos → DT-15](./debitos-tecnicos.md#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção)).
+- **Pool de conexões:** com múltiplas instâncias × pool do Prisma, o `max_connections` do
+  Postgres vira limite; coloque **RDS Proxy/PgBouncer** (ou equivalente) à frente do banco.
+
+**Consequências de arquitetura já no go-live:**
+
+- Multi-instância com **store compartilhado (Redis)** é pré-requisito de **capacidade**, não
+  só de disponibilidade: nesse volume de WebSockets uma instância única não basta, e
+  [DT-1/DT-2](./debitos-tecnicos.md) quebram sem o adaptador. _Sticky sessions não resolve_
+  — clientes do mesmo ER caem em instâncias diferentes e o fan-out da sala dessincroniza.
+- **Particionar e definir retenção** do `AuditEvent` deixa de ser opcional nesse volume —
+  ver [DT-15](./debitos-tecnicos.md#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção)
+  e a política de retenção/LGPD.
+
+**Variáveis a confirmar em campo** (dominam o sizing e já são observáveis no piloto):
+
+- número de telas WebSocket simultâneas por ER (TV + operadoras + gestora);
+- cadência de polling das telas (`overview`, `my-status`), que define a baseline HTTP e a
+  pressão sobre o pool do banco.
+
 ## Variáveis obrigatórias
 
 - `DATABASE_URL`
