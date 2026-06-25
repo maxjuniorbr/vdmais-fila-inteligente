@@ -143,8 +143,7 @@ function pendingActionTitle(kind: PendingActionKind): string {
 }
 
 
-// Item de menu para alternar o atendimento preferencial (§13.5). Centralizado para
-// reuso entre a fila ativa (aguardando) e a lista de pausadas.
+// Reusado pela fila ativa e pela lista de pausadas (§13.5).
 function priorityToggleItem(
   ticket: Ticket,
   onTogglePriority: (ticket: Ticket) => void,
