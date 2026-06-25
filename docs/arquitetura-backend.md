@@ -16,7 +16,7 @@ apps/backend/
 │   ├── audit-log/      # Trilha de auditoria de todos os eventos de ciclo de vida
 │   ├── common/         # Guards, decorators, utilitários compartilhados
 │   ├── counter/        # Ciclo de vida do caixa (abrir, pausar, fechar)
-│   ├── er/             # Espaço de Relacionamento — abertura/fechamento do dia
+│   ├── er/             # Espaço de Revendedora — abertura/fechamento do dia
 │   ├── integration/    # Integração M2M (legado): início/fim de atendimento (OAuth2)
 │   ├── metrics/        # Métricas diárias de atendimento por ER
 │   ├── observability/  # Healthchecks e métricas Prometheus
