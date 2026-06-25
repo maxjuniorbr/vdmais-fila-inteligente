@@ -492,6 +492,34 @@ describe('ManagerPage', () => {
     expect(within(pausedSection).getByText('Pausada')).toBeInTheDocument()
   })
 
+  it('lets the manager toggle preferential on a paused ticket', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    const paused = [
+      {
+        id: 'p1',
+        code: 'A050',
+        state: 'PAUSED',
+        entryChannel: 'QR_CODE',
+        createdAt: minutesAgo(8),
+        representative: { fullName: 'Dora Reis' },
+      },
+    ]
+    vi.mocked(api.get).mockImplementation((path: string) => {
+      if (path.includes('/overview')) return Promise.resolve({ ...overview, paused })
+      if (path.includes('/daily')) return Promise.resolve(metrics)
+      if (path.startsWith('/ers/')) return Promise.resolve(er)
+      return Promise.resolve([])
+    })
+    renderManager()
+    const pausedHeading = await screen.findByText('Senhas pausadas')
+    const pausedSection = pausedHeading.closest('section') as HTMLElement
+
+    fireEvent.click(await within(pausedSection).findByRole('button', { name: /Ações da senha A050/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Marcar preferencial' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/p1/mark-priority'))
+  })
+
   it('restores a no-show ticket from the recent calls menu', async () => {
     vi.mocked(api.post).mockResolvedValue({})
     renderManager()
