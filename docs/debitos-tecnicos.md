@@ -19,7 +19,7 @@
 | [DT-8](#dt-8--complexidade-cognitiva-do-operationpage-acima-do-limite) | Complexidade cognitiva do OperationPage acima do limite | Baixa | Não |
 | [DT-9](#dt-9--jwtauthguard-sem-spec-dedicado) | JwtAuthGuard sem spec dedicado | Baixa | Não |
 | [DT-10](#dt-10--ticketid-opaco-nos-eventos-de-socket-do-painel) | ticketId opaco nos eventos de socket do painel | Baixa | Não |
-| [DT-11](#dt-11--pausaretoma-de-senha-pela-gestora-sem-ui) | Pausa/retoma de senha pela gestora sem UI | Baixa | Não |
+| [DT-11](#dt-11--pausaretoma-de-senha-pela-gestora-sem-ui) | Pausa/retoma de senha pela gestora sem UI — ✅ resolvido | Baixa | Não |
 | [DT-12](#dt-12--qr-code-digital-sem-rotação-automática) | QR Code digital sem rotação automática | Baixa | Não |
 | [DT-13](#dt-13--mensagem-de-sessão-expirada-genérica-para-a-re) | Mensagem de sessão expirada genérica para a RE | Baixa | Não |
 | [DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado) | Cadastro mínimo da RE será descontinuado | Baixa | Não |
@@ -228,20 +228,17 @@ audiência mais ampla, separar a sala pública (TV, eventos sem `ticketId`) da s
 
 ## DT-11 — Pausa/retoma de senha pela gestora sem UI
 
-**Contexto.** O backend agora aceita `MANAGER` em `POST /tickets/:id/staff-pause` e
+> **✅ Resolvido.** A `ManagerPage` passou a expor a ação.
+
+**Contexto.** O backend aceita `MANAGER` em `POST /tickets/:id/staff-pause` e
 `/staff-resume` ([ticket.controller.ts](../apps/backend/src/ticket/ticket.controller.ts)),
 cobrindo o caso cross-caixa que a [§9.5.1 do mvp.md](./mvp.md) reserva à gestora. A UI da
-gestora ([`ManagerPage`](../apps/frontend/src/pages/ManagerPage.tsx)) ainda **não** expõe a
-ação — os botões de pausar/retomar senha vivem só na tela da operadora
-([`OperationPage`](../apps/frontend/src/pages/OperationPage.tsx), perfil `OPERATOR`).
+gestora ([`ManagerPage`](../apps/frontend/src/pages/ManagerPage.tsx)) não expunha a ação —
+os botões viviam só na tela da operadora (`OperationPage`, perfil `OPERATOR`).
 
-**Impacto.** Apenas funcional/UX: a capacidade existe no backend (e é coberta por testes)
-mas é inacessível à gestora até a tela ser construída. Sem efeito em runtime ou segurança
-— o endpoint segue protegido por `@Roles` + `_assertStaffER`.
-
-**Encaminhamento.** Adicionar a ação de pausar/retomar senha à `ManagerPage` num PR de
-frontend dedicado, com testes. Análogo ao "atendente de check-in é previsto, com UI futura"
-da própria §9.5.1.
+**Resolução.** A `ManagerPage` agora oferece **Pausar senha** nas senhas ativas da "Fila
+ativa" — inclusive uma em atendimento em **outro caixa** (cross-caixa), que libera aquele
+caixa — e **Retomar senha** na seção "Senhas pausadas", ambas cobertas por testes.
 
 ---
 
