@@ -601,6 +601,7 @@ export function OperationPage() {
                         <ActionMenu
                           label={`Ações da senha ${ticket.code}`}
                           items={[
+                            priorityMenuItem(ticket, loading, act),
                             {
                               label: 'Retomar senha',
                               disabled: loading,

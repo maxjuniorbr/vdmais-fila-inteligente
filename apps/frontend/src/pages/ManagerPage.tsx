@@ -141,6 +141,18 @@ function pendingActionTitle(kind: PendingActionKind): string {
 }
 
 
+// Item de menu para alternar o atendimento preferencial (§13.5). Centralizado para
+// reuso entre a fila ativa (aguardando) e a lista de pausadas.
+function priorityToggleItem(
+  ticket: Ticket,
+  onTogglePriority: (ticket: Ticket) => void,
+): ActionMenuItem {
+  return {
+    label: ticket.isPriority ? 'Remover preferencial' : 'Marcar preferencial',
+    onClick: () => onTogglePriority(ticket),
+  }
+}
+
 function CancelTicketAction({
   ticket,
   onSelect,
@@ -154,12 +166,7 @@ function CancelTicketAction({
   // toggle não aparece (o backend também recusa).
   const priorityItems =
     ticket.state === 'WAITING' && onTogglePriority
-      ? [
-          {
-            label: ticket.isPriority ? 'Remover preferencial' : 'Marcar preferencial',
-            onClick: () => onTogglePriority(ticket),
-          },
-        ]
+      ? [priorityToggleItem(ticket, onTogglePriority)]
       : []
   // Uma senha EM ATENDIMENTO não é resolvida por /cancel: isso a marcaria CANCELLED de
   // forma irreversível (o restore recusa cancelada com serviceStartedAt) e contaria um
@@ -196,6 +203,16 @@ function CancelTicketAction({
 // Com a operação encerrada o backend rejeita o restore; sem ações possíveis,
 // a coluna não exibe menu (ActionMenu retorna null com lista vazia).
 const NoTicketActions: TicketActionComponent = () => null
+
+// Senha PAUSADA aceita alternância de preferencial (§13.5; o backend aceita WAITING/PAUSED).
+// Retomar a senha pela gestão é um incremento à parte.
+const PausedTicketAction: TicketActionComponent = ({ ticket, onTogglePriority }) =>
+  onTogglePriority ? (
+    <ActionMenu
+      label={`Ações da senha ${ticket.code}`}
+      items={[priorityToggleItem(ticket, onTogglePriority)]}
+    />
+  ) : null
 
 function RestoreTicketAction({
   ticket,
@@ -654,8 +671,9 @@ export function ManagerPage() {
           </div>
           <TicketTable
             tickets={overview?.paused ?? []}
-            ActionComponent={NoTicketActions}
+            ActionComponent={PausedTicketAction}
             onSelect={openTicketAction}
+            onTogglePriority={togglePriority}
           />
         </section>
 
