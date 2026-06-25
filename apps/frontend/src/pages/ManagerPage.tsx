@@ -388,6 +388,9 @@ export function ManagerPage() {
       elapsedMinutes(ticket.serviceStartedAt) >= LONG_SERVICE_THRESHOLD_MIN,
   )
 
+  // Tabela apenas de alerta: destaca atendimentos longos (≥30 min). A correção
+  // (finalizar/cancelar atendimento) vive na "Fila ativa", por senha, para qualquer
+  // IN_SERVICE — sem duplicar a ação aqui.
   const prolongedColumns: Column<Ticket>[] = [
     { key: 'code', header: 'Senha', render: (ticket) => ticket.code },
     { key: 're', header: 'RE', render: (ticket) => ticket.representative?.fullName ?? '-' },
@@ -398,27 +401,6 @@ export function ManagerPage() {
         <Badge tone="warning">
           {ticket.serviceStartedAt ? formatDuration(elapsedSeconds(ticket.serviceStartedAt)) : '—'}
         </Badge>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Ações',
-      align: 'right',
-      render: (ticket) => (
-        <ActionMenu
-          label={`Ações da senha ${ticket.code}`}
-          items={[
-            {
-              label: 'Finalizar atendimento',
-              onClick: () => openTicketAction({ kind: 'correct-finish', ticket }),
-            },
-            {
-              label: 'Cancelar atendimento',
-              tone: 'danger',
-              onClick: () => openTicketAction({ kind: 'correct-cancel', ticket }),
-            },
-          ]}
-        />
       ),
     },
   ]
