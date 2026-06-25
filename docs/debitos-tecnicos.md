@@ -47,7 +47,7 @@ mesmo Redis (com TTL nativo, dispensando a poda manual). Relacionado a [DT-2](#d
 (mesma causa raiz: suposições de instância única). Ver [stack-mvp.md → Redis](./stack-mvp.md).
 
 No [alvo corporativo](./deployment-mvp.md#perfil-de-carga-e-capacidade-entrega-corporativa)
-(5.000 ERs / ~100k pedidos/dia), isso deixa de ser endurecimento adiável e vira
+(5.000 ERs / ~300k pedidos/dia), isso deixa de ser endurecimento adiável e vira
 **pré-requisito de capacidade no go-live**: o volume já exige múltiplas instâncias.
 
 ---
@@ -79,8 +79,8 @@ registra `ip`, `userId`, `erId` e `role` em 100% das requisições. Corpos, senh
 tokens **não** são logados. O IP é útil para investigação de segurança e correlação de
 abuso.
 
-**Impacto (LGPD).** Em uso nacional, isso acumula a correlação IP ↔ profissional de
-saúde autenticado em toda a retenção de logs — dado pessoal sob a LGPD, sem
+**Impacto (LGPD).** Em uso nacional, isso acumula a correlação IP ↔ pessoa autenticada
+(revendedora ou equipe) em toda a retenção de logs — dado pessoal sob a LGPD, sem
 mascaramento, amostragem ou política de retenção explícita.
 
 **Encaminhamento.** Decisão de produto/SI: manter como está (justificado por segurança),
@@ -306,9 +306,9 @@ históricas — não pode ser truncada sem perder evidência operacional
 ([deployment-mvp.md → Backup e rollback](./deployment-mvp.md)).
 
 **Impacto (escala/volume).** No [alvo corporativo](./deployment-mvp.md#perfil-de-carga-e-capacidade-entrega-corporativa)
-(~100k pedidos/dia), a tabela cresce **~180–255M de linhas/ano** (estimativa). Em tabela
-única sem particionamento, isso degrada escrita, índices, vacuum e o custo de storage do
-banco gerenciado ao longo do tempo. Soma-se a ausência de **política de retenção** explícita
+(~300k pedidos/dia), a tabela cresce **~550–770M de linhas/ano** (estimativa; já hoje, com
+~180k/dia, são ~390M/ano). Em tabela única sem particionamento, isso degrada escrita, índices,
+vacuum e o custo de storage do banco gerenciado ao longo do tempo. Soma-se a ausência de **política de retenção** explícita
 — também levantada, pelo ângulo dos logs, na [DT-3](#dt-3--log-de-ip-por-requisição-lgpd).
 
 **Encaminhamento.** Na entrega corporativa, **particionar `AuditEvent` por data**

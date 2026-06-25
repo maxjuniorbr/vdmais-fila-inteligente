@@ -29,27 +29,31 @@ Redis permanece fora do escopo do MVP e é o caminho para ambos ao escalar.
 
 > Base de dimensionamento para o **go-live corporativo** (não para a validação do MVP).
 > Os números do alvo valem **desde o go-live**, não como horizonte futuro: o
-> provisionamento inicial na nuvem corporativa já deve sustentá-los.
+> provisionamento inicial na nuvem corporativa já deve sustentá-los — e o **alvo é um
+> piso de planejamento, não um teto** (ver "Por que 300 mil não é teto" abaixo).
 
 | Dimensão | Linha de base (hoje) | Alvo mínimo (go-live) |
 |---|---|---|
 | ERs | 1.800+ | 5.000 |
-| Pedidos/dia | ~50 mil | ~100 mil |
+| Pedidos/dia | ~180 mil | ~300 mil (piso, não teto) |
 | Distribuição | Nacional (Brasil) | Nacional (Brasil) |
 
 > "Pedido" é a transação de negócio; "atendimento" é a senha na fila deste sistema. Para
 > capacidade são da mesma ordem de grandeza — atendimentos podem ser um pouco maiores (há
 > não comparecimento/cancelamento sem pedido). Refine com a medição de campo do piloto.
 
-**Perfil derivado do alvo** — estimativas, com os pressupostos: ~10h de operação/dia,
-fator de pico ~3× e ~5–7 eventos de auditoria por atendimento.
+**Perfil derivado do alvo (~300 mil/dia)** — estimativas, com os pressupostos: ~10h de
+operação/dia, fator de pico ~3× e ~5–7 eventos de auditoria por atendimento.
 
-- **Throughput HTTP:** ~80–170 req/s no pico do ciclo de atendimento. Compute não é o
-  gargalo; ≥2 instâncias justificam-se por folga e disponibilidade, não por CPU.
+- **Throughput HTTP:** ~250–500 req/s no pico do ciclo de atendimento (média ~8/s de
+  atendimentos, pico ~25/s). Compute **não** é o gargalo — alguns Node sustentam isso com
+  folga; o nº de instâncias é guiado por WebSocket e disponibilidade, não por CPU.
 - **Conexões WebSocket simultâneas:** ordem de **15–25 mil no pico nacional** (≈1 TV por ER
-  mais as telas de operadora e gestora). **É o dimensionamento dominante**, acima do req/s.
-- **Crescimento de dados:** ~36M de tickets/ano e **~180–255M de eventos de `AuditEvent`/ano**
+  mais as telas de operadora e gestora). É guiado pela quantidade de **ERs/telas**, não pelo
+  volume de pedidos, e é o **dimensionamento dominante**.
+- **Crescimento de dados:** ~110M de tickets/ano e **~550–770M de eventos de `AuditEvent`/ano**
   (ver [Débitos técnicos → DT-15](./debitos-tecnicos.md#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção)).
+  É a maior pressão de escala.
 - **Pool de conexões:** com múltiplas instâncias × pool do Prisma, o `max_connections` do
   Postgres vira limite; coloque **RDS Proxy/PgBouncer** (ou equivalente) à frente do banco.
 
@@ -62,6 +66,20 @@ fator de pico ~3× e ~5–7 eventos de auditoria por atendimento.
 - **Particionar e definir retenção** do `AuditEvent` deixa de ser opcional nesse volume —
   ver [DT-15](./debitos-tecnicos.md#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção)
   e a política de retenção/LGPD.
+
+**Por que 300 mil não é teto.** A aplicação é **stateless** (identidade no JWT) e o estado
+volátil (WebSocket, rate-limit, trava de brute-force) migra para um **store compartilhado
+(Redis)** — então a camada de aplicação **escala horizontalmente**: mais carga = mais
+instâncias, de forma ~linear, sem reescrita. O banco escala por **vertical + réplicas de
+leitura** (a fila é por ER e por dia, então as consultas particionam naturalmente) e o
+`AuditEvent` por **particionamento + arquivamento**. Logo, 300 mil é o piso que o
+provisionamento inicial deve cobrir; ultrapassá-lo é adicionar instâncias e capacidade de
+banco, não rearquitetar. Para o alvo **não virar teto na prática**, recomenda-se:
+**autoscaling** da camada de aplicação (sem nº fixo de instâncias), **ElastiCache**
+dimensionado para o pico de WebSockets, e **headroom de ~2×** em storage/IO do RDS e na
+retenção do `AuditEvent`. Os pré-requisitos são [DT-1/DT-2](./debitos-tecnicos.md) (Redis)
+e [DT-15](./debitos-tecnicos.md#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção)
+(particionamento) — sem eles, instância única + tabela única tornam até volumes menores um teto.
 
 **Variáveis a confirmar em campo** (dominam o sizing e já são observáveis no piloto):
 
