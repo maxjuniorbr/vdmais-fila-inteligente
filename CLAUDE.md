@@ -1,6 +1,6 @@
 # vdmais-fila-inteligente
 
-Queue management system for hospital ERs. Monorepo: `apps/backend` (NestJS + Prisma + Postgres) and `apps/frontend` (React + Vite).
+Queue management system for beauty-retail reseller spaces (Espaços de Revendedora — "ER"). Representatives (revendedoras) join a per-ER queue by QR code, link, or assisted check-in; operators call and serve them at counters; managers oversee the day. **"ER" means Espaço de Revendedora, not a hospital emergency room.** Monorepo: `apps/backend` (NestJS + Prisma + Postgres) and `apps/frontend` (React + Vite).
 
 ## Commands
 
@@ -25,6 +25,13 @@ Types: `feat` `fix` `refactor` `style` `chore` `docs` `test`
 English, imperative mood, lowercase, no trailing period.
 
 Use `/commit` to run the full commit assistant.
+
+## Code style
+
+- **Comments explain *why*, not *what*** — add one only for intent, a domain/business
+  rule, or a non-obvious trade-off the code can't convey; never to restate the code.
+  `/commit` removes unnecessary comments as part of its checks.
+- Write code that matches the surrounding file (naming, idioms, comment density).
 
 ## MCPs available
 
