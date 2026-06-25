@@ -132,6 +132,8 @@ type TicketActionComponent = React.ComponentType<{
   ticket: Ticket
   onSelect: (action: PendingAction) => void
   onTogglePriority?: (ticket: Ticket) => void
+  onPause?: (ticket: Ticket) => void
+  onResume?: (ticket: Ticket) => void
 }>
 
 function pendingActionTitle(kind: PendingActionKind): string {
@@ -157,10 +159,12 @@ function CancelTicketAction({
   ticket,
   onSelect,
   onTogglePriority,
+  onPause,
 }: Readonly<{
   ticket: Ticket
   onSelect: (action: PendingAction) => void
   onTogglePriority?: (ticket: Ticket) => void
+  onPause?: (ticket: Ticket) => void
 }>) {
   // Prioridade só faz sentido enquanto a senha aguarda; em chamada/atendimento o
   // toggle não aparece (o backend também recusa).
@@ -168,6 +172,11 @@ function CancelTicketAction({
     ticket.state === 'WAITING' && onTogglePriority
       ? [priorityToggleItem(ticket, onTogglePriority)]
       : []
+  // A gestora pode pausar qualquer senha ativa do ER, inclusive uma em atendimento em
+  // outro caixa (§9.5.1 — cross-caixa restrito à gestora); staff-pause libera o caixa.
+  const pauseItems: ActionMenuItem[] = onPause
+    ? [{ label: 'Pausar senha', onClick: () => onPause(ticket) }]
+    : []
   // Uma senha EM ATENDIMENTO não é resolvida por /cancel: isso a marcaria CANCELLED de
   // forma irreversível (o restore recusa cancelada com serviceStartedAt) e contaria um
   // atendimento real como cancelamento, distorcendo as métricas. A resolução de um
@@ -195,7 +204,7 @@ function CancelTicketAction({
   return (
     <ActionMenu
       label={`Ações da senha ${ticket.code}`}
-      items={[...priorityItems, ...resolutionItems]}
+      items={[...priorityItems, ...pauseItems, ...resolutionItems]}
     />
   )
 }
@@ -204,15 +213,16 @@ function CancelTicketAction({
 // a coluna não exibe menu (ActionMenu retorna null com lista vazia).
 const NoTicketActions: TicketActionComponent = () => null
 
-// Senha PAUSADA aceita alternância de preferencial (§13.5; o backend aceita WAITING/PAUSED).
-// Retomar a senha pela gestão é um incremento à parte.
-const PausedTicketAction: TicketActionComponent = ({ ticket, onTogglePriority }) =>
-  onTogglePriority ? (
-    <ActionMenu
-      label={`Ações da senha ${ticket.code}`}
-      items={[priorityToggleItem(ticket, onTogglePriority)]}
-    />
+// Senha PAUSADA: a gestão pode retomar (volta à posição original) e alternar o
+// preferencial (§13.5; o backend aceita WAITING/PAUSED).
+const PausedTicketAction: TicketActionComponent = ({ ticket, onTogglePriority, onResume }) => {
+  const items: ActionMenuItem[] = []
+  if (onResume) items.push({ label: 'Retomar senha', onClick: () => onResume(ticket) })
+  if (onTogglePriority) items.push(priorityToggleItem(ticket, onTogglePriority))
+  return items.length > 0 ? (
+    <ActionMenu label={`Ações da senha ${ticket.code}`} items={items} />
   ) : null
+}
 
 function RestoreTicketAction({
   ticket,
@@ -443,6 +453,14 @@ export function ManagerPage() {
     )
   }
 
+  function pauseTicket(ticket: Ticket) {
+    void execute(() => api.post(`/tickets/${ticket.id}/staff-pause`), 'Senha pausada.')
+  }
+
+  function resumeTicket(ticket: Ticket) {
+    void execute(() => api.post(`/tickets/${ticket.id}/staff-resume`), 'Senha retomada.')
+  }
+
   function openCounterRelease(counter: Counter) {
     setError(null)
     setPendingCounter(counter)
@@ -661,6 +679,7 @@ export function ManagerPage() {
             ActionComponent={CancelTicketAction}
             onSelect={openTicketAction}
             onTogglePriority={togglePriority}
+            onPause={pauseTicket}
           />
         </section>
 
@@ -674,6 +693,7 @@ export function ManagerPage() {
             ActionComponent={PausedTicketAction}
             onSelect={openTicketAction}
             onTogglePriority={togglePriority}
+            onResume={resumeTicket}
           />
         </section>
 
@@ -795,11 +815,15 @@ function TicketTable({
   ActionComponent,
   onSelect,
   onTogglePriority,
+  onPause,
+  onResume,
 }: Readonly<{
   tickets: Ticket[]
   ActionComponent: TicketActionComponent
   onSelect: (action: PendingAction) => void
   onTogglePriority?: (ticket: Ticket) => void
+  onPause?: (ticket: Ticket) => void
+  onResume?: (ticket: Ticket) => void
 }>) {
   const columns: Column<Ticket>[] = [
     {
@@ -822,7 +846,13 @@ function TicketTable({
       header: 'Ações',
       align: 'right',
       render: (ticket) => (
-        <ActionComponent ticket={ticket} onSelect={onSelect} onTogglePriority={onTogglePriority} />
+        <ActionComponent
+          ticket={ticket}
+          onSelect={onSelect}
+          onTogglePriority={onTogglePriority}
+          onPause={onPause}
+          onResume={onResume}
+        />
       ),
     },
   ]

@@ -407,6 +407,20 @@ describe('ManagerPage', () => {
     )
   })
 
+  it('lets the manager pause an in-service ticket from the active queue', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    renderManager()
+    const queueHeading = await screen.findByText('Fila ativa')
+    const queueSection = queueHeading.closest('section') as HTMLElement
+
+    // Cross-caixa (§9.5.1): a gestora pausa uma senha em atendimento em outro caixa;
+    // staff-pause libera aquele caixa.
+    fireEvent.click(await within(queueSection).findByRole('button', { name: /Ações da senha A002/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pausar senha' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/s1/staff-pause'))
+  })
+
   it('freezes a cancelled ticket wait minus the paused time', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
@@ -518,6 +532,34 @@ describe('ManagerPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Marcar preferencial' }))
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/p1/mark-priority'))
+  })
+
+  it('lets the manager resume a paused ticket', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    const paused = [
+      {
+        id: 'p1',
+        code: 'A050',
+        state: 'PAUSED',
+        entryChannel: 'QR_CODE',
+        createdAt: minutesAgo(8),
+        representative: { fullName: 'Dora Reis' },
+      },
+    ]
+    vi.mocked(api.get).mockImplementation((path: string) => {
+      if (path.includes('/overview')) return Promise.resolve({ ...overview, paused })
+      if (path.includes('/daily')) return Promise.resolve(metrics)
+      if (path.startsWith('/ers/')) return Promise.resolve(er)
+      return Promise.resolve([])
+    })
+    renderManager()
+    const pausedHeading = await screen.findByText('Senhas pausadas')
+    const pausedSection = pausedHeading.closest('section') as HTMLElement
+
+    fireEvent.click(await within(pausedSection).findByRole('button', { name: /Ações da senha A050/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retomar senha' }))
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/p1/staff-resume'))
   })
 
   it('restores a no-show ticket from the recent calls menu', async () => {
