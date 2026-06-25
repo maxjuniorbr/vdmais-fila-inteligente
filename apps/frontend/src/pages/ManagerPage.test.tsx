@@ -465,6 +465,33 @@ describe('ManagerPage', () => {
     )
   })
 
+  it('lists paused tickets in the manager view', async () => {
+    const paused = [
+      {
+        id: 'p1',
+        code: 'A050',
+        state: 'PAUSED',
+        entryChannel: 'QR_CODE',
+        createdAt: minutesAgo(8),
+        pausedSeconds: 60,
+        representative: { fullName: 'Dora Reis' },
+      },
+    ]
+    vi.mocked(api.get).mockImplementation((path: string) => {
+      if (path.includes('/overview')) return Promise.resolve({ ...overview, paused })
+      if (path.includes('/daily')) return Promise.resolve(metrics)
+      if (path.startsWith('/ers/')) return Promise.resolve(er)
+      return Promise.resolve([])
+    })
+    renderManager()
+    const pausedHeading = await screen.findByText('Senhas pausadas')
+    const pausedSection = pausedHeading.closest('section') as HTMLElement
+
+    expect(await within(pausedSection).findByText('A050')).toBeInTheDocument()
+    expect(within(pausedSection).getByText('Dora Reis')).toBeInTheDocument()
+    expect(within(pausedSection).getByText('Pausada')).toBeInTheDocument()
+  })
+
   it('restores a no-show ticket from the recent calls menu', async () => {
     vi.mocked(api.post).mockResolvedValue({})
     renderManager()

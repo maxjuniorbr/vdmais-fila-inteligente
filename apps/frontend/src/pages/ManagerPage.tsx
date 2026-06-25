@@ -649,6 +649,18 @@ export function ManagerPage() {
 
         <section style={styles.card}>
           <div style={styles.sectionHead}>
+            <h2 style={{ ...styles.cardTitle, margin: 0 }}>Senhas pausadas</h2>
+            <Badge>{overview?.paused.length ?? 0}</Badge>
+          </div>
+          <TicketTable
+            tickets={overview?.paused ?? []}
+            ActionComponent={NoTicketActions}
+            onSelect={openTicketAction}
+          />
+        </section>
+
+        <section style={styles.card}>
+          <div style={styles.sectionHead}>
             <h2 style={{ ...styles.cardTitle, margin: 0 }}>Chamadas recentes</h2>
             <Badge>{overview?.recent.length ?? 0}</Badge>
           </div>
