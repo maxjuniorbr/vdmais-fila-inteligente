@@ -27,8 +27,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/gestao" element={<ManagerPage />} />
           <Route path="/painel/:erId" element={<PanelPage />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="/playground" element={<PlaygroundPage />} />
-          <Route path="/simulador" element={<SimuladorPage />} />
+          {/* Ferramentas só de desenvolvimento: as rotas não são registradas no build
+              de produção (import.meta.env.DEV é false), ficando inacessíveis lá. */}
+          {import.meta.env.DEV && (
+            <>
+              <Route path="/playground" element={<PlaygroundPage />} />
+              <Route path="/simulador" element={<SimuladorPage />} />
+            </>
+          )}
         </Routes>
       </ToastProvider>
     </BrowserRouter>
