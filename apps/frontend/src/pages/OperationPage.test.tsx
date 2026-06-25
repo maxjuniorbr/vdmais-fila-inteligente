@@ -121,6 +121,30 @@ describe('OperationPage accessibility', () => {
     expect(showToast).toHaveBeenCalledWith('Prioridade removida.', 'success')
   })
 
+  it('marks a paused ticket as preferential from the action menu', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      isDayOpen: true,
+      waiting: [],
+      calling: [],
+      inService: [],
+      paused: [
+        { id: 'pk-1', code: 'A050', state: 'PAUSED', isPriority: false, representative: { fullName: 'Dora' } },
+      ],
+      recent: [],
+      counters,
+    })
+    vi.mocked(api.post).mockResolvedValue({})
+
+    render(<OperationPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ações da senha A050' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Marcar preferencial' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/tickets/pk-1/mark-priority'),
+    )
+  })
+
   it('blocks "Chamar próximo" while a ticket is open on the own counter', async () => {
     vi.mocked(api.get).mockResolvedValue({
       isDayOpen: true,
