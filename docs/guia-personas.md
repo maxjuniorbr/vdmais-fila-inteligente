@@ -28,7 +28,7 @@ Cada seção descreve **quem é a persona**, **qual tela ela usa**, e a
 ## 1. Representante (RE) — a cliente da fila
 
 **Quem é:** a revendedora/representante de estética que chega ao Espaço de
-Relacionamento e precisa ser atendida.
+Revendedora e precisa ser atendida.
 
 **Como entra na fila (3 canais):**
 
@@ -196,7 +196,7 @@ pode administrar vários.
 **Jornada passo a passo:**
 
 1. Faz login com a conta **ADMIN**.
-2. Cria um **ER** (Espaço de Relacionamento).
+2. Cria um **ER** (Espaço de Revendedora).
 3. Em **Gerenciar ER**:
    - cadastra os **caixas** físicos;
    - cria as contas de **gestora**, **operadoras** e (se usar) **atendente**;

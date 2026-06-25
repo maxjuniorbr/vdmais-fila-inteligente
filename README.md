@@ -1,6 +1,6 @@
 # VDMais Fila Inteligente
 
-Sistema de fila digital presencial para Espaços de Relacionamento (ERs) de varejo de beleza. Representantes de estética entram na fila por QR Code, link alternativo ou check-in assistido; operadoras conduzem os atendimentos e gestoras acompanham a operação em tempo real.
+Sistema de fila digital presencial para Espaços de Revendedora (ERs) de varejo de beleza. Representantes de estética entram na fila por QR Code, link alternativo ou check-in assistido; operadoras conduzem os atendimentos e gestoras acompanham a operação em tempo real.
 
 **Funcionalidades principais:**
 
@@ -308,7 +308,7 @@ vdmais-fila-inteligente/
 │   │   ├── src/
 │   │   │   ├── auth/      # Autenticação JWT + cadastro
 │   │   │   ├── admin/     # Configuração de ERs, caixas e equipe
-│   │   │   ├── er/        # Espaços de Relacionamento
+│   │   │   ├── er/        # Espaços de Revendedora
 │   │   │   ├── ticket/    # Geração e ciclo de vida da senha
 │   │   │   ├── queue/     # Lógica de fila (call-next atômico)
 │   │   │   ├── counter/   # Caixas de atendimento
