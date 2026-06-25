@@ -596,26 +596,17 @@ describe('ManagerPage', () => {
     )
   })
 
-  it('finishes a prolonged attendance correction', async () => {
-    vi.mocked(api.post).mockResolvedValue({})
+  it('shows the prolonged-services table as alert-only, without an action menu', async () => {
     renderManager()
     const prolongedHeading = await screen.findByText('Atendimentos prolongados')
     const section = prolongedHeading.closest('section') as HTMLElement
 
-    fireEvent.click(within(section).getByRole('button', { name: /Ações da senha A002/ }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Finalizar atendimento' }))
-
-    const dialog = await screen.findByRole('dialog')
-    const user = userEvent.setup()
-    await user.type(within(dialog).getByRole('textbox'), 'concluído manualmente')
-    fireEvent.click(within(dialog).getByRole('button', { name: /Cancelar senha|Restaurar senha|Corrigir atendimento|Finalizar atendimento/ }))
-
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/tickets/s1/correct', {
-        action: 'FINISH',
-        reason: 'concluído manualmente',
-      }),
-    )
+    // A correção (finalizar/cancelar atendimento) mora na "Fila ativa", por senha; a
+    // tabela de prolongados é apenas alerta de atendimentos longos, sem menu de ações.
+    expect(within(section).getByText('Bia Lima')).toBeInTheDocument()
+    expect(
+      within(section).queryByRole('button', { name: /Ações da senha/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('hides the restore action on recent calls when the day is closed', async () => {
@@ -761,32 +752,6 @@ describe('ManagerPage', () => {
 
     await waitFor(() =>
       expect(screen.getAllByText('Não foi possível cancelar').length).toBeGreaterThan(0),
-    )
-  })
-
-  it('cancels a prolonged attendance correction', async () => {
-    vi.mocked(api.post).mockResolvedValue({})
-    renderManager()
-    const prolongedHeading = await screen.findByText('Atendimentos prolongados')
-    const section = prolongedHeading.closest('section') as HTMLElement
-
-    fireEvent.click(within(section).getByRole('button', { name: /Ações da senha A002/ }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Cancelar atendimento' }))
-
-    const dialog = await screen.findByRole('dialog')
-    const user = userEvent.setup()
-    await user.type(within(dialog).getByRole('textbox'), 'erro de registro')
-    fireEvent.click(
-      within(dialog).getByRole('button', {
-        name: /Cancelar senha|Restaurar senha|Corrigir atendimento|Finalizar atendimento/,
-      }),
-    )
-
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/tickets/s1/correct', {
-        action: 'CANCEL',
-        reason: 'erro de registro',
-      }),
     )
   })
 
