@@ -296,7 +296,7 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Fila ativa')
 
-    const menus = screen.getAllByRole('button', { name: /Ações da senha A001/ })
+    const menus = await screen.findAllByRole('button', { name: /Ações da senha A001/ })
     fireEvent.click(menus[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Cancelar senha' }))
 
@@ -309,7 +309,7 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Fila ativa')
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Ações da senha A001/ })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: /Ações da senha A001/ }))[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Marcar preferencial' }))
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/w1/mark-priority'))
@@ -338,25 +338,73 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Fila ativa')
 
-    fireEvent.click(screen.getByRole('button', { name: /Ações da senha A010/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Ações da senha A010/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remover preferencial' }))
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/tickets/wp/unmark-priority'))
   })
 
-  it('hides the preferential toggle for a ticket already in service', async () => {
+  it('offers attendance correction (not /cancel) for a ticket already in service', async () => {
     renderManager()
     const queueHeading = await screen.findByText('Fila ativa')
     const queueSection = queueHeading.closest('section') as HTMLElement
 
-    // A002 está em atendimento (IN_SERVICE): o toggle de preferencial só existe
-    // para senhas aguardando, então o menu traz apenas "Cancelar senha". (A002
-    // também aparece em "Atendimentos prolongados", por isso buscamos na fila ativa.)
-    fireEvent.click(within(queueSection).getByRole('button', { name: /Ações da senha A002/ }))
-    expect(screen.getByRole('menuitem', { name: 'Cancelar senha' })).toBeInTheDocument()
+    // A002 está em atendimento (IN_SERVICE). O toggle de preferencial só existe para
+    // senhas aguardando, e "Cancelar senha" (/cancel) é proibido em atendimento — ele
+    // marcaria CANCELLED de forma irreversível e distorceria as métricas. O menu deve
+    // oferecer a correção (/correct: finalizar/cancelar atendimento). (A002 também
+    // aparece em "Atendimentos prolongados", por isso buscamos na fila ativa.)
+    fireEvent.click(await within(queueSection).findByRole('button', { name: /Ações da senha A002/ }))
+    expect(screen.getByRole('menuitem', { name: 'Finalizar atendimento' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Cancelar atendimento' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Cancelar senha' })).not.toBeInTheDocument()
     expect(
       screen.queryByRole('menuitem', { name: /preferencial/ }),
     ).not.toBeInTheDocument()
+  })
+
+  it('finishes an in-service ticket from the active queue through /correct', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    renderManager()
+    const queueHeading = await screen.findByText('Fila ativa')
+    const queueSection = queueHeading.closest('section') as HTMLElement
+
+    fireEvent.click(await within(queueSection).findByRole('button', { name: /Ações da senha A002/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Finalizar atendimento' }))
+
+    const dialog = await screen.findByRole('dialog')
+    const user = userEvent.setup()
+    await user.type(within(dialog).getByRole('textbox'), 'concluído pela gestora')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancelar senha|Restaurar senha|Corrigir atendimento|Finalizar atendimento/ }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/tickets/s1/correct', {
+        action: 'FINISH',
+        reason: 'concluído pela gestora',
+      }),
+    )
+  })
+
+  it('cancels an in-service ticket from the active queue through /correct', async () => {
+    vi.mocked(api.post).mockResolvedValue({})
+    renderManager()
+    const queueHeading = await screen.findByText('Fila ativa')
+    const queueSection = queueHeading.closest('section') as HTMLElement
+
+    fireEvent.click(await within(queueSection).findByRole('button', { name: /Ações da senha A002/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cancelar atendimento' }))
+
+    const dialog = await screen.findByRole('dialog')
+    const user = userEvent.setup()
+    await user.type(within(dialog).getByRole('textbox'), 'desistência no caixa')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancelar senha|Restaurar senha|Corrigir atendimento|Finalizar atendimento/ }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/tickets/s1/correct', {
+        action: 'CANCEL',
+        reason: 'desistência no caixa',
+      }),
+    )
   })
 
   it('freezes a cancelled ticket wait minus the paused time', async () => {
@@ -404,7 +452,7 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Fila ativa')
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Ações da senha A001/ })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: /Ações da senha A001/ }))[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Cancelar senha' }))
 
     const dialog = await screen.findByRole('dialog')
@@ -422,7 +470,7 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Chamadas recentes')
 
-    fireEvent.click(screen.getByRole('button', { name: /Ações da senha A003/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Ações da senha A003/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Restaurar senha' }))
 
     const dialog = await screen.findByRole('dialog')
@@ -602,7 +650,7 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Fila ativa')
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Ações da senha A001/ })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: /Ações da senha A001/ }))[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Cancelar senha' }))
 
     const dialog = await screen.findByRole('dialog')
@@ -649,7 +697,7 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Fila ativa')
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Ações da senha A001/ })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: /Ações da senha A001/ }))[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Cancelar senha' }))
     const dialog = await screen.findByRole('dialog')
 
@@ -765,7 +813,7 @@ describe('ManagerPage', () => {
     renderManager()
     await screen.findByText('Chamadas recentes')
 
-    expect(screen.getByRole('button', { name: /Ações da senha A003/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Ações da senha A003/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Ações da senha A004/ })).toBeInTheDocument()
 
     // A CANCELLED ticket that already entered service exposes no restore menu
