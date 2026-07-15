@@ -969,11 +969,14 @@ describe('TicketConfirmationPage', () => {
   describe('polling and countdown (fake timers)', () => {
     beforeEach(() => {
       vi.useFakeTimers()
+      // Zero the poll jitter so the timing assertions stay deterministic.
+      vi.spyOn(Math, 'random').mockReturnValue(0)
     })
 
     afterEach(() => {
       vi.runOnlyPendingTimers()
       vi.useRealTimers()
+      vi.mocked(Math.random).mockRestore()
     })
 
     async function renderWaitingTicket(
@@ -1130,6 +1133,61 @@ describe('TicketConfirmationPage', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10000)
       })
+      expect(screen.getByText('#3')).toBeInTheDocument()
+    })
+
+    it('spreads polls with jitter so synchronized clients drift apart', async () => {
+      vi.mocked(Math.random).mockReturnValue(1)
+      const fetchMock = await renderWaitingTicket(async (input) => {
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return statusResponse({ currentPosition: 1 })
+        }
+        return new Response(null, { status: 200 })
+      })
+      const statusCalls = () =>
+        fetchMock.mock.calls.filter(([input]) =>
+          input.toString().includes('/api/tickets/my-status'),
+        ).length
+
+      // With maximum jitter the poll lands at 12s: the base interval alone must not fire.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000)
+      })
+      expect(statusCalls()).toBe(0)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+      expect(statusCalls()).toBe(1)
+    })
+
+    it('backs off the polling cadence after a 429 rate-limit response', async () => {
+      const fetchMock = await renderWaitingTicket(async (input) => {
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return new Response(null, { status: 429 })
+        }
+        return new Response(null, { status: 200 })
+      })
+      const statusCalls = () =>
+        fetchMock.mock.calls.filter(([input]) =>
+          input.toString().includes('/api/tickets/my-status'),
+        ).length
+
+      // First poll at the base cadence gets rate limited…
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000)
+      })
+      expect(statusCalls()).toBe(1)
+      // …so the next attempt waits 20s: still nothing after only 10s more…
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000)
+      })
+      expect(statusCalls()).toBe(1)
+      // …and it fires once the doubled interval elapses.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000)
+      })
+      expect(statusCalls()).toBe(2)
+      // The screen quietly keeps the last known position meanwhile.
       expect(screen.getByText('#3')).toBeInTheDocument()
     })
 

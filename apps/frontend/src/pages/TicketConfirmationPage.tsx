@@ -9,6 +9,14 @@ import { brand } from '../styles/brand'
 import { playCallAlert, unlockCallAlert } from '../utils/callAlert'
 import { PRIORITY_SERVICE_LABEL } from '../utils/labels'
 
+// A fixed cadence keeps every RE who scanned together polling in sync, hitting
+// the API in bursts; the random jitter drifts the clients apart. On 429 (rate
+// limited — e.g. a venue full of REs on one Wi-Fi) the wait doubles up to the
+// cap, so the screen recovers on its own instead of hammering the limit.
+const POLL_BASE_MS = 10000
+const POLL_JITTER_MS = 2000
+const POLL_BACKOFF_CAP_MS = 60000
+
 interface TicketInfo {
   id: string
   code: string
@@ -177,7 +185,7 @@ export function TicketConfirmationPage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmingLeave, setConfirmingLeave] = useState(false)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const entryStartedRef = useRef(false)
   const prevStateRef = useRef<string | null>(null)
 
@@ -213,7 +221,7 @@ export function TicketConfirmationPage() {
 
   useEffect(() => {
     if (!ticket) {
-      if (pollRef.current) clearInterval(pollRef.current)
+      if (pollRef.current) clearTimeout(pollRef.current)
       return
     }
     // Keep polling until the engagement is truly over. NO_SHOW and CANCELLED are
@@ -221,23 +229,36 @@ export function TicketConfirmationPage() {
     // only FINISHED is final. Polling my-status (not my-active) returns the real
     // state, so a no-show shows as "não comparecimento" instead of "concluído".
     if (ticket.state === 'FINISHED') {
-      if (pollRef.current) clearInterval(pollRef.current)
+      if (pollRef.current) clearTimeout(pollRef.current)
       return
     }
     const token = sessionStorage.getItem('token')
     if (!token) return
-    pollRef.current = setInterval(async () => {
+    let cancelled = false
+    let rateLimitedPolls = 0
+    // NOSONAR: jitter de agendamento não é uso criptográfico — Math.random basta.
+    const nextDelay = () =>
+      Math.min(POLL_BASE_MS * 2 ** rateLimitedPolls, POLL_BACKOFF_CAP_MS) +
+      Math.random() * POLL_JITTER_MS // NOSONAR
+    const poll = async () => {
       try {
         const res = await fetchMyStatus(token)
-        if (!res.ok) return
-        const data = (await res.json()) as TicketInfo
-        setTicket(data)
+        if (res.status === 429) {
+          rateLimitedPolls += 1
+        } else if (res.ok) {
+          rateLimitedPolls = 0
+          const data = (await res.json()) as TicketInfo
+          if (!cancelled) setTicket(data)
+        }
       } catch {
         /* silently ignore; UI stays with last known state */
       }
-    }, 10000)
+      if (!cancelled) pollRef.current = setTimeout(poll, nextDelay())
+    }
+    pollRef.current = setTimeout(poll, nextDelay())
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
+      cancelled = true
+      if (pollRef.current) clearTimeout(pollRef.current)
     }
   }, [ticket?.state, ticket?.id, erId, fetchMyStatus])
 
