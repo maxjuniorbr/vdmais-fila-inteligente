@@ -26,6 +26,9 @@
 | [DT-15](#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção) | Volume do AuditEvent em escala (particionamento/retenção) | Média | Não |
 | [DT-16](#dt-16--react-fixado-na-linha-18-por-exigência-da-plataforma-alvo) | React fixado na linha 18 por exigência da plataforma-alvo | Baixa | Não |
 | [DT-17](#dt-17--major-do-typescript-adiado-compilador-nativo-7x) | Major do TypeScript adiado (compilador nativo 7.x) | Baixa | Não |
+| [DT-18](#dt-18--mfa-ausente-para-contas-privilegiadas-e-token-estático-nas-métricas) | MFA ausente para contas privilegiadas e token estático nas métricas | Média | Não |
+| [DT-19](#dt-19--sessão-de-staff-sem-refresh-token-rotativo) | Sessão de staff sem refresh token rotativo | Média | Não |
+| [DT-20](#dt-20--endurecimento-do-websocket-e-validações-de-segurança-no-ambiente-real) | Endurecimento do WebSocket e validações de segurança no ambiente real | Média | Não |
 
 ---
 
@@ -296,7 +299,9 @@ termos/uso de dados, observação de check-in) **não serão adicionados**.
 
 **Encaminhamento.** Em momento futuro, substituir o cadastro mínimo pela autenticação via
 API do app / fluxo sem cadastro com QR rotativo, e então reavaliar §5 (cadastro) e §6
-(jornadas) do [mvp.md](./mvp.md). Toca backend (auth) e frontend.
+(jornadas) do [mvp.md](./mvp.md). Toca backend (auth) e frontend. Primeiro passo dado em
+jul/2026: entrada de **convidada** por QR (nome + telefone, sem cadastro), habilitável por
+ER — ver o modelo de dados em [arquitetura-backend.md](./arquitetura-backend.md#modelo-de-dados).
 
 ---
 
@@ -354,3 +359,57 @@ sem impacto funcional. A linha 6.x segue recebendo minors normalmente.
 **Encaminhamento.** Subir quando `ts-jest` e `typescript-eslint` publicarem suporte ao
 7.x. Janela dedicada: remover o ignore, subir a toolchain junto, revisar breaking
 changes e rodar a suíte completa (unit + e2e) antes de promover.
+
+---
+
+## DT-18 — MFA ausente para contas privilegiadas e token estático nas métricas
+
+**Contexto.** Origem: auditoria de segurança de jun/2026 (finding B-07). O `staff-login`
+([auth.controller.ts](../apps/backend/src/auth/auth.controller.ts)) é fator único
+(e-mail + senha → JWT), inclusive para `ADMIN`. `GET /observability/metrics`
+([observability.controller.ts](../apps/backend/src/observability/observability.controller.ts))
+autentica com um único bearer estático (`OBSERVABILITY_TOKEN`) — fail-closed e com
+comparação em tempo constante, porém sem rotação.
+
+**Impacto.** Credencial de staff vazada dá acesso direto ao papel (inclusive ADMIN); o
+token de métricas é um segredo estático de longa vida.
+
+**Encaminhamento.** MFA para `ADMIN` (ideal também `MANAGER`); métricas atrás de
+allowlist de rede / mTLS / proxy autenticado, com rotação do token. Relacionado a
+[DT-19](#dt-19--sessão-de-staff-sem-refresh-token-rotativo).
+
+---
+
+## DT-19 — Sessão de staff sem refresh token rotativo
+
+**Contexto.** Origem: auditoria de segurança de jun/2026 (evolução pendente do B-02). O
+JWT de staff vive `JWT_EXPIRES_IN` (8h) e a revogação é por `sessionVersion`
+(logout/troca de senha invalida tokens antigos) — não há refresh token; o access token
+vale as 8h inteiras.
+
+**Impacto.** Um token de staff vazado permanece válido até expirar; a revogação por
+`sessionVersion` depende de uma ação na conta (logout/troca de senha/desativação).
+
+**Encaminhamento.** Access token curto (15–30 min) + refresh rotativo. Toca backend
+(auth) e frontend (renovação transparente). Relacionado a
+[DT-18](#dt-18--mfa-ausente-para-contas-privilegiadas-e-token-estático-nas-métricas).
+
+---
+
+## DT-20 — Endurecimento do WebSocket e validações de segurança no ambiente real
+
+**Contexto.** Origem: auditoria de segurança de jun/2026 (F-04 parcial + pendências
+finais das duas frentes). O handshake `joinER` já é autorizado no servidor (painel por
+token de exibição; staff por JWT + `sessionVersion` + escopo de ER), mas faltam
+validação de `Origin`/`Host` e quotas de conexão por IP/token no gateway Socket.IO. Além
+disso, algumas garantias só fecham sobre o deploy real: headers efetivos de borda
+(CSP/HSTS), comportamento do WS através do gateway e um pentest dinâmico (descoberta de
+`erId`, retenção de logs).
+
+**Impacto.** Superfície de conexão WS aceita origens arbitrárias e não tem quota
+própria; controles de borda documentados porém não verificados no ambiente real.
+
+**Encaminhamento.** Validar `Origin`/`Host` e aplicar quotas de conexão no Socket.IO;
+se possível, servir o WS no mesmo domínio do app. Executar as validações no ambiente
+real — oportuno no go-live AWS/Apigee (10/08): headers efetivos, WS através do gateway e
+pentest dinâmico. Relacionado a [DT-2](#dt-2--websocket-socketio-sem-adaptador-compartilhado).
