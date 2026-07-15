@@ -7,7 +7,7 @@
 > aqui são a implementação concreta atual, **não a infraestrutura-alvo corporativa**.
 > Os requisitos independentes de fornecedor estão no
 > [README → Infraestrutura necessária](../README.md#infraestrutura-necessária). Ao
-> migrar o sistema, substitua os fornecedores por infraestrutura aprovada pela
+> migrar para a infraestrutura definitiva, substitua os fornecedores por infraestrutura aprovada pela
 > organização, preservando os requisitos (TLS, secrets manager, banco gerenciado,
 > WebSocket com upgrade, observabilidade).
 
@@ -91,7 +91,8 @@ e [DT-15](./debitos-tecnicos.md#dt-15--volume-do-auditevent-em-escala-particiona
 
 - `DATABASE_URL`
 - `JWT_SECRET`
-- `FRONTEND_URL`
+- `FRONTEND_URL` — origem do frontend para o CORS; aceita lista separada por vírgula
+  quando houver mais de um domínio (ex.: hml e prod corporativos)
 - `OBSERVABILITY_TOKEN`
 
 Valores locais de `.env` não devem ser promovidos. Use um segredo JWT aleatório com pelo
@@ -115,9 +116,10 @@ emissor corporativo (Apigee): `INTEGRATION_JWT_ISSUER`, `INTEGRATION_JWT_AUDIENC
 `INTEGRATION_JWKS_URI`. Quando `INTEGRATION_JWKS_URI` está definido, `INTEGRATION_JWT_ISSUER`
 e `INTEGRATION_JWT_AUDIENCE` são **obrigatórios**: o backend falha no boot (fail-closed) se
 faltarem, garantindo que nunca aceite um token RS256 emitido para outra audience daquele JWKS.
-As variáveis `INTEGRATION_DEV_*` e `INTEGRATION_DOCS_ENABLED`
+As variáveis `INTEGRATION_DEV_*`, `INTEGRATION_DOCS_ENABLED` e `APP_DOCS_ENABLED`
 são **exclusivas de desenvolvimento** e não devem ser promovidas (o emissor de dev já
-fica bloqueado fora de `development`/`test`). Equivalências dev × produção em
+fica bloqueado fora de `development`/`test`; as UIs de documentação só devem subir em
+produção por decisão explícita). Equivalências dev × produção em
 [`arquitetura-backend.md`](arquitetura-backend.md#local-dev--produção-corporativo).
 
 ## Publicação

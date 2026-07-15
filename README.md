@@ -54,7 +54,7 @@ O sistema é composto por dois artefatos independentes — uma API HTTP/WebSocke
 | **Hospedagem do frontend** | Qualquer servidor HTTP ou CDN capaz de entregar arquivos estáticos (output de `vite build`) |
 | **Terminação TLS / proxy reverso** | HTTPS obrigatório em produção; o `compose.prod.yml` usa nginx como referência para cabeçalhos de segurança e deve ser replicado no proxy da organização |
 | **Variáveis de ambiente** | Injetadas na inicialização do processo (ver seção de setup abaixo) |
-| **Conectividade interna** | Backend ↔ banco; frontend ↔ backend (domínio do frontend declarado em `FRONTEND_URL` para CORS) |
+| **Conectividade interna** | Backend ↔ banco; frontend ↔ backend (domínios do frontend declarados em `FRONTEND_URL` para CORS — aceita lista separada por vírgula) |
 
 > **Infraestrutura do MVP:** Vercel (frontend), Render (backend) e Supabase (PostgreSQL gerenciado) foram escolhidos exclusivamente para validação rápida do produto, antes das etapas de SI, LGPD e aprovações corporativas de infraestrutura. Não constituem dependência do sistema e podem ser substituídos integralmente por infraestrutura aprovada pela organização.
 
@@ -264,7 +264,7 @@ Na borda, o frontend serve cabeçalhos de segurança (CSP, `X-Frame-Options`, `X
 
 Endpoints M2M para um sistema legado marcar **início** e **fim** do atendimento da revendedora (`POST /integration/v1/atendimentos/iniciar` e `/encerrar`), eliminando a gestão manual da fila. Autenticação OAuth2 (Bearer JWT RS256) com scopes `tickets:start`/`tickets:finish`, pronta para o Apigee. Contrato, erros e modelo de segurança em [`docs/arquitetura-backend.md`](docs/arquitetura-backend.md#integração-com-sistemas-corporativos-integration).
 
-**Documentação OpenAPI/Swagger:** com o backend rodando em `development`, acesse **http://localhost:3000/docs/integration**.
+**Documentação OpenAPI/Swagger:** com o backend rodando em `development`, acesse **http://localhost:3000/docs/integration** (API M2M) e **http://localhost:3000/docs/api** (contrato completo da API consumida pelo frontend).
 
 **Testar localmente** (sem Apigee, usando o emissor de token de desenvolvimento):
 

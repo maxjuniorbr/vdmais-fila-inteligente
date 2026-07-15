@@ -44,8 +44,8 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@prisma/client"
         update-types: ["version-update:semver-major"]
-      # React is pinned to the 18 line per the target platform requirement (DT-16 in
-      # docs/debitos-tecnicos.md). Do not propose the major back to 19.
+      # React is pinned to the 18 line per DT-16 in docs/debitos-tecnicos.md.
+      # Do not propose the major back to 19.
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"

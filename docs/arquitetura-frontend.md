@@ -81,7 +81,7 @@ api.patch<T>(path, body?)     → Promise<T>
 api.delete<T>(path)           → Promise<T>
 ```
 
-- Base URL HTTP: caminho relativo fixo `/api` (definido em `api/client.ts`), roteado ao backend pela borda — proxy do Vite em dev, rewrite do `vercel.json` em prod; **não** depende de `VITE_API_URL`
+- Base URL HTTP: resolvida em `api/config.ts` a partir de `VITE_API_URL` — quando definida, REST e WebSocket falam **direto** com o backend pela mesma origem (modelo dos ambientes corporativos); quando omitida, cai no caminho relativo `/api`, roteado ao backend pela borda (proxy do Vite em dev, rewrite do `vercel.json`)
 - Header automático: `Authorization: Bearer <token>` quando há sessão ativa
 - 401 automático: chama `notifySessionExpired()` antes de rejeitar a Promise
 
@@ -232,7 +232,7 @@ npm run build --workspace=apps/frontend
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `VITE_API_URL` | Não | Origem do **WebSocket** (Socket.IO). Se omitida, usa `/` (mesma origem). Em borda que não faz proxy de WS (ex.: Vercel), aponte para a origem do backend. As chamadas HTTP usam sempre `/api`, roteado ao backend pela borda. |
+| `VITE_API_URL` | Não | Origem do backend para **REST e WebSocket** (resolvida em `api/config.ts`). Se omitida, REST usa `/api` e o socket usa `/` (mesma origem, dependentes de proxy na borda). Defina quando frontend e backend vivem em hosts separados sem proxy — o caso dos ambientes corporativos. |
 
 ---
 
