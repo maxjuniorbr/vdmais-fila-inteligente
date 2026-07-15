@@ -6,8 +6,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     # Título no formato do projeto: `chore: bump ...` (type válido, sem escopo).
-    # O Dependabot ainda anexa um body (changelog); ao mesclar por squash, limpe
-    # o body para o commit final ficar conforme (linha única, sem corpo).
+    # Os PRs do bot NÃO são mesclados (o commit deles tem body/changelog e o
+    # título pode passar de 72 chars): porta-se o bump manualmente para master
+    # via /commit (agente dependency-updater), que passa pelo hook commit-msg.
+    # Após o push o Dependabot detecta a versão atualizada e fecha o PR sozinho.
     commit-message:
       prefix: "chore"
       prefix-development: "chore"

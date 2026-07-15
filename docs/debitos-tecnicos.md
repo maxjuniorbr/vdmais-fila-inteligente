@@ -153,12 +153,13 @@ rebaixando-o.
 podem mascarar incompatibilidades se um pacote pai passar a exigir uma faixa diferente.
 Risco baixo — patches dentro do mesmo major, validados por unit + e2e.
 
-**Resíduo conhecido (js-yaml 3.x).** O `@istanbuljs/load-nyc-config` (transitivo de
-**dev**, via babel-plugin-istanbul/jest) fixa `js-yaml` **3.x**, que não tem patch para
-a GHSA-h67p-54hq-rp68 (a correção é a linha 4.x) e quebraria se forçado a 4.x (`safeLoad`
-removido). Por isso há um override aninhado mantendo-o em `^3.14.2`. É **dev-only**, sem
-superfície real (só parseia configs de cobertura nossas, não entrada não confiável) e
-abaixo do gate `high`; aceito até o `load-nyc-config` (sem manutenção) sair da árvore.
+**Resíduo quitado (js-yaml 3.x).** O `@istanbuljs/load-nyc-config` (transitivo de
+**dev**, via babel-plugin-istanbul/jest) fixa `js-yaml` **3.x**, que quebraria se forçado
+a 4.x (`safeLoad` removido). O upstream lançou o **3.15.0** com o patch da
+GHSA-h67p-54hq-rp68 na própria linha 3.x; o override aninhado subiu o piso para
+`^3.15.0` e o lockfile resolve 3.15.0 — o alerta do Dependabot fecha após o push.
+O override aninhado permanece apenas para impedir regressão abaixo de 3.15 enquanto
+o `load-nyc-config` (sem manutenção) estiver na árvore.
 
 **Encaminhamento.** Remover cada override quando o pacote pai subir para uma versão que já
 traga o transitivo corrigido; revisar na rotina do Dependabot. Relacionado a
