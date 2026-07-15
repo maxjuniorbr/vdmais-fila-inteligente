@@ -1,6 +1,7 @@
 import { notifySessionExpired } from '../auth/session'
+import { API_BASE } from './config'
 
-const BASE = '/api'
+const BASE = API_BASE
 
 function authHeaders() {
   return {
