@@ -6,7 +6,11 @@ import { ScopesGuard } from './auth/scopes.guard'
 import { Scopes } from './auth/scopes.decorator'
 import { IntegrationActionDto } from './dto/integration-action.dto'
 import { IntegrationService } from './integration.service'
-import { SCOPE_TICKETS_FINISH, SCOPE_TICKETS_START } from './integration.constants'
+import {
+  IDEMPOTENCY_KEY_MAX_LENGTH,
+  SCOPE_TICKETS_FINISH,
+  SCOPE_TICKETS_START,
+} from './integration.constants'
 
 @ApiTags('integration')
 @ApiBearerAuth()
@@ -64,6 +68,8 @@ export class IntegrationController {
     headerKey: string | undefined,
   ): IntegrationActionDto {
     if (dto.idempotencyKey || !headerKey) return dto
-    return { ...dto, idempotencyKey: headerKey }
+    // O header não passa pelo ValidationPipe; trunca no mesmo limite do campo do
+    // corpo para não persistir strings arbitrárias no AuditEvent.metadata.
+    return { ...dto, idempotencyKey: headerKey.slice(0, IDEMPOTENCY_KEY_MAX_LENGTH) }
   }
 }

@@ -48,7 +48,9 @@ export function getJwtSecret(config: ConfigService): string {
 }
 
 export function getJwtExpiresInSeconds(config: ConfigService): number {
-  const value = config.get<string>('JWT_EXPIRES_IN')?.trim() || '7d'
+  // Fallback curto e igual ao default documentado (.env.example/compose.prod.yml):
+  // um deploy sem a env não pode alongar silenciosamente a vida do token de staff.
+  const value = config.get<string>('JWT_EXPIRES_IN')?.trim() || '8h'
   if (/^\d+$/.test(value)) return Number(value)
 
   const match = /^(\d+)([smhd])$/.exec(value)

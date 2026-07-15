@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { IsOptional, IsString, MaxLength } from 'class-validator'
+import { IDEMPOTENCY_KEY_MAX_LENGTH } from '../integration.constants'
 
 export class IntegrationActionDto {
   @ApiPropertyOptional({ description: 'Código oficial da revendedora (reCode). Informe reCode OU cpf.' })
@@ -25,6 +26,6 @@ export class IntegrationActionDto {
   @ApiPropertyOptional({ description: 'Chave de idempotência para correlação de retries.' })
   @IsOptional()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(IDEMPOTENCY_KEY_MAX_LENGTH)
   idempotencyKey?: string
 }

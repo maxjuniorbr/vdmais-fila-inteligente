@@ -1,6 +1,7 @@
 import { IntegrationController } from '../integration.controller'
 import { IntegrationService } from '../integration.service'
 import { IntegrationPrincipal } from '../auth/integration-jwt.strategy'
+import { IDEMPOTENCY_KEY_MAX_LENGTH } from '../integration.constants'
 
 const principal: IntegrationPrincipal = { type: 'integration', client: 'erp', scopes: [] }
 
@@ -32,6 +33,16 @@ describe('IntegrationController', () => {
     await controller.iniciar({ reCode: 'RE1' }, 'idem-header', { user: principal })
     expect(integration.startService).toHaveBeenCalledWith(
       { reCode: 'RE1', idempotencyKey: 'idem-header' },
+      principal,
+    )
+  })
+
+  it('truncates an oversized Idempotency-Key header to the body field limit', async () => {
+    integration.startService.mockResolvedValue({ ticketId: 't1' })
+    const oversized = 'k'.repeat(IDEMPOTENCY_KEY_MAX_LENGTH + 50)
+    await controller.iniciar({ reCode: 'RE1' }, oversized, { user: principal })
+    expect(integration.startService).toHaveBeenCalledWith(
+      { reCode: 'RE1', idempotencyKey: 'k'.repeat(IDEMPOTENCY_KEY_MAX_LENGTH) },
       principal,
     )
   })

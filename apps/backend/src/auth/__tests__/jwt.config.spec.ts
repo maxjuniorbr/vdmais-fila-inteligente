@@ -62,8 +62,8 @@ describe('getJwtSecret', () => {
 })
 
 describe('getJwtExpiresInSeconds', () => {
-  it('defaults to 7 days when unset', () => {
-    expect(getJwtExpiresInSeconds(configWith({}))).toBe(7 * 86400)
+  it('defaults to 8 hours when unset, matching the documented default', () => {
+    expect(getJwtExpiresInSeconds(configWith({}))).toBe(8 * 3600)
   })
 
   it('accepts a plain number of seconds', () => {
