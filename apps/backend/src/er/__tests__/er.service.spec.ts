@@ -254,16 +254,18 @@ describe('ERService', () => {
       id: 'er-1',
       name: 'ER Centro',
       isDayOpen: true,
+      guestEntryEnabled: false,
     })
 
     await expect(service.getPublic('er-1')).resolves.toEqual({
       id: 'er-1',
       name: 'ER Centro',
       isDayOpen: true,
+      guestEntryEnabled: false,
     })
     expect(prisma.eR.findUnique).toHaveBeenCalledWith({
       where: { id: 'er-1' },
-      select: { id: true, name: true, isDayOpen: true },
+      select: { id: true, name: true, isDayOpen: true, guestEntryEnabled: true },
     })
   })
 

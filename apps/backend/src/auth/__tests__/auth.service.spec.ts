@@ -1,6 +1,6 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common'
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import { EntryChannel, Prisma, Role } from '@prisma/client'
+import { EntryChannel, Prisma, RepresentativeKind, Role } from '@prisma/client'
 import * as bcrypt from 'bcrypt'
 import { AuditLogService } from '../../audit-log/audit-log.service'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -14,8 +14,14 @@ jest.mock('bcrypt')
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>
 
 const prisma = {
-  representative: { findFirst: jest.fn(), create: jest.fn() },
+  representative: {
+    findFirst: jest.fn(),
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  },
   operator: { findUnique: jest.fn() },
+  eR: { findUnique: jest.fn() },
 }
 
 const jwt = {
@@ -307,6 +313,143 @@ describe('AuthService', () => {
     })
   })
 
+  describe('guestEntry', () => {
+    const guestEntryDto = {
+      firstName: ' Ana ',
+      lastName: ' de  Souza ',
+      phone: '11999990000',
+      erId: 'er-1',
+      entryChannel: EntryChannel.QR_CODE,
+      entryToken: 'entry-token',
+    }
+
+    beforeEach(() => {
+      prisma.eR.findUnique.mockResolvedValue({ guestEntryEnabled: true })
+    })
+
+    it('creates a guest with normalized name and signs a day-scoped session', async () => {
+      prisma.representative.findUnique.mockResolvedValue(null)
+      prisma.representative.create.mockResolvedValue({ id: 'guest-1' })
+
+      const result = await service.guestEntry(guestEntryDto)
+
+      expect(prisma.representative.create).toHaveBeenCalledWith({
+        data: {
+          kind: RepresentativeKind.GUEST,
+          fullName: 'Ana de Souza',
+          phone: '11999990000',
+        },
+      })
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: 'guest-1',
+          role: Role.REPRESENTATIVE,
+          erId: 'er-1',
+          entryChannel: EntryChannel.QR_CODE,
+        }),
+        expect.objectContaining({ expiresIn: expect.any(Number) }),
+      )
+      expect(auditLog.logIfERExists).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'queue_entry_started',
+          erId: 'er-1',
+          representativeId: 'guest-1',
+          metadata: { entryChannel: EntryChannel.QR_CODE, guest: true },
+        }),
+      )
+      expect(result.access_token).toBe('signed-token')
+    })
+
+    it('reuses the guest matched by phone and refreshes the name', async () => {
+      prisma.representative.findUnique.mockResolvedValue({
+        id: 'guest-1',
+        kind: RepresentativeKind.GUEST,
+        fullName: 'Ana Sousa',
+      })
+      prisma.representative.update.mockResolvedValue({ id: 'guest-1' })
+
+      await service.guestEntry(guestEntryDto)
+
+      expect(prisma.representative.update).toHaveBeenCalledWith({
+        where: { id: 'guest-1' },
+        data: { fullName: 'Ana de Souza' },
+      })
+      expect(prisma.representative.create).not.toHaveBeenCalled()
+    })
+
+    it('keeps the record untouched when the same guest re-enters with the same name', async () => {
+      prisma.representative.findUnique.mockResolvedValue({
+        id: 'guest-1',
+        kind: RepresentativeKind.GUEST,
+        fullName: 'Ana de Souza',
+      })
+
+      const result = await service.guestEntry(guestEntryDto)
+
+      expect(prisma.representative.update).not.toHaveBeenCalled()
+      expect(prisma.representative.create).not.toHaveBeenCalled()
+      expect(result.access_token).toBe('signed-token')
+    })
+
+    it('rejects a registered representative phone without assuming her identity', async () => {
+      prisma.representative.findUnique.mockResolvedValue({
+        id: 're-9',
+        kind: RepresentativeKind.REGISTERED,
+        fullName: 'Maria Registrada',
+      })
+
+      const error = (await service.guestEntry(guestEntryDto).catch((e: Error) => e)) as Error
+
+      expect(error).toBeInstanceOf(ConflictException)
+      // The conflict must not leak who owns the phone.
+      expect(error.message).not.toContain('Maria')
+      expect(jwt.sign).not.toHaveBeenCalled()
+    })
+
+    it('rejects guest entry when the ER has it disabled', async () => {
+      prisma.eR.findUnique.mockResolvedValue({ guestEntryEnabled: false })
+
+      await expect(service.guestEntry(guestEntryDto)).rejects.toThrow(ForbiddenException)
+      expect(prisma.representative.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('rejects guest entry when the ER does not exist', async () => {
+      prisma.eR.findUnique.mockResolvedValue(null)
+
+      await expect(service.guestEntry(guestEntryDto)).rejects.toThrow(ForbiddenException)
+    })
+
+    it('rejects guest entry when the queue entry token is invalid', async () => {
+      queueEntryTokens.verify.mockImplementation(() => {
+        throw new UnauthorizedException('Acesso à fila inválido ou expirado')
+      })
+
+      await expect(service.guestEntry(guestEntryDto)).rejects.toThrow(UnauthorizedException)
+      expect(prisma.representative.create).not.toHaveBeenCalled()
+    })
+
+    it('recovers from a same-phone create race by reusing the winner', async () => {
+      prisma.representative.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'guest-1',
+          kind: RepresentativeKind.GUEST,
+          fullName: 'Ana de Souza',
+        })
+      prisma.representative.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('dup', {
+          code: 'P2002',
+          clientVersion: '6.19.3',
+        }),
+      )
+
+      const result = await service.guestEntry(guestEntryDto)
+
+      expect(result.access_token).toBe('signed-token')
+      expect(prisma.representative.findUnique).toHaveBeenCalledTimes(2)
+    })
+  })
+
   describe('login', () => {
     it('authenticates a representative and audits the success', async () => {
       prisma.representative.findFirst.mockResolvedValue({
@@ -382,6 +525,21 @@ describe('AuthService', () => {
       )
       // Runs a bcrypt comparison even when the account is missing, so timing does
       // not reveal whether the credential exists.
+      expect(mockedBcrypt.compare).toHaveBeenCalled()
+    })
+
+    it('rejects a login against a guest record exactly like an unknown account', async () => {
+      prisma.representative.findFirst.mockResolvedValue({ id: 'guest-1', passwordHash: null })
+      await expect(
+        service.login({
+          credential: '00000000000',
+          password: 'x',
+          erId: 'er-1',
+          entryToken: 'entry-token',
+          entryChannel: EntryChannel.QR_CODE,
+        }),
+      ).rejects.toThrow('Credenciais inválidas')
+      // Same timing-equalizing bcrypt comparison as the missing-account path.
       expect(mockedBcrypt.compare).toHaveBeenCalled()
     })
 

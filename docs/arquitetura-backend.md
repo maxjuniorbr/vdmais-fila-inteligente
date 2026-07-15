@@ -36,16 +36,16 @@ apps/backend/
 ## Modelo de dados
 
 ```
-Representative          Operador (equipe)
-─────────────           ──────────────────
-id                      id
-fullName                name
-cpf (unique)            email (unique)
-phone (unique)          passwordHash
-birthDate               role: OPERATOR|ATTENDANT|MANAGER|ADMIN
-reCode (unique)         sessionVersion
-passwordHash            erId? (null para ADMIN)
-                        counter? (1:1)
+Representative           Operador (equipe)
+─────────────            ──────────────────
+id                       id
+kind: REGISTERED|GUEST   name
+fullName                 email (unique)
+cpf? (unique)            passwordHash
+phone (unique)           role: OPERATOR|ATTENDANT|MANAGER|ADMIN
+birthDate?               sessionVersion
+reCode? (unique)         erId? (null para ADMIN)
+passwordHash?            counter? (1:1)
 
 ER                      Queue
 ──                      ─────
@@ -58,6 +58,7 @@ qrCodeUrl?              tickets[]
 panelTokenHash?         Constraint: UNIQUE(erId, businessDate)
 callTimeoutSeconds
 pauseTimeoutSeconds
+guestEntryEnabled
 
 Counter                 Ticket
 ───────                 ──────
@@ -84,6 +85,12 @@ id / eventType / erId
 ticketId? / representativeId? / operatorId?
 metadata (JSON) / createdAt
 ```
+
+> Convidada (`kind: GUEST`): entra na fila só com nome + telefone (via
+> `POST /auth/guest-entry`, habilitado por ER em `guestEntryEnabled`). O telefone —
+> único e obrigatório — é a identidade dela: reler o QR com o mesmo número devolve a
+> mesma senha ativa. CPF, nascimento, código de RE e senha ficam nulos; convidada não
+> faz login por senha.
 
 ---
 
@@ -138,6 +145,7 @@ Tokens de entrada na fila (QR Code / link) trafegam no header `x-entry-token` e 
 |---|---|---|---|---|
 | `POST` | `/auth/register` | Público | 20/min por IP (`THROTTLE_REGISTER_PER_MINUTE`) | Cadastro de RE |
 | `POST` | `/auth/login` | Público | 40/min por IP (`THROTTLE_LOGIN_PER_MINUTE`) + trava por credencial | Login de RE |
+| `POST` | `/auth/guest-entry` | Público | 20/min por IP (`THROTTLE_GUEST_ENTRY_PER_MINUTE`) | Entrada de convidada (nome + sobrenome + telefone; exige token de entrada e `guestEntryEnabled` no ER) |
 | `POST` | `/auth/staff-login` | Público | 20/min por IP + trava por credencial | Login da equipe |
 | `POST` | `/representatives` | ATTENDANT, MANAGER | — | Criar RE manualmente |
 | `GET` | `/representatives/search?q=` | ATTENDANT, MANAGER | — | Buscar REs por nome/CPF/código |
@@ -148,7 +156,7 @@ Tokens de entrada na fila (QR Code / link) trafegam no header `x-entry-token` e 
 
 | Método | Caminho | Auth | Descrição |
 |---|---|---|---|
-| `GET` | `/public/ers/:erId` | `x-entry-token` | Metadados do ER para entrada na fila (nome, canal) |
+| `GET` | `/public/ers/:erId` | `x-entry-token` | Metadados do ER para entrada na fila (nome, canal, `guestEntryEnabled`) |
 
 ---
 
@@ -341,7 +349,7 @@ Console interno de simulação para desenvolvimento e demonstração. **Bloquead
 
 ## Segurança
 
-- **Rate limiting (por usuário/IP):** ThrottlerModule — 300 req/60s globais; limites por endpoint nos críticos. Requisição com JWT **verificado** usa o usuário como chave (`user:<id>`), então um ER cheio de REs no mesmo Wi-Fi/NAT não esgota um balde único por IP; a identidade é segura como chave porque exige assinatura válida (criar identidades passa pelo `/auth/register`, que é limitado por IP). Rotas anônimas usam **apenas o IP**, nunca campos do corpo (que o cliente controla) — caso contrário variar `erId`/`entryChannel` criaria baldes novos e burlaria o limite. Limites ajustáveis por env sem redeploy (`THROTTLE_GLOBAL_PER_MINUTE`, `THROTTLE_REGISTER_PER_MINUTE`, `THROTTLE_LOGIN_PER_MINUTE`, `THROTTLE_TICKET_CREATE_PER_MINUTE`) — ex.: evento com muita gente na mesma rede. Camada grosseira de anti-enxurrada.
+- **Rate limiting (por usuário/IP):** ThrottlerModule — 300 req/60s globais; limites por endpoint nos críticos. Requisição com JWT **verificado** usa o usuário como chave (`user:<id>`), então um ER cheio de REs no mesmo Wi-Fi/NAT não esgota um balde único por IP; a identidade é segura como chave porque exige assinatura válida (criar identidades passa pelo `/auth/register`, que é limitado por IP). Rotas anônimas usam **apenas o IP**, nunca campos do corpo (que o cliente controla) — caso contrário variar `erId`/`entryChannel` criaria baldes novos e burlaria o limite. Limites ajustáveis por env sem redeploy (`THROTTLE_GLOBAL_PER_MINUTE`, `THROTTLE_REGISTER_PER_MINUTE`, `THROTTLE_LOGIN_PER_MINUTE`, `THROTTLE_GUEST_ENTRY_PER_MINUTE`, `THROTTLE_TICKET_CREATE_PER_MINUTE`) — ex.: evento com muita gente na mesma rede. Camada grosseira de anti-enxurrada.
 - **`trust proxy` fixo:** `TRUST_PROXY_HOPS` (default 1) define quantos proxies confiáveis ficam à frente; o `req.ip` (base do throttle) vem da posição correta do `X-Forwarded-For`, não do valor falsificável que o cliente envia.
 - **Trava de brute-force por credencial:** [`LoginThrottleService`](../apps/backend/src/auth/login-throttle.service.ts) conta falhas por conta alvo (CPF/RE code no login; e-mail no staff-login), janela de 15 min, máx. 10 → `429`. Imune a NAT e a rotação de IP; normaliza o identificador (sem driblar por formatação) e bloqueia antes de tocar o banco. _Em memória, por instância — ver [DT-1](./debitos-tecnicos.md#dt-1--estado-de-rate-limit-e-trava-de-brute-force-em-memória)._
 - **Anti-enumeração por timing:** o caminho "conta inexistente" roda uma comparação bcrypt dummy, igualando o tempo de resposta ao da senha errada.

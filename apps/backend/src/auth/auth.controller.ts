@@ -4,6 +4,7 @@ import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { StaffLoginDto } from './dto/staff-login.dto'
+import { GuestEntryDto } from './dto/guest-entry.dto'
 import { throttleLimit } from '../common/throttle-limits'
 
 @Controller('auth')
@@ -27,6 +28,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto)
+  }
+
+  @Post('guest-entry')
+  @Throttle({ default: { ttl: 60000, limit: throttleLimit('THROTTLE_GUEST_ENTRY_PER_MINUTE', 20) } })
+  @HttpCode(HttpStatus.OK)
+  guestEntry(@Body() dto: GuestEntryDto) {
+    return this.authService.guestEntry(dto)
   }
 
   @Post('staff-login')

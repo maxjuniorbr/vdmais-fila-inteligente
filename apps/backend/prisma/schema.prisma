@@ -33,6 +33,11 @@ enum EntryChannel {
   CHECKIN_ASSISTED
 }
 
+enum RepresentativeKind {
+  REGISTERED
+  GUEST
+}
+
 enum CounterState {
   UNAVAILABLE
   ACTIVE
@@ -43,14 +48,17 @@ enum CounterState {
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
+// Convidada (kind GUEST) entra na fila só com nome + telefone: o telefone (único e
+// obrigatório) é a identidade dela; os demais campos de cadastro ficam nulos.
 model Representative {
-  id           String   @id @default(cuid())
+  id           String             @id @default(cuid())
+  kind         RepresentativeKind @default(REGISTERED)
   fullName     String
-  cpf          String   @unique
-  phone        String   @unique
-  birthDate    DateTime
-  reCode       String   @unique
-  passwordHash String
+  cpf          String?            @unique
+  phone        String             @unique
+  birthDate    DateTime?
+  reCode       String?            @unique
+  passwordHash String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -76,6 +84,10 @@ model ER {
   // Tempo máximo (em segundos) que uma senha pode ficar em chamada antes de
   // ser marcada como não comparecimento automaticamente. 0 desativa.
   callTimeoutSeconds Int @default(600)
+
+  // Entrada de convidada (só nome + telefone, sem cadastro) habilitada por ER.
+  // Desligado por padrão: nenhum ER muda de comportamento sem ação explícita.
+  guestEntryEnabled Boolean @default(false)
 
   // Hash do token de exibição do painel (TV). O token em claro é mostrado uma
   // única vez na administração; aqui guardamos só o hash. Nulo = sem acesso.

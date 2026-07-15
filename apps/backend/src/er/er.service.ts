@@ -36,7 +36,7 @@ export class ERService {
   async getPublic(erId: string) {
     const er = await this.prisma.eR.findUnique({
       where: { id: erId },
-      select: { id: true, name: true, isDayOpen: true },
+      select: { id: true, name: true, isDayOpen: true, guestEntryEnabled: true },
     })
     if (!er) throw new NotFoundException('ER não encontrado')
     return er

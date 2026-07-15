@@ -513,6 +513,7 @@ describe('Full queue journey and concurrency (e2e)', () => {
       id: erId,
       name: expect.any(String),
       isDayOpen: true,
+      guestEntryEnabled: false,
       entryChannel: EntryChannel.QR_CODE,
     })
     expect(response.body).not.toHaveProperty('dayOpenedAt')

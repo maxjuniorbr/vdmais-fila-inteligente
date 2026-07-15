@@ -12,6 +12,7 @@ describe('pii-mask', () => {
   it('never leaks a malformed/short CPF in full', () => {
     expect(maskCpf('12')).toBe('***.***.***-**')
     expect(maskCpf('')).toBe('***.***.***-**')
+    expect(maskCpf(null)).toBe('***.***.***-**')
   })
 
   it('never leaks a malformed/short phone in full', () => {

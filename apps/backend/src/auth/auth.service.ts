@@ -1,11 +1,17 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common'
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcrypt'
-import { EntryChannel, Prisma, Role } from '@prisma/client'
+import { EntryChannel, Prisma, RepresentativeKind, Role } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { StaffLoginDto } from './dto/staff-login.dto'
+import { GuestEntryDto } from './dto/guest-entry.dto'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { normalizeReCode, onlyDigits } from '../common/representative-identifiers'
@@ -131,6 +137,73 @@ export class AuthService {
     }
   }
 
+  async guestEntry(dto: GuestEntryDto) {
+    const entry = this._resolveQueueEntry(dto)
+
+    const er = await this.prisma.eR.findUnique({
+      where: { id: entry.erId },
+      select: { guestEntryEnabled: true },
+    })
+    if (!er?.guestEntryEnabled) {
+      throw new ForbiddenException('Entrada como convidada não está habilitada neste espaço')
+    }
+
+    const fullName = `${dto.firstName} ${dto.lastName}`.trim().replace(/\s+/g, ' ')
+    const guest = await this._resolveGuest(fullName, onlyDigits(dto.phone))
+
+    await this.auditLog.logIfERExists({
+      eventType: 'queue_entry_started',
+      erId: entry.erId,
+      representativeId: guest.id,
+      metadata: { entryChannel: entry.entryChannel, guest: true },
+    })
+
+    return this._sign(
+      guest.id,
+      Role.REPRESENTATIVE,
+      entry.erId,
+      undefined,
+      undefined,
+      entry.entryChannel,
+      this._entrySessionTtlSeconds(entry),
+    )
+  }
+
+  // The phone is the guest's identity: same phone → same person → same record
+  // (and therefore the same active ticket via the per-representative dedup).
+  private async _resolveGuest(fullName: string, phone: string): Promise<{ id: string }> {
+    const existing = await this.prisma.representative.findUnique({ where: { phone } })
+    if (existing) {
+      if (existing.kind !== RepresentativeKind.GUEST) {
+        // Typing a registered RE's phone must not assume her identity nor leak
+        // her name; her path is the password login.
+        throw new ConflictException(
+          'Este telefone pertence a um cadastro. Entre com CPF ou código de RE e senha.',
+        )
+      }
+      // Same phone is the same person; refreshing the name lets a re-scan fix a typo.
+      if (existing.fullName !== fullName) {
+        return this.prisma.representative.update({
+          where: { id: existing.id },
+          data: { fullName },
+        })
+      }
+      return existing
+    }
+
+    try {
+      return await this.prisma.representative.create({
+        data: { kind: RepresentativeKind.GUEST, fullName, phone },
+      })
+    } catch (error) {
+      // Two first entries racing on the same phone: the loser reuses the winner's record.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return this._resolveGuest(fullName, phone)
+      }
+      throw error
+    }
+  }
+
   async login(dto: LoginDto) {
     const entry = this._resolveQueueEntry(dto)
     if (dto.erId) {
@@ -150,11 +223,13 @@ export class AuthService {
       },
     })
 
-    // Use same error message regardless of which field is wrong (security)
-    if (!rep) {
+    // Use same error message regardless of which field is wrong (security).
+    // A guest record has no password, so it must fail exactly like an unknown
+    // account (same message and timing), never reach the hash comparison.
+    if (!rep?.passwordHash) {
       await bcrypt.compare(dto.password, DUMMY_PASSWORD_HASH)
       this.loginThrottle.registerFailure(throttleKey)
-      await this._recordAuthenticationFailure(dto.erId, 'representative')
+      await this._recordAuthenticationFailure(dto.erId, 'representative', rep?.id)
       throw new UnauthorizedException('Credenciais inválidas')
     }
 

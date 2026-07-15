@@ -1,4 +1,14 @@
-import { IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength } from 'class-validator'
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator'
 
 export class CreateERDto {
   @IsString()
@@ -24,4 +34,9 @@ export class CreateERDto {
   @Min(0)
   @Max(86400)
   callTimeoutSeconds?: number
+
+  // Entrada de convidada (só nome + telefone) — desligada por padrão.
+  @IsOptional()
+  @IsBoolean()
+  guestEntryEnabled?: boolean
 }

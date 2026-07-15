@@ -42,6 +42,7 @@ export class AdminService {
         isDayOpen: true,
         pauseTimeoutSeconds: true,
         callTimeoutSeconds: true,
+        guestEntryEnabled: true,
         createdAt: true,
         _count: { select: { counters: true, operators: true } },
       },
@@ -82,6 +83,9 @@ export class AdminService {
         ...(dto.callTimeoutSeconds === undefined
           ? {}
           : { callTimeoutSeconds: dto.callTimeoutSeconds }),
+        ...(dto.guestEntryEnabled === undefined
+          ? {}
+          : { guestEntryEnabled: dto.guestEntryEnabled }),
       },
     })
     await this.auditLog.log({
@@ -106,6 +110,9 @@ export class AdminService {
         ...(dto.callTimeoutSeconds === undefined
           ? {}
           : { callTimeoutSeconds: dto.callTimeoutSeconds }),
+        ...(dto.guestEntryEnabled === undefined
+          ? {}
+          : { guestEntryEnabled: dto.guestEntryEnabled }),
       },
     })
     await this.auditLog.log({

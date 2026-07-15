@@ -109,10 +109,11 @@ menos 32 bytes e rotacione-o conforme a política do ambiente.
   representante expira sempre no fim do dia útil, independente desses valores; o QR digital
   é regenerado a cada dia (manual hoje; automático no DT-12).
 - `THROTTLE_GLOBAL_PER_MINUTE` (default `300`), `THROTTLE_REGISTER_PER_MINUTE` (default
-  `20`), `THROTTLE_LOGIN_PER_MINUTE` (default `40`) e `THROTTLE_TICKET_CREATE_PER_MINUTE`
-  (default `40`) — limites de rate-limit por minuto. Requisição autenticada conta por
-  usuário (JWT verificado); anônima conta por IP. Eleve os limites anônimos
-  (register/login) para eventos com muita gente no mesmo Wi-Fi/NAT e reverta depois.
+  `20`), `THROTTLE_LOGIN_PER_MINUTE` (default `40`), `THROTTLE_GUEST_ENTRY_PER_MINUTE`
+  (default `20`) e `THROTTLE_TICKET_CREATE_PER_MINUTE` (default `40`) — limites de
+  rate-limit por minuto. Requisição autenticada conta por usuário (JWT verificado);
+  anônima conta por IP. Eleve os limites anônimos (register/login/guest-entry) para
+  eventos com muita gente no mesmo Wi-Fi/NAT e reverta depois.
 
 ### Integração M2M (quando habilitada)
 
