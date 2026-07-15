@@ -281,6 +281,32 @@ describe('PanelPage', () => {
     expect(screen.queryByRole('img', { name: 'QR Code de entrada na fila' })).not.toBeInTheDocument()
   })
 
+  it('shrinks the upcoming list to five rows when the QR occupies the footer', async () => {
+    const state = fixture(1)
+    state.qrEntry = { token: 'entry-tok', expiresAt: '2026-07-15T23:59:59.000Z' }
+    state.waiting = Array.from({ length: 8 }, (_, index) => ({
+      code: `W${index + 1}`,
+      position: index + 1,
+    }))
+    renderPanel(state)
+
+    expect(await screen.findByText('ENTRE NA FILA')).toBeInTheDocument()
+    expect(screen.getByText('W5')).toBeInTheDocument()
+    expect(screen.queryByText('W6')).not.toBeInTheDocument()
+  })
+
+  it('gives the footer space back to the queue when there is no QR', async () => {
+    const state = fixture(1)
+    state.waiting = Array.from({ length: 8 }, (_, index) => ({
+      code: `W${index + 1}`,
+      position: index + 1,
+    }))
+    renderPanel(state)
+
+    expect(await screen.findByText('W7')).toBeInTheDocument()
+    expect(screen.queryByText('W8')).not.toBeInTheDocument()
+  })
+
   it('does not crash when the state payload omits inService', async () => {
     const state = {
       isDayOpen: true,

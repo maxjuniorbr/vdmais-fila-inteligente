@@ -77,10 +77,10 @@ function resolvePanelLayout(callCount: number): PanelLayout {
   return { columns, codeSize, nameSize, caixaSize }
 }
 
-// 5 linhas (era 7): o rodapé da sidebar agora abriga o QR de entrada; o rodízio
-// existente absorve a diferença sem perder informação.
-const NEXT_VISIBLE = 5
-const NEXT_WINDOW = NEXT_VISIBLE - 1
+// Com o QR de entrada no rodapé a lista encolhe para 5 linhas; sem ele (estado
+// sem token) o espaço volta para a fila com 7. O rodízio absorve a diferença.
+const NEXT_VISIBLE_WITH_QR = 5
+const NEXT_VISIBLE_FULL = 7
 const NEXT_ROTATE_MS = 5000
 
 export function PanelPage() {
@@ -126,16 +126,19 @@ export function PanelPage() {
     return () => clearInterval(id)
   }, [])
 
+  const nextVisible = qrEntry ? NEXT_VISIBLE_WITH_QR : NEXT_VISIBLE_FULL
+  const nextWindow = nextVisible - 1
+
   useEffect(() => {
     const poolSize = Math.max(0, waiting.length - 1)
-    const pages = Math.max(1, Math.ceil(poolSize / NEXT_WINDOW))
+    const pages = Math.max(1, Math.ceil(poolSize / nextWindow))
     if (pages <= 1) {
       setNextPage(0)
       return
     }
     const id = setInterval(() => setNextPage((p) => (p + 1) % pages), NEXT_ROTATE_MS)
     return () => clearInterval(id)
-  }, [waiting.length])
+  }, [waiting.length, nextWindow])
 
   const fetchPanelState = useCallback(async () => {
     if (!erId) return
@@ -187,15 +190,15 @@ export function PanelPage() {
   const callCount = calling.length
 
   const rotatingPool = waiting.slice(1)
-  const rotatingPages = Math.max(1, Math.ceil(rotatingPool.length / NEXT_WINDOW))
-  const needsRotation = waiting.length > NEXT_VISIBLE
+  const rotatingPages = Math.max(1, Math.ceil(rotatingPool.length / nextWindow))
+  const needsRotation = waiting.length > nextVisible
   const activePage = needsRotation ? nextPage % rotatingPages : 0
   const displayedWaiting = needsRotation
     ? [
         waiting[0],
-        ...rotatingPool.slice(activePage * NEXT_WINDOW, activePage * NEXT_WINDOW + NEXT_WINDOW),
+        ...rotatingPool.slice(activePage * nextWindow, activePage * nextWindow + nextWindow),
       ]
-    : waiting.slice(0, NEXT_VISIBLE)
+    : waiting.slice(0, nextVisible)
   const { columns, codeSize, nameSize, caixaSize } = resolvePanelLayout(callCount)
 
   // Mesma URL de entrada que a administração imprime (fila/:erId#entry=token).
