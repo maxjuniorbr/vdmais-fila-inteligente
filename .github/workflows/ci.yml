@@ -80,7 +80,7 @@ jobs:
           JWT_EXPIRES_IN: 7d
 
       - name: Install browser for frontend E2E
-        run: npx playwright install --with-deps chromium
+        run: npm exec --workspace=apps/frontend -- playwright install --with-deps chromium
 
       - name: Frontend browser E2E
         run: npm run test:e2e --workspace=apps/frontend
