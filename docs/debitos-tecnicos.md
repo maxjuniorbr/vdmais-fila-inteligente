@@ -25,6 +25,7 @@
 | [DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado) | Cadastro mínimo da RE será descontinuado | Baixa | Não |
 | [DT-15](#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção) | Volume do AuditEvent em escala (particionamento/retenção) | Média | Não |
 | [DT-16](#dt-16--react-fixado-na-linha-18-por-exigência-da-plataforma-alvo) | React fixado na linha 18 por exigência da plataforma-alvo | Baixa | Não |
+| [DT-17](#dt-17--major-do-typescript-adiado-compilador-nativo-7x) | Major do TypeScript adiado (compilador nativo 7.x) | Baixa | Não |
 
 ---
 
@@ -337,3 +338,19 @@ suportam 18 e 19), o que travaria os bumps de minor dessas dependências.
 **Encaminhamento.** Reavaliar quando a plataforma-alvo homologar o React 19.
 Subir em janela dedicada: remover os ignores do Dependabot, revisar os breaking changes
 do major e rodar a suíte completa (unit + e2e) antes de promover.
+
+---
+
+## DT-17 — Major do TypeScript adiado (compilador nativo 7.x)
+
+**Contexto.** O TypeScript 7 é o major do **compilador nativo** (reescrita em Go). A
+toolchain atual **veta** a subida: `ts-jest` exige `typescript <7` e
+`@typescript-eslint/parser` exige `<6.1`. O Dependabot ignora o major
+([dependabot.yml](../.github/dependabot.yml)); o PR do bot foi fechado sem merge.
+
+**Impacto.** Defasagem controlada, mesma classe do [DT-6](#dt-6--major-do-prisma-adiado);
+sem impacto funcional. A linha 6.x segue recebendo minors normalmente.
+
+**Encaminhamento.** Subir quando `ts-jest` e `typescript-eslint` publicarem suporte ao
+7.x. Janela dedicada: remover o ignore, subir a toolchain junto, revisar breaking
+changes e rodar a suíte completa (unit + e2e) antes de promover.

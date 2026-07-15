@@ -54,6 +54,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/react-dom"
         update-types: ["version-update:semver-major"]
+      # TypeScript 7 is the native-compiler major; the toolchain vetoes it for now
+      # (ts-jest requires <7, typescript-eslint <6.1). See DT-17.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
