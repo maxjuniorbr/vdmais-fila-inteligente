@@ -29,6 +29,7 @@
 | [DT-18](#dt-18--mfa-ausente-para-contas-privilegiadas-e-token-estático-nas-métricas) | MFA ausente para contas privilegiadas e token estático nas métricas | Média | Não |
 | [DT-19](#dt-19--sessão-de-staff-sem-refresh-token-rotativo) | Sessão de staff sem refresh token rotativo | Média | Não |
 | [DT-20](#dt-20--endurecimento-do-websocket-e-validações-de-segurança-no-ambiente-real) | Endurecimento do WebSocket e validações de segurança no ambiente real | Média | Não |
+| [DT-21](#dt-21--convidada-não-migra-para-cadastro-completo) | Convidada não migra para cadastro completo | Baixa | Não |
 
 ---
 
@@ -416,3 +417,25 @@ própria; controles de borda documentados porém não verificados no ambiente re
 se possível, servir o WS no mesmo domínio do app. Executar as validações no ambiente
 real — oportuno no go-live AWS/Apigee (10/08): headers efetivos, WS através do gateway e
 pentest dinâmico. Relacionado a [DT-2](#dt-2--websocket-socketio-sem-adaptador-compartilhado).
+
+---
+
+## DT-21 — Convidada não migra para cadastro completo
+
+**Contexto.** O modelo de convidada (jul/2026) usa o telefone como identidade única
+(`representatives.phone` é `@unique`). Se a convidada tentar depois o **cadastro completo**
+(`POST /auth/register`) com o mesmo telefone, o `createRepresentative`
+([auth.service.ts](../apps/backend/src/auth/auth.service.ts)) encontra o registro `GUEST` e
+recusa com a mensagem genérica de conflito (anti-enumeração) — não existe caminho de
+"promoção" do registro.
+
+**Impacto.** Fricção pós-evento: quem entrou como convidada e quiser virar RE cadastrada
+precisa de outro telefone ou de intervenção manual no banco. Decisão consciente para manter
+a Fase 1 do modelo de convidada enxuta; sem impacto no evento em si.
+
+**Encaminhamento.** Promover `GUEST` → `REGISTERED` quando o telefone do cadastro coincidir
+com um registro `GUEST` (completar cpf/reCode/senha no MESMO registro, preservando o
+histórico de senhas), mantendo as checagens de unicidade de CPF/código e a mensagem
+anti-enumeração. Avaliar junto de
+[DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado) — se o cadastro mínimo for
+descontinuado, este débito pode morrer com ele.
