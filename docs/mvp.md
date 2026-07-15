@@ -98,7 +98,8 @@ A RE poderá entrar na fila por três canais:
     
     Canal preferencial. A RE escaneia o QR Code assinado dentro da unidade e
     acessa a fila daquele ER. O acesso expira em 24 horas (QR digital, regenerado
-    a cada dia).
+    a cada dia). No painel da TV, o QR é servido sempre atualizado — um token novo
+    a cada atualização do estado —, dispensando a regeneração manual naquela mídia.
     
 2. **Link do site**  
     
