@@ -20,12 +20,15 @@ import { AdminModule } from './admin/admin.module'
 import { IntegrationModule } from './integration/integration.module'
 import { SimulationModule } from './simulation/simulation.module'
 import { ContextualThrottlerGuard } from './common/guards/contextual-throttler.guard'
+import { throttleLimit } from './common/throttle-limits'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 300 }]),
+    ThrottlerModule.forRoot([
+      { ttl: 60000, limit: throttleLimit('THROTTLE_GLOBAL_PER_MINUTE', 300) },
+    ]),
     PrismaModule,
     AuthModule,
     ERModule,

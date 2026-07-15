@@ -7,6 +7,7 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { Throttle } from '@nestjs/throttler'
+import { throttleLimit } from '../common/throttle-limits'
 
 @Controller('tickets')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -15,7 +16,7 @@ export class TicketController {
 
   @Post()
   @Roles('REPRESENTATIVE', 'ATTENDANT')
-  @Throttle({ default: { ttl: 60000, limit: 40 } })
+  @Throttle({ default: { ttl: 60000, limit: throttleLimit('THROTTLE_TICKET_CREATE_PER_MINUTE', 40) } })
   create(@Body() dto: CreateTicketDto, @Request() req: { user: AuthenticatedUser }) {
     return this.ticketService.create(req.user, dto)
   }

@@ -126,6 +126,12 @@ TRUST_PROXY_HOPS=1
 # independente destes valores.
 QUEUE_ENTRY_QR_CODE_TTL_SECONDS=86400
 QUEUE_ENTRY_LINK_TTL_SECONDS=86400
+# Rate limit por minuto (opcionais: default no código, a env apenas sobrescreve).
+# Autenticado conta por usuário (JWT verificado); anônimo conta por IP.
+THROTTLE_GLOBAL_PER_MINUTE=300
+THROTTLE_REGISTER_PER_MINUTE=20
+THROTTLE_LOGIN_PER_MINUTE=40
+THROTTLE_TICKET_CREATE_PER_MINUTE=40
 ```
 
 > **Importante:** fora de `development` e `test`, o backend rejeita a inicialização se `JWT_SECRET` for um valor fraco ou tiver menos de 32 caracteres. Em produção, use um segredo aleatório forte — por exemplo `openssl rand -base64 48`.

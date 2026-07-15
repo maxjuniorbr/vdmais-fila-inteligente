@@ -130,14 +130,14 @@ Tokens de entrada na fila (QR Code / link) trafegam no header `x-entry-token` e 
 
 > Base URL: `http://<host>:3000`
 >
-> Throttle global: 300 requisições / 60 s por IP. Endpoints críticos têm limites adicionais (indicados abaixo). A chave do throttle é **apenas o IP** resolvido via `trust proxy` (`TRUST_PROXY_HOPS`); o login adiciona uma trava por credencial (ver [Segurança](#segurança)).
+> Throttle global: 300 requisições / 60 s (default; `THROTTLE_GLOBAL_PER_MINUTE`). Endpoints críticos têm limites adicionais (indicados abaixo; os limites por endpoint também aceitam override por env — ver [Segurança](#segurança)). A chave do throttle é **por usuário** quando a requisição traz JWT válido (`user:<id>`), e **o IP** resolvido via `trust proxy` (`TRUST_PROXY_HOPS`) nas rotas anônimas; o login adiciona uma trava por credencial (ver [Segurança](#segurança)).
 
 ### Autenticação — `auth/`
 
 | Método | Caminho | Auth | Throttle | Descrição |
 |---|---|---|---|---|
-| `POST` | `/auth/register` | Público | 20/min por IP | Cadastro de RE |
-| `POST` | `/auth/login` | Público | 40/min por IP + trava por credencial | Login de RE |
+| `POST` | `/auth/register` | Público | 20/min por IP (`THROTTLE_REGISTER_PER_MINUTE`) | Cadastro de RE |
+| `POST` | `/auth/login` | Público | 40/min por IP (`THROTTLE_LOGIN_PER_MINUTE`) + trava por credencial | Login de RE |
 | `POST` | `/auth/staff-login` | Público | 20/min por IP + trava por credencial | Login da equipe |
 | `POST` | `/representatives` | ATTENDANT, MANAGER | — | Criar RE manualmente |
 | `GET` | `/representatives/search?q=` | ATTENDANT, MANAGER | — | Buscar REs por nome/CPF/código |
@@ -197,7 +197,7 @@ Endpoints centrais para operação e integração.
 
 | Método | Caminho | Auth | Throttle | Descrição |
 |---|---|---|---|---|
-| `POST` | `/tickets` | REPRESENTATIVE, ATTENDANT | 40/min por IP | Criar senha na fila (aceita `isPriority` opcional — só honrado quando criada por staff/check-in; ignorado para a própria RE) |
+| `POST` | `/tickets` | REPRESENTATIVE, ATTENDANT | 40/min por usuário (`THROTTLE_TICKET_CREATE_PER_MINUTE`) | Criar senha na fila (aceita `isPriority` opcional — só honrado quando criada por staff/check-in; ignorado para a própria RE) |
 | `GET` | `/tickets/my-active?erId=` | REPRESENTATIVE | — | Senha ativa da RE |
 | `GET` | `/tickets/my-status?erId=` | REPRESENTATIVE | — | Senha mais recente da RE em qualquer estado (polling da tela da RE: reflete não-comparecimento, cancelamento e restauração) |
 | `POST` | `/tickets/:id/start-service` | OPERATOR | — | Iniciar atendimento (CALLING → IN_SERVICE) |
@@ -341,7 +341,7 @@ Console interno de simulação para desenvolvimento e demonstração. **Bloquead
 
 ## Segurança
 
-- **Rate limiting (por IP):** ThrottlerModule — 300 req/60s globais; limites por endpoint nos críticos. A chave é **apenas o IP**, nunca campos do corpo (que o cliente controla) — caso contrário variar `erId`/`entryChannel` criaria baldes novos e burlaria o limite. Camada grosseira de anti-enxurrada, tolerante a IP compartilhado (Wi-Fi do ER, CGNAT de 4G/5G).
+- **Rate limiting (por usuário/IP):** ThrottlerModule — 300 req/60s globais; limites por endpoint nos críticos. Requisição com JWT **verificado** usa o usuário como chave (`user:<id>`), então um ER cheio de REs no mesmo Wi-Fi/NAT não esgota um balde único por IP; a identidade é segura como chave porque exige assinatura válida (criar identidades passa pelo `/auth/register`, que é limitado por IP). Rotas anônimas usam **apenas o IP**, nunca campos do corpo (que o cliente controla) — caso contrário variar `erId`/`entryChannel` criaria baldes novos e burlaria o limite. Limites ajustáveis por env sem redeploy (`THROTTLE_GLOBAL_PER_MINUTE`, `THROTTLE_REGISTER_PER_MINUTE`, `THROTTLE_LOGIN_PER_MINUTE`, `THROTTLE_TICKET_CREATE_PER_MINUTE`) — ex.: evento com muita gente na mesma rede. Camada grosseira de anti-enxurrada.
 - **`trust proxy` fixo:** `TRUST_PROXY_HOPS` (default 1) define quantos proxies confiáveis ficam à frente; o `req.ip` (base do throttle) vem da posição correta do `X-Forwarded-For`, não do valor falsificável que o cliente envia.
 - **Trava de brute-force por credencial:** [`LoginThrottleService`](../apps/backend/src/auth/login-throttle.service.ts) conta falhas por conta alvo (CPF/RE code no login; e-mail no staff-login), janela de 15 min, máx. 10 → `429`. Imune a NAT e a rotação de IP; normaliza o identificador (sem driblar por formatação) e bloqueia antes de tocar o banco. _Em memória, por instância — ver [DT-1](./debitos-tecnicos.md#dt-1--estado-de-rate-limit-e-trava-de-brute-force-em-memória)._
 - **Anti-enumeração por timing:** o caminho "conta inexistente" roda uma comparação bcrypt dummy, igualando o tempo de resposta ao da senha errada.

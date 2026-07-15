@@ -32,7 +32,7 @@
 ## DT-1 — Estado de rate-limit e trava de brute-force em memória
 
 **Contexto.** A proteção de autenticação tem duas camadas:
-- limite por IP (`ThrottlerModule` + [`ContextualThrottlerGuard`](../apps/backend/src/common/guards/contextual-throttler.guard.ts)), anti-enxurrada grosseiro;
+- limite por usuário (JWT verificado) ou por IP nas rotas anônimas (`ThrottlerModule` + [`ContextualThrottlerGuard`](../apps/backend/src/common/guards/contextual-throttler.guard.ts)), anti-enxurrada grosseiro;
 - trava por credencial ([`LoginThrottleService`](../apps/backend/src/auth/login-throttle.service.ts)), a defesa real contra brute-force, imune a NAT e a rotação de IP.
 
 Ambas guardam o contador **em memória, por processo**.

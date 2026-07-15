@@ -534,18 +534,20 @@ describe('Full queue journey and concurrency (e2e)', () => {
       .expect(401)
   })
 
-  it('limits ticket creation attempts by IP, ER and channel', async () => {
+  it('limits ticket creation per authenticated user without blocking NAT neighbors', async () => {
     const rateLimitErId = `rate-limit-${suffix}`
-    const token = jwt.sign({
-      sub: 'rate-limit-representative',
-      userId: 'rate-limit-representative',
-      role: Role.REPRESENTATIVE,
-      erId: rateLimitErId,
-      entryChannel: EntryChannel.QR_CODE,
-    })
+    const tokenFor = (userId: string) =>
+      jwt.sign({
+        sub: userId,
+        userId,
+        role: Role.REPRESENTATIVE,
+        erId: rateLimitErId,
+        entryChannel: EntryChannel.QR_CODE,
+      })
+    const token = tokenFor('rate-limit-representative')
 
     // Dedicated client IP so this flood neither inherits nor pollutes the shared
-    // per-IP throttle bucket used by the other ticket-creation tests.
+    // throttle bucket used by the other ticket-creation tests.
     const clientIp = '198.51.100.7'
 
     for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -563,6 +565,15 @@ describe('Full queue journey and concurrency (e2e)', () => {
       .set('X-Forwarded-For', clientIp)
       .send({ erId: rateLimitErId, entryChannel: EntryChannel.QR_CODE })
       .expect(429)
+
+    // Another RE behind the SAME IP (ER Wi-Fi NAT) keeps her own bucket: one
+    // user's flood must not lock the whole venue out of the queue.
+    const neighbor = await request(app.getHttpServer())
+      .post('/tickets')
+      .set('Authorization', `Bearer ${tokenFor('rate-limit-neighbor')}`)
+      .set('X-Forwarded-For', clientIp)
+      .send({ erId: rateLimitErId, entryChannel: EntryChannel.QR_CODE })
+    expect(neighbor.status).not.toBe(429)
   })
 
   it('exposes liveness, readiness and protected Prometheus metrics', async () => {
