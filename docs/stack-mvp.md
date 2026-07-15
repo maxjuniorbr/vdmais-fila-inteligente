@@ -123,7 +123,10 @@ Uso:
 - exibir caixa destino;
 - exibir próximas senhas (com rodízio automático quando excedem a tela);
 - exibir atendimentos em andamento;
-- exibir tempos médios de espera e atendimento.
+- exibir tempos médios de espera e atendimento;
+- exibir o QR Code de entrada na fila (rodapé da coluna lateral), renderizado
+  localmente com a lib `qrcode` (sem rede, compatível com a CSP) e realimentado a
+  cada atualização do estado — o token exibido nunca expira na tela.
 
 A TV pode ser uma rota React em tela cheia:
 

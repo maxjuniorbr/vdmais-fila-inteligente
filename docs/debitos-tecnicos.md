@@ -20,7 +20,7 @@
 | [DT-9](#dt-9--jwtauthguard-sem-spec-dedicado) | JwtAuthGuard sem spec dedicado | Baixa | Não |
 | [DT-10](#dt-10--ticketid-opaco-nos-eventos-de-socket-do-painel) | ticketId opaco nos eventos de socket do painel | Baixa | Não |
 | [DT-11](#dt-11--pausaretoma-de-senha-pela-gestora-sem-ui) | Pausa/retoma de senha pela gestora sem UI — ✅ resolvido | Baixa | Não |
-| [DT-12](#dt-12--qr-code-digital-sem-rotação-automática) | QR Code digital sem rotação automática | Baixa | Não |
+| [DT-12](#dt-12--qr-code-digital-sem-rotação-automática) | QR Code digital sem rotação automática — ✅ resolvido | Baixa | Não |
 | [DT-13](#dt-13--mensagem-de-sessão-expirada-genérica-para-a-re) | Mensagem de sessão expirada genérica para a RE | Baixa | Não |
 | [DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado) | Cadastro mínimo da RE será descontinuado | Baixa | Não |
 | [DT-15](#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção) | Volume do AuditEvent em escala (particionamento/retenção) | Média | Não |
@@ -250,20 +250,23 @@ caixa — e **Retomar senha** na seção "Senhas pausadas", ambas cobertas por t
 
 ## DT-12 — QR Code digital sem rotação automática
 
+> **✅ Resolvido.** O painel da TV passou a exibir o QR de entrada com token emitido a cada
+> atualização do estado.
+
 **Contexto.** O QR Code de entrada será exibido em **mídia digital** (a própria TV/painel),
 não impresso. O token do QR já vale só **24h** (`QUEUE_ENTRY_QR_CODE_TTL_SECONDS`), e a
 sessão da representante expira no dia corrente
-([auth.service.ts](../apps/backend/src/auth/auth.service.ts)). Porém **nada regenera o QR
-exibido automaticamente**: ao expirar, alguém precisa abrir **Gerenciar ER** e regenerar a
+([auth.service.ts](../apps/backend/src/auth/auth.service.ts)). Porém **nada regenerava o QR
+exibido automaticamente**: ao expirar, alguém precisava abrir **Gerenciar ER** e regenerar a
 URL **manualmente** a cada dia.
 
-**Impacto.** Operacional: depende de uma ação manual diária; se esquecida, o QR exibido para
-de funcionar até ser regenerado. Sem brecha de segurança — o token é assinado/vinculado ao
-ER/canal, a sessão dura só o dia, e há limite por IP + trava por credencial.
-
-**Encaminhamento.** Automatizar a rotação diária do QR digital (a TV/admin regenera/serve um
-token novo a cada dia útil), eliminando o passo manual. Toca frontend (TV/admin) — avaliar
-junto com o frontend.
+**Resolução (jul/2026).** `GET /panel/:erId/state` (protegido pelo token do painel) passou a
+emitir um token de entrada **novo e assinado** a cada consulta com o dia aberto
+([panel.service.ts](../apps/backend/src/panel/panel.service.ts)); a TV renderiza o QR
+localmente e o repõe a cada poll de 15s ([PanelPage](../apps/frontend/src/pages/PanelPage.tsx)).
+O QR exibido nunca fica obsoleto e uma rotação/invalidação no servidor se propaga sozinha à
+TV. O QR gerado manualmente em **Gerenciar ER** permanece para mídias estáticas (impressos),
+com a validade de sempre.
 
 ---
 

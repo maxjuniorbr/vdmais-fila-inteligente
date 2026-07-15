@@ -1,7 +1,10 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import QRCode from 'qrcode'
 import { PanelPage } from './PanelPage'
+
+vi.mock('qrcode', () => ({ default: { toCanvas: vi.fn().mockResolvedValue(undefined) } }))
 
 type SocketHandler = (...args: unknown[]) => void
 let socketDouble: {
@@ -32,6 +35,7 @@ vi.mock('../hooks/useSocket', () => ({
 
 interface PanelFixture {
   isDayOpen: boolean
+  qrEntry?: { token: string; expiresAt: string } | null
   current: null | {
     code: string
     displayName: string
@@ -57,6 +61,7 @@ function fixture(callCount: number): PanelFixture {
 
   return {
     isDayOpen: true,
+    qrEntry: null,
     current: calling[0] ?? null,
     calling,
     inService: [],
@@ -246,6 +251,34 @@ describe('PanelPage', () => {
     expect(await screen.findByText('Atendimento encerrado por hoje')).toBeInTheDocument()
     expect(screen.queryByText('A001')).not.toBeInTheDocument()
     expect(screen.queryByText('Aguardando próxima chamada')).not.toBeInTheDocument()
+    // A closed day never offers the entry QR.
+    expect(screen.queryByText('ENTRE NA FILA')).not.toBeInTheDocument()
+  })
+
+  it('shows the entry QR with its call to action when the state provides a token', async () => {
+    const state = fixture(1)
+    state.qrEntry = { token: 'entry-tok', expiresAt: '2026-07-15T23:59:59.000Z' }
+    renderPanel(state)
+
+    expect(await screen.findByText('ENTRE NA FILA')).toBeInTheDocument()
+    expect(screen.getByText('Aponte a câmera para o QR Code')).toBeInTheDocument()
+    const canvas = screen.getByRole('img', { name: 'QR Code de entrada na fila' })
+    await waitFor(() => {
+      // The QR encodes the same entry URL shape the admin prints: /fila/:erId#entry=<token>.
+      expect(vi.mocked(QRCode.toCanvas)).toHaveBeenCalledWith(
+        canvas,
+        expect.stringContaining('/fila/er-1#entry=entry-tok'),
+        expect.objectContaining({ errorCorrectionLevel: 'M' }),
+      )
+    })
+  })
+
+  it('omits the QR block when the state carries no entry token', async () => {
+    renderPanel(fixture(1))
+
+    expect(await screen.findByText('A001')).toBeInTheDocument()
+    expect(screen.queryByText('ENTRE NA FILA')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'QR Code de entrada na fila' })).not.toBeInTheDocument()
   })
 
   it('does not crash when the state payload omits inService', async () => {

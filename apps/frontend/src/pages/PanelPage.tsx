@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
+import { QrCanvas } from '../components/QrCanvas'
 import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { formatDate, formatDuration, formatTimeWithSeconds } from '../utils/format'
@@ -23,8 +24,14 @@ interface WaitingTicket {
   isPriority?: boolean
 }
 
+interface QrEntry {
+  token: string
+  expiresAt: string
+}
+
 interface PanelState {
   isDayOpen: boolean
+  qrEntry?: QrEntry | null
   current: Call | null
   calling: Call[]
   inService: InService[]
@@ -70,7 +77,9 @@ function resolvePanelLayout(callCount: number): PanelLayout {
   return { columns, codeSize, nameSize, caixaSize }
 }
 
-const NEXT_VISIBLE = 7
+// 5 linhas (era 7): o rodapé da sidebar agora abriga o QR de entrada; o rodízio
+// existente absorve a diferença sem perder informação.
+const NEXT_VISIBLE = 5
 const NEXT_WINDOW = NEXT_VISIBLE - 1
 const NEXT_ROTATE_MS = 5000
 
@@ -85,6 +94,7 @@ export function PanelPage() {
   const [waiting, setWaiting] = useState<WaitingTicket[]>([])
   const [avgServiceSeconds, setAvgServiceSeconds] = useState<number | null>(null)
   const [avgWaitSeconds, setAvgWaitSeconds] = useState<number | null>(null)
+  const [qrEntry, setQrEntry] = useState<QrEntry | null>(null)
   // Defaults to open so the TV never flashes "encerrada" before the first load.
   const [dayOpen, setDayOpen] = useState(true)
   const [accessDenied, setAccessDenied] = useState(false)
@@ -147,6 +157,7 @@ export function PanelPage() {
       setWaiting(state.waiting ?? [])
       setAvgServiceSeconds(state.avgServiceSeconds ?? null)
       setAvgWaitSeconds(state.avgWaitSeconds ?? null)
+      setQrEntry(state.qrEntry ?? null)
     } catch {
       // Polling retries automatically; the TV must remain on screen.
     }
@@ -186,6 +197,14 @@ export function PanelPage() {
       ]
     : waiting.slice(0, NEXT_VISIBLE)
   const { columns, codeSize, nameSize, caixaSize } = resolvePanelLayout(callCount)
+
+  // Mesma URL de entrada que a administração imprime (fila/:erId#entry=token).
+  // Como o estado é repolido a cada 15s, uma rotação do token no servidor troca
+  // o QR da TV sozinha.
+  const qrEntryUrl =
+    qrEntry && erId ? `${globalThis.location.origin}/fila/${erId}#entry=${qrEntry.token}` : null
+  // O canvas exige px; a TV não redimensiona, então medir uma vez no render basta.
+  const qrSizePx = Math.round(Math.min(globalThis.innerWidth * 0.11, globalThis.innerHeight * 0.2))
 
   if (accessDenied) {
     return (
@@ -330,22 +349,36 @@ export function PanelPage() {
             )}
           </div>
 
-          {(avgWaitSeconds !== null || avgServiceSeconds !== null) && (
-            <div style={styles.avgBlock}>
-              {avgWaitSeconds !== null && (
-                <div style={styles.avgItem}>
-                  <span style={styles.avgLabel}>ESPERA MÉDIA</span>
-                  <span style={styles.avgValue}>{formatDuration(avgWaitSeconds)}</span>
-                </div>
-              )}
-              {avgServiceSeconds !== null && (
-                <div style={styles.avgItem}>
-                  <span style={styles.avgLabel}>ATENDIMENTO MÉDIO</span>
-                  <span style={styles.avgValue}>{formatDuration(avgServiceSeconds)}</span>
-                </div>
-              )}
-            </div>
-          )}
+          <div style={styles.sideFooter}>
+            {(avgWaitSeconds !== null || avgServiceSeconds !== null) && (
+              <div style={styles.avgBlock}>
+                {avgWaitSeconds !== null && (
+                  <div style={styles.avgItem}>
+                    <span style={styles.avgLabel}>ESPERA MÉDIA</span>
+                    <span style={styles.avgValue}>{formatDuration(avgWaitSeconds)}</span>
+                  </div>
+                )}
+                {avgServiceSeconds !== null && (
+                  <div style={styles.avgItem}>
+                    <span style={styles.avgLabel}>ATENDIMENTO MÉDIO</span>
+                    <span style={styles.avgValue}>{formatDuration(avgServiceSeconds)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {qrEntryUrl && (
+              <div style={styles.qrBlock}>
+                <QrCanvas
+                  value={qrEntryUrl}
+                  sizePx={qrSizePx}
+                  label="QR Code de entrada na fila"
+                />
+                <span style={styles.qrTitle}>ENTRE NA FILA</span>
+                <span style={styles.qrHint}>Aponte a câmera para o QR Code</span>
+              </div>
+            )}
+          </div>
         </aside>
       </div>
     </main>
@@ -667,13 +700,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontVariantNumeric: 'tabular-nums',
   },
 
-  avgBlock: {
+  sideFooter: {
     marginTop: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1vh',
+    flexShrink: 0,
+  },
+  // Lado a lado (era empilhado): o rodapé da sidebar agora divide espaço com o QR
+  // de entrada, e as médias são a informação menos crítica da TV.
+  avgBlock: {
     paddingTop: '1vh',
     borderTop: `1px solid ${C.border}`,
     display: 'flex',
-    flexDirection: 'column',
-    gap: '0.8vh',
+    justifyContent: 'space-between',
+    gap: '1vw',
     flexShrink: 0,
   },
   avgItem: {
@@ -692,5 +733,26 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '1.8vw',
     fontWeight: 800,
     color: C.accent,
+  },
+
+  qrBlock: {
+    paddingTop: '1.2vh',
+    borderTop: `1px solid ${C.border}`,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.5vh',
+    flexShrink: 0,
+  },
+  qrTitle: {
+    fontSize: '1.15vw',
+    fontWeight: 800,
+    letterSpacing: '0.14em',
+    color: C.ink,
+  },
+  qrHint: {
+    fontSize: '0.95vw',
+    fontWeight: 600,
+    color: C.inkMuted,
   },
 }

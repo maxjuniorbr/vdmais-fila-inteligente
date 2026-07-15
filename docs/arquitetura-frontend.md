@@ -30,7 +30,7 @@ apps/frontend/src/
 | `/checkin` | `CheckinAttendantPage` | ATTENDANT | Check-in assistido — buscar/criar RE e gerar senha |
 | `/operacao` | `OperationPage` | OPERATOR | Gestão do caixa e chamada de senhas |
 | `/gestao` | `ManagerPage` | MANAGER | Abertura/fechamento do dia, métricas, correções |
-| `/painel/:erId` | `PanelPage` | Público (token) | Painel TV com chamadas em tempo real |
+| `/painel/:erId` | `PanelPage` | Público (token) | Painel TV com chamadas em tempo real e QR Code de entrada na fila (sempre atual, renderizado localmente) |
 | `/admin` | `AdminPage` | ADMIN | Configuração de ERs, caixas e contas |
 | `/simulador` | `SimuladorPage` | ADMIN | Console interno de simulação — rota só registrada em dev (`import.meta.env.DEV`); o backend também bloqueia fora de dev/test |
 | `/playground` | `PlaygroundPage` | Dev | Catálogo de componentes do design system — rota só registrada em dev (`import.meta.env.DEV`), fora do build de produção |

@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { TicketState } from '@prisma/client'
+import { EntryChannel, TicketState } from '@prisma/client'
 import { getBusinessDayRange } from '../common/business-date'
 import { PrismaService } from '../prisma/prisma.service'
+import { QueueEntryTokenService } from '../auth/queue-entry-token.service'
 import { abbreviateName } from './panel.presenter'
 
 @Injectable()
 export class PanelService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly queueEntryTokens: QueueEntryTokenService,
+  ) {}
 
   async getState(erId: string) {
     const er = await this.prisma.eR.findUnique({
@@ -93,6 +97,11 @@ export class PanelService {
 
     return {
       isDayOpen: er.isDayOpen,
+      // The TV is the public display: issuing a fresh signed entry token through
+      // the panel-token-guarded endpoint keeps the on-screen QR always valid —
+      // a token rotation propagates to the TV on the next poll, with no manual
+      // step. Suppressed while the day is closed, when entering is blocked anyway.
+      qrEntry: er.isDayOpen ? this.queueEntryTokens.issue(erId, EntryChannel.QR_CODE) : null,
       current,
       calling,
       inService: inService.map((ticket) => ({

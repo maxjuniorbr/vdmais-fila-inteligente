@@ -262,7 +262,7 @@ WAITING → (call-next) → CALLING → (start-service) → IN_SERVICE → (fini
 
 | Método | Caminho | Auth | Descrição |
 |---|---|---|---|
-| `GET` | `/panel/:erId/state` | Token do painel (header) | Estado completo para renderização do painel |
+| `GET` | `/panel/:erId/state` | Token do painel (header) | Estado completo para renderização do painel; com o dia aberto inclui `qrEntry` (token de entrada QR recém-assinado + validade) para a TV exibir o QR sempre atual |
 
 **WebSocket — eventos:**
 

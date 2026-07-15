@@ -1,5 +1,6 @@
-import { TicketState } from '@prisma/client'
+import { EntryChannel, TicketState } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
+import { QueueEntryTokenService } from '../../auth/queue-entry-token.service'
 import { PanelService } from '../panel.service'
 
 describe('PanelService', () => {
@@ -7,19 +8,45 @@ describe('PanelService', () => {
     eR: { findUnique: jest.fn() },
     ticket: { findMany: jest.fn() },
   }
+  const queueEntryTokens = {
+    issue: jest.fn(() => ({ token: 'entry-token', expiresAt: '2026-07-15T23:59:59.000Z' })),
+  }
+
+  function makeService() {
+    return new PanelService(
+      prisma as unknown as PrismaService,
+      queueEntryTokens as unknown as QueueEntryTokenService,
+    )
+  }
 
   beforeEach(() => {
     jest.resetAllMocks()
     prisma.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: true })
     prisma.ticket.findMany.mockResolvedValue([])
+    queueEntryTokens.issue.mockReturnValue({
+      token: 'entry-token',
+      expiresAt: '2026-07-15T23:59:59.000Z',
+    })
   })
 
   it('exposes whether the operation day is open', async () => {
-    const service = new PanelService(prisma as unknown as PrismaService)
+    const service = makeService()
     await expect(service.getState('er-1')).resolves.toMatchObject({ isDayOpen: true })
 
     prisma.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: false })
     await expect(service.getState('er-1')).resolves.toMatchObject({ isDayOpen: false })
+  })
+
+  it('issues a QR entry token for the TV only while the day is open', async () => {
+    const service = makeService()
+
+    await expect(service.getState('er-1')).resolves.toMatchObject({
+      qrEntry: { token: 'entry-token', expiresAt: '2026-07-15T23:59:59.000Z' },
+    })
+    expect(queueEntryTokens.issue).toHaveBeenCalledWith('er-1', EntryChannel.QR_CODE)
+
+    prisma.eR.findUnique.mockResolvedValue({ id: 'er-1', isDayOpen: false })
+    await expect(service.getState('er-1')).resolves.toMatchObject({ qrEntry: null })
   })
 
   it('returns every calling ticket (one per counter) and the most recent as current', async () => {
@@ -44,7 +71,7 @@ describe('PanelService', () => {
       }
       return Promise.resolve([])
     })
-    const service = new PanelService(prisma as unknown as PrismaService)
+    const service = makeService()
 
     const result = await service.getState('er-1')
 
@@ -72,7 +99,7 @@ describe('PanelService', () => {
       }
       return Promise.resolve([])
     })
-    const service = new PanelService(prisma as unknown as PrismaService)
+    const service = makeService()
 
     const result = await service.getState('er-1')
 
@@ -83,7 +110,7 @@ describe('PanelService', () => {
 
   it('throws when the ER does not exist', async () => {
     prisma.eR.findUnique.mockResolvedValue(null)
-    const service = new PanelService(prisma as unknown as PrismaService)
+    const service = makeService()
     await expect(service.getState('missing')).rejects.toThrow('ER não encontrado')
   })
 
@@ -117,7 +144,7 @@ describe('PanelService', () => {
         },
       ])
     })
-    const service = new PanelService(prisma as unknown as PrismaService)
+    const service = makeService()
 
     const result = await service.getState('er-1')
 
@@ -143,7 +170,7 @@ describe('PanelService', () => {
       }
       return Promise.resolve([])
     })
-    const service = new PanelService(prisma as unknown as PrismaService)
+    const service = makeService()
 
     const result = await service.getState('er-1')
 
@@ -191,7 +218,7 @@ describe('PanelService', () => {
       }
       return Promise.resolve([])
     })
-    const service = new PanelService(prisma as unknown as PrismaService)
+    const service = makeService()
 
     const result = await service.getState('er-1')
 
@@ -220,7 +247,7 @@ describe('PanelService', () => {
   })
 
   it('returns null averages with no data and filters out non-positive durations', async () => {
-    const service = new PanelService(prisma as unknown as PrismaService)
+    const service = makeService()
 
     // Sem nenhum atendimento/chamada hoje → médias nulas e listas vazias.
     const empty = await service.getState('er-1')
