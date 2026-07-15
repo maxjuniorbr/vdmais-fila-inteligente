@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
+import { SOCKET_URL } from '../api/config'
 
 export function useSocket(erId: string, clientType = 'dashboard', authToken?: string) {
   const [socket, setSocket] = useState<Socket | null>(null)
@@ -10,11 +11,7 @@ export function useSocket(erId: string, clientType = 'dashboard', authToken?: st
       return
     }
 
-    // In production the socket connects directly to the backend (WebSocket
-    // cannot be proxied through Vercel). In dev it stays relative so the Vite
-    // proxy forwards /socket.io to localhost:3000.
-    const socketUrl = import.meta.env.VITE_API_URL || '/'
-    const s = io(socketUrl, {
+    const s = io(SOCKET_URL, {
       auth: { token: sessionStorage.getItem('token') },
       reconnectionAttempts: Infinity,
       reconnectionDelay: 2000,

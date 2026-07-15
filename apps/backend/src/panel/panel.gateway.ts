@@ -8,11 +8,12 @@ import {
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { AuditLogService } from '../audit-log/audit-log.service'
+import { parseAllowedOrigins } from '../common/allowed-origins'
 import { PanelAccessService } from './panel-access.service'
 
 @WebSocketGateway({
   cors: {
-    origin: process.env['FRONTEND_URL'] ?? 'http://localhost:5173',
+    origin: parseAllowedOrigins(process.env['FRONTEND_URL']),
     credentials: false,
   },
 })
