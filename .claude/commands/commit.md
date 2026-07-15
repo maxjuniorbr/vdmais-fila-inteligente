@@ -52,6 +52,12 @@ irrelevant without checking what it covers.
 - `docs/credenciais-teste-local.md` — local test credentials / seed data.
 - `docs/mvp.md` — product scope and MVP feature spec.
 - `docs/guia-personas.md` — user personas and product narrative.
+- `docs/template-apigee.yaml` — **local-only, gitignored** OpenAPI draft for publishing the
+  integration M2M API on Apigee. If the diff touches `apps/backend/src/integration/**` or the
+  swagger setup in `apps/backend/src/main.ts` (routes, DTOs, response/error shapes, scopes),
+  refresh it when present locally: boot the backend and re-sync everything from `paths` down
+  against `GET /docs/integration-json`, keeping the corporate header (`info`/`servers`/`x-*`)
+  untouched. It can never be committed — after updating, republish it on the Apigee portal.
 
 **Root:**
 

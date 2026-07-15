@@ -365,6 +365,8 @@ A senha é localizada por `reCode`/`cpf` (ambos `@unique`) e **pela senha onde a
 ### Endpoints — `/integration/v1`
 
 > Base separada da API de staff. Autenticação por **Bearer JWT (OAuth2 client_credentials)** validado como *resource server*; scope por endpoint. Documentação OpenAPI em `/docs/integration` (habilitada em dev ou via `INTEGRATION_DOCS_ENABLED`).
+>
+> O spec de publicação no **Apigee** é um rascunho local **não versionado** (`docs/template-apigee.yaml`, no `.gitignore`): do `paths` para baixo ele deriva do `GET /docs/integration-json` gerado por este módulo e deve ser ressincronizado a cada mudança na API de integração (o gate de docs do `/commit` cobra isso); o cabeçalho (`info`/`servers`/`x-*`) segue o padrão corporativo e é preenchido à parte.
 
 | Método | Caminho | Scope | Descrição |
 |---|---|---|---|
