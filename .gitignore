@@ -34,3 +34,6 @@ Thumbs.db
 # Local test credentials (plaintext — never version)
 /docs/credenciais-teste-local.md
 /docs/credenciais-teste-supabase.md
+
+# Apigee onboarding spec draft (will hold corporate gateway values — never version)
+/docs/template-apigee.yaml
