@@ -350,7 +350,8 @@ Console interno de simulação para desenvolvimento e demonstração. **Bloquead
 - **PII:** CPF e telefone mascarados nas respostas (`***.***.344-**`), com fallback total para valores malformados; o `panelTokenHash` nunca sai em respostas de staff (`GET /ers/:id` expõe só `hasPanelToken`)
 - **Tokens de entrada:** assinados com chave separada, carregam `erId`, `entryChannel` e expiração. O TTL por canal é configurável via env (default 24h): `QUEUE_ENTRY_QR_CODE_TTL_SECONDS` e `QUEUE_ENTRY_LINK_TTL_SECONDS`
 - **Sessão da RE por dia:** o JWT da representante expira no **fim do dia útil** (meia-noite, fuso de São Paulo), nunca além do token de entrada — a fila é diária (senhas pendentes viram `day_rollover` na virada), então a sessão não sobrevive ao dia. Tokens de staff seguem o `JWT_EXPIRES_IN` global + `sessionVersion`
-- **CORS:** apenas a origem declarada em `FRONTEND_URL` é aceita
+- **CORS:** apenas as origens declaradas em `FRONTEND_URL` são aceitas — valor único ou lista separada por vírgula (hml/prod corporativos têm domínios distintos); vale para HTTP e para o handshake do Socket.IO
+- **OpenAPI do aplicativo:** o contrato completo da API consumida pelo frontend é publicado em `/docs/api` (habilitado em dev ou via `APP_DOCS_ENABLED`) — é o contrato formal da fronteira frontend ↔ backend; o documento M2M de `/docs/integration` permanece separado
 
 ---
 

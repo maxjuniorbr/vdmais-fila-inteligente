@@ -24,7 +24,7 @@
 | [DT-13](#dt-13--mensagem-de-sessão-expirada-genérica-para-a-re) | Mensagem de sessão expirada genérica para a RE | Baixa | Não |
 | [DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado) | Cadastro mínimo da RE será descontinuado | Baixa | Não |
 | [DT-15](#dt-15--volume-do-auditevent-em-escala-particionamento-e-retenção) | Volume do AuditEvent em escala (particionamento/retenção) | Média | Não |
-| [DT-16](#dt-16--react-fixado-na-linha-18-para-migração) | React fixado na linha 18 para migração | Baixa | Não |
+| [DT-16](#dt-16--react-fixado-na-linha-18-por-exigência-da-plataforma-alvo) | React fixado na linha 18 por exigência da plataforma-alvo | Baixa | Não |
 
 ---
 
@@ -321,9 +321,9 @@ Sem impacto em runtime hoje; é dimensionamento e governança de dados para o vo
 
 ---
 
-## DT-16 — React fixado na linha 18 para migração
+## DT-16 — React fixado na linha 18 por exigência da plataforma-alvo
 
-**Contexto.** A migração na infraestrutura corporativa exige React 18: o front-end
+**Contexto.** A plataforma-alvo do produto homologa o React na linha 18: o front-end
 foi rebaixado de 19.2.7 para a última versão da linha 18 (18.3.1). Nenhuma API exclusiva
 do React 19 era usada, então o downgrade foi apenas de versões, sem mudança de código.
 O Dependabot ignora o major de `react`/`react-dom`/`@types/react*` para não propor a
@@ -334,6 +334,6 @@ sem impacto funcional imediato. Risco futuro: novas versões das bibliotecas de 
 passar a exigir React 19 (hoje `react-router-dom@7` e `@testing-library/react@16`
 suportam 18 e 19), o que travaria os bumps de minor dessas dependências.
 
-**Encaminhamento.** Reavaliar quando a plataforma corporativa homologar o React 19.
+**Encaminhamento.** Reavaliar quando a plataforma-alvo homologar o React 19.
 Subir em janela dedicada: remover os ignores do Dependabot, revisar os breaking changes
 do major e rodar a suíte completa (unit + e2e) antes de promover.
