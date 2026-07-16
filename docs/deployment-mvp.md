@@ -106,8 +106,8 @@ menos 32 bytes e rotacione-o conforme a política do ambiente.
   **falsificável** (burla o rate-limit); menor agrupa clientes distintos no mesmo balde.
 - `QUEUE_ENTRY_QR_CODE_TTL_SECONDS` e `QUEUE_ENTRY_LINK_TTL_SECONDS` (default `86400` = 24h
   cada) — validade dos tokens de entrada por canal (QR Code / link). A sessão da
-  representante expira sempre no fim do dia útil, independente desses valores; o QR digital
-  é regenerado a cada dia (manual hoje; automático no DT-12).
+  representante expira sempre no fim do dia útil, independente desses valores; o QR da TV
+  recebe tokens novos automaticamente, enquanto QR impresso/estático precisa ser renovado.
 - `THROTTLE_GLOBAL_PER_MINUTE` (default `300`), `THROTTLE_REGISTER_PER_MINUTE` (default
   `20`), `THROTTLE_LOGIN_PER_MINUTE` (default `40`), `THROTTLE_GUEST_ENTRY_PER_MINUTE`
   (default `20`) e `THROTTLE_TICKET_CREATE_PER_MINUTE` (default `40`) — limites de
@@ -165,9 +165,9 @@ HTTPS.
 - O token fica em `#entry=...`, não na query string, para não ser enviado em
   referrers ou logs HTTP comuns.
 - QR Code e link expiram em 24h por padrão (configurável por env, ver acima). A
-  validade aparece na administração. Como o QR é digital (TV), regenere-o a cada dia.
-- Ao expirar, abra **Gerenciar ER**, copie a URL atual e regenere o QR Code ou
-  redistribua o link.
+  validade aparece na administração. O QR exibido na TV é atualizado automaticamente.
+- Para QR impresso/estático, ao expirar, abra **Gerenciar ER**, copie a URL atual e
+  regenere o QR Code. Links distribuídos também precisam ser renovados.
 - Links antigos sem `#entry=` deixam de funcionar. Regere os QR Codes existentes
   na implantação desta versão.
 - O backend limita autenticação e criação de senha por IP, com uma trava adicional
