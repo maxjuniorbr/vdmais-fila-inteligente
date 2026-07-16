@@ -38,3 +38,8 @@ Thumbs.db
 
 # Local-only working docs
 /docs/local-*
+
+# OpenSpec (local-only, not shared via git)
+/openspec/
+/.claude/commands/opsx/
+/.claude/skills/openspec-*/
