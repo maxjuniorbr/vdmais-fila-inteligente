@@ -153,6 +153,16 @@ describe('Integration M2M endpoints (e2e)', () => {
   })
 
   afterAll(async () => {
+    const erIds = [erId, otherErId]
+    await prisma.$transaction([
+      prisma.auditEvent.deleteMany({ where: { erId: { in: erIds } } }),
+      prisma.ticket.deleteMany({ where: { erId: { in: erIds } } }),
+      prisma.counter.deleteMany({ where: { erId: { in: erIds } } }),
+      prisma.operator.deleteMany({ where: { erId: { in: erIds } } }),
+      prisma.queue.deleteMany({ where: { erId: { in: erIds } } }),
+      prisma.eR.deleteMany({ where: { id: { in: erIds } } }),
+      prisma.representative.deleteMany({ where: { reCode: { startsWith: `RE${suffix}` } } }),
+    ])
     await app.close()
   })
 
