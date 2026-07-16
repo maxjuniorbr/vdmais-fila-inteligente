@@ -128,6 +128,15 @@ interface QueueOverview {
   counters: Counter[]
 }
 
+function getCallNextHint(
+  currentTicket: Ticket | null,
+  currentCounter: Counter | undefined,
+): string {
+  if (currentTicket) return 'Conclua a senha atual antes de chamar a próxima.'
+  if (currentCounter?.state === 'PAUSED') return 'Retome o caixa para chamar a próxima.'
+  return 'Pressione Enter para chamar a próxima.'
+}
+
 const QUEUE_EVENTS = [
   'ticket.created',
   'ticket.called',
@@ -264,7 +273,8 @@ export function OperationPage() {
       const el = document.activeElement
       const interactive =
         el instanceof HTMLElement &&
-        (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(el.tagName) || el.isContentEditable)
+        (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(el.tagName) ||
+          el.isContentEditable)
       if (interactive) return
       event.preventDefault()
       callNextRef.current()
@@ -355,9 +365,7 @@ export function OperationPage() {
   const callNext = () => {
     void act(() => api.post(`/queues/${erId}/call-next`, { counterId }))
   }
-  let callNextHint = 'Pressione Enter para chamar a próxima.'
-  if (currentTicket) callNextHint = 'Conclua a senha atual antes de chamar a próxima.'
-  else if (currentCounter?.state === 'PAUSED') callNextHint = 'Retome o caixa para chamar a próxima.'
+  const callNextHint = getCallNextHint(currentTicket, currentCounter)
   callNextEnabledRef.current = canCallNext && !confirmingClose
   callNextRef.current = callNext
 
@@ -410,7 +418,9 @@ export function OperationPage() {
               {counterId && !currentCounter?.operator && (
                 <Button
                   style={{ marginTop: brand.spacing[12] }}
-                  onClick={() => act(() => api.post(`/counters/${counterId}/open`), 'Caixa assumido.')}
+                  onClick={() =>
+                    act(() => api.post(`/counters/${counterId}/open`), 'Caixa assumido.')
+                  }
                   disabled={loading || !isDayOpen}
                 >
                   Assumir e abrir caixa
@@ -429,30 +439,32 @@ export function OperationPage() {
                   </Button>
                   <p style={styles.callHint}>{callNextHint}</p>
                   <div style={styles.counterActions}>
-                  {currentCounter.state === 'ACTIVE' && (
-                    <PauseCounterControls counterId={counterId} loading={loading} act={act} />
-                  )}
-                  {currentCounter.state === 'PAUSED' && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => act(() => api.post(`/counters/${counterId}/resume`), 'Caixa retomado.')}
-                      disabled={loading}
-                    >
-                      Retomar
-                    </Button>
-                  )}
-                  {['ACTIVE', 'PAUSED'].includes(currentCounter.state) && !currentTicket && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        setError(null)
-                        setConfirmingClose(true)
-                      }}
-                      disabled={loading}
-                    >
-                      Fechar caixa
-                    </Button>
-                  )}
+                    {currentCounter.state === 'ACTIVE' && (
+                      <PauseCounterControls counterId={counterId} loading={loading} act={act} />
+                    )}
+                    {currentCounter.state === 'PAUSED' && (
+                      <Button
+                        variant="secondary"
+                        onClick={() =>
+                          act(() => api.post(`/counters/${counterId}/resume`), 'Caixa retomado.')
+                        }
+                        disabled={loading}
+                      >
+                        Retomar
+                      </Button>
+                    )}
+                    {['ACTIVE', 'PAUSED'].includes(currentCounter.state) && !currentTicket && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setError(null)
+                          setConfirmingClose(true)
+                        }}
+                        disabled={loading}
+                      >
+                        Fechar caixa
+                      </Button>
+                    )}
                   </div>
                 </>
               )}
@@ -507,21 +519,33 @@ export function OperationPage() {
                         <div style={styles.absentActions}>
                           <Button
                             variant="secondary"
-                            onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/recall`))}
+                            onClick={() =>
+                              act(() => api.post(`/tickets/${currentTicket.id}/recall`))
+                            }
                             disabled={loading}
                           >
                             Chamar novamente
                           </Button>
                           <Button
                             variant="secondary"
-                            onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/staff-pause`), 'Senha pausada.')}
+                            onClick={() =>
+                              act(
+                                () => api.post(`/tickets/${currentTicket.id}/staff-pause`),
+                                'Senha pausada.',
+                              )
+                            }
                             disabled={loading}
                           >
                             Pausar senha
                           </Button>
                           <Button
                             variant="danger"
-                            onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/no-show`), 'Marcada como não compareceu.')}
+                            onClick={() =>
+                              act(
+                                () => api.post(`/tickets/${currentTicket.id}/no-show`),
+                                'Marcada como não compareceu.',
+                              )
+                            }
                             disabled={loading}
                           >
                             Não compareceu
@@ -535,7 +559,10 @@ export function OperationPage() {
                       <Button
                         style={{ width: '100%' }}
                         onClick={() =>
-                          act(() => api.post(`/tickets/${currentTicket.id}/finish-service`), 'Atendimento finalizado.')
+                          act(
+                            () => api.post(`/tickets/${currentTicket.id}/finish-service`),
+                            'Atendimento finalizado.',
+                          )
                         }
                         disabled={loading}
                       >
@@ -546,7 +573,12 @@ export function OperationPage() {
                         <div style={styles.absentActions}>
                           <Button
                             variant="secondary"
-                            onClick={() => act(() => api.post(`/tickets/${currentTicket.id}/staff-pause`), 'Senha pausada.')}
+                            onClick={() =>
+                              act(
+                                () => api.post(`/tickets/${currentTicket.id}/staff-pause`),
+                                'Senha pausada.',
+                              )
+                            }
                             disabled={loading}
                           >
                             Pausar senha
@@ -606,7 +638,10 @@ export function OperationPage() {
                               label: 'Retomar senha',
                               disabled: loading,
                               onClick: () =>
-                                act(() => api.post(`/tickets/${ticket.id}/staff-resume`), 'Senha retomada.'),
+                                act(
+                                  () => api.post(`/tickets/${ticket.id}/staff-resume`),
+                                  'Senha retomada.',
+                                ),
                             },
                           ]}
                         />
@@ -652,9 +687,7 @@ export function OperationPage() {
               <div style={styles.chipRow}>
                 {overview?.recent.slice(0, 8).map((ticket) => (
                   <span key={ticket.id} style={styles.chip}>
-                    <StatusDot
-                      color={ticket.state === 'NO_SHOW' ? brand.warning : brand.success}
-                    />
+                    <StatusDot color={ticket.state === 'NO_SHOW' ? brand.warning : brand.success} />
                     <strong>{ticket.code}</strong>
                     <span style={styles.chipState}>{ticketStateLabel(ticket.state)}</span>
                   </span>
@@ -671,19 +704,25 @@ export function OperationPage() {
           onClose={() => setConfirmingClose(false)}
           footer={
             <>
-              <Button variant="secondary" onClick={() => setConfirmingClose(false)} disabled={loading}>
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmingClose(false)}
+                disabled={loading}
+              >
                 Voltar
               </Button>
               <Button
                 variant="danger"
                 disabled={loading}
                 onClick={() =>
-                  act(() => api.post(`/counters/${counterId}/close`), 'Caixa fechado.').then((ok) => {
-                    if (ok) {
-                      selectCounter('')
-                      setConfirmingClose(false)
-                    }
-                  })
+                  act(() => api.post(`/counters/${counterId}/close`), 'Caixa fechado.').then(
+                    (ok) => {
+                      if (ok) {
+                        selectCounter('')
+                        setConfirmingClose(false)
+                      }
+                    },
+                  )
                 }
               >
                 {loading ? 'Fechando...' : 'Fechar caixa'}
@@ -696,8 +735,8 @@ export function OperationPage() {
               {error}
             </Alert>
           )}
-          O caixa será encerrado e você deixará de receber novas senhas. É possível assumir um
-          caixa novamente depois.
+          O caixa será encerrado e você deixará de receber novas senhas. É possível assumir um caixa
+          novamente depois.
         </Modal>
       )}
     </div>

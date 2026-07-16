@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import QRCode from 'qrcode'
 import { PanelPage } from './PanelPage'
 
-vi.mock('qrcode', () => ({ default: { toCanvas: vi.fn().mockResolvedValue(undefined) } }))
+vi.mock('qrcode', () => ({
+  default: { toDataURL: vi.fn(async (value: string) => `data:image/png;base64,${value}`) },
+}))
 
 type SocketHandler = (...args: unknown[]) => void
 let socketDouble: {
@@ -262,15 +264,15 @@ describe('PanelPage', () => {
 
     expect(await screen.findByText('ENTRE NA FILA')).toBeInTheDocument()
     expect(screen.getByText('Aponte a câmera para o QR Code')).toBeInTheDocument()
-    const canvas = screen.getByRole('img', { name: 'QR Code de entrada na fila' })
+    const image = await screen.findByRole('img', { name: 'QR Code de entrada na fila' })
     await waitFor(() => {
       // The QR encodes the same entry URL shape the admin prints: /fila/:erId#entry=<token>.
-      expect(vi.mocked(QRCode.toCanvas)).toHaveBeenCalledWith(
-        canvas,
+      expect(vi.mocked(QRCode.toDataURL)).toHaveBeenCalledWith(
         expect.stringContaining('/fila/er-1#entry=entry-tok'),
         expect.objectContaining({ errorCorrectionLevel: 'M' }),
       )
     })
+    expect(image).toHaveAttribute('alt', 'QR Code de entrada na fila')
   })
 
   it('omits the QR block when the state carries no entry token', async () => {
@@ -278,7 +280,9 @@ describe('PanelPage', () => {
 
     expect(await screen.findByText('A001')).toBeInTheDocument()
     expect(screen.queryByText('ENTRE NA FILA')).not.toBeInTheDocument()
-    expect(screen.queryByRole('img', { name: 'QR Code de entrada na fila' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('img', { name: 'QR Code de entrada na fila' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shrinks the upcoming list to five rows when the QR occupies the footer', async () => {
@@ -338,7 +342,10 @@ describe('PanelPage', () => {
   })
 
   it('keeps the panel on screen when the state request is not ok', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 500 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 500 })),
+    )
 
     render(
       <MemoryRouter initialEntries={['/painel/er-1']}>
@@ -424,4 +431,3 @@ describe('PanelPage', () => {
     }
   })
 })
-

@@ -16,7 +16,7 @@
 | [DT-5](#dt-5--dupla-contabilidade-de-migrations-e-deploy-manual) | Dupla contabilidade de migrations e deploy manual | Média | Não |
 | [DT-6](#dt-6--major-do-prisma-adiado) | Major do Prisma adiado | Baixa | Não |
 | [DT-7](#dt-7--overrides-de-dependências-para-patches-de-segurança) | Overrides de dependências para patches de segurança | Baixa | Não |
-| [DT-8](#dt-8--complexidade-cognitiva-do-operationpage-acima-do-limite) | Complexidade cognitiva do OperationPage acima do limite | Baixa | Não |
+| [DT-8](#dt-8--complexidade-cognitiva-do-operationpage-acima-do-limite) | Complexidade cognitiva do OperationPage acima do limite — ✅ resolvido | Baixa | Não |
 | [DT-9](#dt-9--jwtauthguard-sem-spec-dedicado) | JwtAuthGuard sem spec dedicado | Baixa | Não |
 | [DT-10](#dt-10--ticketid-opaco-nos-eventos-de-socket-do-painel) | ticketId opaco nos eventos de socket do painel | Baixa | Não |
 | [DT-11](#dt-11--pausaretoma-de-senha-pela-gestora-sem-ui) | Pausa/retoma de senha pela gestora sem UI — ✅ resolvido | Baixa | Não |
@@ -174,18 +174,15 @@ traga o transitivo corrigido; revisar na rotina do Dependabot. Relacionado a
 
 ## DT-8 — Complexidade cognitiva do OperationPage acima do limite
 
-**Contexto.** O componente `OperationPage` (tela da operadora) tem complexidade cognitiva
-16, um ponto acima do limite 15 do SonarQube (regra `typescript:S3776`). O smell é
-**pré-existente** e vem da densidade de condicionais do render principal (cards de Caixa e
-Senha atual), não da feature de atendimento preferencial — extrair a lista "Aguardando"
-(`WaitingTicketRow`/`priorityMenuItem`) não reduziu o número. O Quality Gate segue verde
-(a regra não bloqueia o gate).
+> **✅ Resolvido.** O `OperationPage` voltou ao limite aceito pelo SonarQube.
 
-**Impacto.** Apenas manutenibilidade — sem efeito em runtime, comportamento ou desempenho.
-A tela funciona igual; a função é só mais difícil de ler e manter.
+**Contexto.** O componente `OperationPage` (tela da operadora) tinha complexidade
+cognitiva 16, um ponto acima do limite 15 do SonarQube (regra `typescript:S3776`), pela
+densidade de condicionais do render principal.
 
-**Encaminhamento.** Decompor o `OperationPage` em subcomponentes (`CounterCard`,
-`CurrentTicketCard`, etc.) num PR dedicado, com testes, até a complexidade ficar ≤ 15.
+**Resolução (jul/2026).** A decisão da dica da ação **Chamar próximo** foi extraída para
+uma função pura (`getCallNextHint`), reduzindo a complexidade da página sem alterar o
+comportamento. A análise local do SonarQube passou sem issues abertas.
 
 ---
 
