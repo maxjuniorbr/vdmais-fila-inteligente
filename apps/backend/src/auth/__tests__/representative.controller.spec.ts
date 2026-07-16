@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client'
+import { RepresentativeKind, Role } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuthService } from '../auth.service'
 import { RepresentativeController } from '../representative.controller'
@@ -54,7 +54,13 @@ describe('RepresentativeController', () => {
 
   it('scopes the search to representatives with a ticket in the caller ER and masks PII', async () => {
     prisma.representative.findMany.mockResolvedValue([
-      { id: 're-1', fullName: 'Ana Souza', cpf: '11122233344', phone: '11999990000', reCode: 'RE0001' },
+      {
+        id: 're-1',
+        fullName: 'Ana Souza',
+        cpf: '11122233344',
+        phone: '11999990000',
+        reCode: 'RE0001',
+      },
     ])
     const result = await controller.search('11122233344', req)
     expect(prisma.representative.findMany).toHaveBeenCalledWith(
@@ -62,6 +68,7 @@ describe('RepresentativeController', () => {
         where: {
           AND: [
             { OR: [{ cpf: '11122233344' }, { phone: '11122233344' }, { reCode: '11122233344' }] },
+            { kind: RepresentativeKind.REGISTERED },
             { tickets: { some: { erId: 'er-1' } } },
           ],
         },

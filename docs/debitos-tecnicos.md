@@ -29,7 +29,7 @@
 | [DT-18](#dt-18--mfa-ausente-para-contas-privilegiadas-e-token-estático-nas-métricas) | MFA ausente para contas privilegiadas e token estático nas métricas | Média | Não |
 | [DT-19](#dt-19--sessão-de-staff-sem-refresh-token-rotativo) | Sessão de staff sem refresh token rotativo | Média | Não |
 | [DT-20](#dt-20--endurecimento-do-websocket-e-validações-de-segurança-no-ambiente-real) | Endurecimento do WebSocket e validações de segurança no ambiente real | Média | Não |
-| [DT-21](#dt-21--convidada-não-migra-para-cadastro-completo) | Convidada não migra para cadastro completo | Baixa | Não |
+| [DT-21](#dt-21--cpf-autodeclarado-na-entrada-temporária-de-convidada) | CPF autodeclarado na entrada temporária de convidada | Baixa | Não |
 
 ---
 
@@ -304,7 +304,7 @@ termos/uso de dados, observação de check-in) **não serão adicionados**.
 **Encaminhamento.** Em momento futuro, substituir o cadastro mínimo pela autenticação via
 API do app / fluxo sem cadastro com QR rotativo, e então reavaliar §5 (cadastro) e §6
 (jornadas) do [mvp.md](./mvp.md). Toca backend (auth) e frontend. Primeiro passo dado em
-jul/2026: entrada de **convidada** por QR (nome + telefone, sem cadastro), habilitável por
+jul/2026: entrada de **convidada** por QR (nome + CPF, sem cadastro), habilitável por
 ER — ver o modelo de dados em [arquitetura-backend.md](./arquitetura-backend.md#modelo-de-dados).
 
 ---
@@ -420,22 +420,25 @@ pentest dinâmico. Relacionado a [DT-2](#dt-2--websocket-socketio-sem-adaptador-
 
 ---
 
-## DT-21 — Convidada não migra para cadastro completo
+## DT-21 — CPF autodeclarado na entrada temporária de convidada
 
-**Contexto.** O modelo de convidada (jul/2026) usa o telefone como identidade única
-(`representatives.phone` é `@unique`). Se a convidada tentar depois o **cadastro completo**
-(`POST /auth/register`) com o mesmo telefone, o `createRepresentative`
-([auth.service.ts](../apps/backend/src/auth/auth.service.ts)) encontra o registro `GUEST` e
-recusa com a mensagem genérica de conflito (anti-enumeração) — não existe caminho de
-"promoção" do registro.
+**Contexto.** Para eventos controlados de franqueados, um ER pode habilitar
+`guestEntryEnabled` e permitir entrada com nome, sobrenome e CPF, sem cadastro ou senha.
+O CPF é validado por dígito verificador e identifica o registro dentro da fila, mas não
+há consulta externa que comprove sua titularidade. A sessão resultante usa o papel
+`REPRESENTATIVE` para a autoentrada e a gestão da própria senha; check-in assistido e
+integrações corporativas continuam restritos a `REGISTERED`.
 
-**Impacto.** Fricção pós-evento: quem entrou como convidada e quiser virar RE cadastrada
-precisa de outro telefone ou de intervenção manual no banco. Decisão consciente para manter
-a Fase 1 do modelo de convidada enxuta; sem impacto no evento em si.
+Também são decisões conscientes desta exceção: CPF de cadastro completo recebe `409` e
+segue para login; registro `GUEST` não é promovido automaticamente a `REGISTERED`. O
+fluxo é opt-in por ER, exige token assinado de entrada e possui limite por IP.
 
-**Encaminhamento.** Promover `GUEST` → `REGISTERED` quando o telefone do cadastro coincidir
-com um registro `GUEST` (completar cpf/reCode/senha no MESMO registro, preservando o
-histórico de senhas), mantendo as checagens de unicidade de CPF/código e a mensagem
-anti-enumeração. Avaliar junto de
-[DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado) — se o cadastro mínimo for
-descontinuado, este débito pode morrer com ele.
+**Impacto.** O mecanismo atende ao evento sem exigir onboarding completo, mas não deve
+ser tratado como autenticação definitiva nem habilitado indiscriminadamente. Reentrada
+com o mesmo CPF recupera a identidade leve da convidada dentro da fila.
+
+**Encaminhamento.** Antes de usar a modalidade fora desse contexto, integrar a validação
+do CPF a uma fonte autorizada ou desabilitar `guestEntryEnabled`. Nessa evolução,
+reavaliar em conjunto a promoção `GUEST` → `REGISTERED` e a resposta de conflito do
+endpoint público. Relacionado a
+[DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado).

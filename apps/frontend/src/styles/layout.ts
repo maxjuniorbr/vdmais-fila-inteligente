@@ -218,6 +218,11 @@ export const layout: Record<string, CSSProperties> = {
     color: brand.inkSoft,
   },
 
+  formHint: {
+    ...brand.typography.auxiliar,
+    color: brand.inkMuted,
+  },
+
   formInput: {
     padding: `${brand.spacing[12]}px`,
     minHeight: 44,

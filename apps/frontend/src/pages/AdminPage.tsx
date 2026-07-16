@@ -10,6 +10,7 @@ import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { CopyField } from '../components/CopyField'
 import { Input } from '../components/Input'
+import { Switch } from '../components/Switch'
 import { Modal } from '../components/Modal'
 import { Select } from '../components/Select'
 import { useToast } from '../components/Toast'
@@ -25,6 +26,7 @@ interface ERSummary {
   isDayOpen: boolean
   pauseTimeoutSeconds: number
   callTimeoutSeconds: number
+  guestEntryEnabled: boolean
   createdAt: string
   _count: { counters: number; operators: number }
 }
@@ -382,8 +384,8 @@ function ERDetailSection({
           <div>
             <h3 style={styles.sectionTitle}>Painel de TV</h3>
             <p style={styles.sectionDescription}>
-              O painel só abre com um token de acesso. Gere o token, configure a URL na TV e
-              revogue a qualquer momento se o endereço vazar.
+              O painel só abre com um token de acesso. Gere o token, configure a URL na TV e revogue
+              a qualquer momento se o endereço vazar.
             </p>
           </div>
         </div>
@@ -559,6 +561,7 @@ function EditERForm({
   const [name, setName] = useState(er.name)
   const [pauseMinutes, setPauseMinutes] = useState(String(Math.round(er.pauseTimeoutSeconds / 60)))
   const [callMinutes, setCallMinutes] = useState(String(Math.round(er.callTimeoutSeconds / 60)))
+  const [guestEntryEnabled, setGuestEntryEnabled] = useState(er.guestEntryEnabled)
   const [loading, setLoading] = useState(false)
   const parsedPauseMinutes = Number(pauseMinutes)
   const parsedCallMinutes = Number(callMinutes)
@@ -573,6 +576,7 @@ function EditERForm({
     name.trim() === er.name &&
     nextPauseTimeoutSeconds === er.pauseTimeoutSeconds &&
     nextCallTimeoutSeconds === er.callTimeoutSeconds &&
+    guestEntryEnabled === er.guestEntryEnabled &&
     minutesValid &&
     callMinutesValid
 
@@ -592,6 +596,7 @@ function EditERForm({
         name,
         pauseTimeoutSeconds: nextPauseTimeoutSeconds,
         callTimeoutSeconds: nextCallTimeoutSeconds,
+        guestEntryEnabled,
       })
       onError(null)
       await onUpdated()
@@ -638,6 +643,17 @@ function EditERForm({
         onChange={(event) => setCallMinutes(event.target.value)}
         required
       />
+      <div style={styles.settingRow}>
+        <Switch
+          label="Entrada de convidada (nome + CPF, sem cadastro)"
+          checked={guestEntryEnabled}
+          onChange={(event) => setGuestEntryEnabled(event.target.checked)}
+        />
+        <p style={styles.settingHint}>
+          Ligada, quem escaneia o QR Code — impresso no ER ou exibido no painel da TV — entra na
+          fila só com nome, sobrenome e CPF. Desligada, apenas login ou cadastro completo.
+        </p>
+      </div>
       <Button type="submit" disabled={loading || unchanged}>
         {loading ? 'Salvando...' : 'Salvar alteração'}
       </Button>
@@ -856,8 +872,8 @@ function PanelAccessManager({
 
       {!generatedUrl && hasPanelToken && (
         <p style={styles.sectionDescription}>
-          Um token já está ativo. Gere um novo apenas para substituir o acesso da TV; isso
-          invalida o endereço anterior imediatamente.
+          Um token já está ativo. Gere um novo apenas para substituir o acesso da TV; isso invalida
+          o endereço anterior imediatamente.
         </p>
       )}
     </div>
@@ -998,6 +1014,17 @@ const styles: Record<string, React.CSSProperties> = {
   summaryDetail: {
     color: brand.inkMuted,
     fontSize: brand.typography.bodySmall.fontSize,
+  },
+  // Full-width so the toggle drops to its own line inside the wrapping inline form.
+  settingRow: {
+    flexBasis: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: `${brand.spacing[4]}px`,
+  },
+  settingHint: {
+    ...layout.formHint,
+    margin: 0,
   },
   innerSection: {
     marginTop: `${brand.spacing[16]}px`,

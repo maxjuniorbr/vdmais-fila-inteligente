@@ -18,5 +18,6 @@ describe('pii-mask', () => {
   it('never leaks a malformed/short phone in full', () => {
     expect(maskPhone('99')).toBe('(**) *****-****')
     expect(maskPhone('')).toBe('(**) *****-****')
+    expect(maskPhone(null)).toBe('(**) *****-****')
   })
 })

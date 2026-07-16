@@ -48,14 +48,15 @@ enum CounterState {
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
-// Convidada (kind GUEST) entra na fila só com nome + telefone: o telefone (único e
-// obrigatório) é a identidade dela; os demais campos de cadastro ficam nulos.
+// Convidada (kind GUEST) entra na fila só com nome + CPF: o CPF (único e validado
+// por dígito verificador) é a identidade dela; os demais campos de cadastro ficam
+// nulos, inclusive o telefone (que convidada não informa).
 model Representative {
   id           String             @id @default(cuid())
   kind         RepresentativeKind @default(REGISTERED)
   fullName     String
   cpf          String?            @unique
-  phone        String             @unique
+  phone        String?            @unique
   birthDate    DateTime?
   reCode       String?            @unique
   passwordHash String?
@@ -85,7 +86,7 @@ model ER {
   // ser marcada como não comparecimento automaticamente. 0 desativa.
   callTimeoutSeconds Int @default(600)
 
-  // Entrada de convidada (só nome + telefone, sem cadastro) habilitada por ER.
+  // Entrada de convidada (nome + sobrenome + CPF, sem cadastro) habilitada por ER.
   // Desligado por padrão: nenhum ER muda de comportamento sem ação explícita.
   guestEntryEnabled Boolean @default(false)
 

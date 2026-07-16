@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
-import { TicketState } from '@prisma/client'
+import { RepresentativeKind, TicketState } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { TicketService } from '../../ticket/ticket.service'
 import { IntegrationService } from '../integration.service'
@@ -48,7 +48,7 @@ describe('IntegrationService', () => {
     expect(err.getResponse()).toMatchObject({ code: 'REPRESENTATIVE_NOT_FOUND' })
     expect(prisma.representative.findUnique).toHaveBeenCalledWith({
       where: { reCode: 'RE001' },
-      select: { id: true },
+      select: { id: true, kind: true },
     })
   })
 
@@ -57,19 +57,38 @@ describe('IntegrationService', () => {
     await service.startService({ cpf: '529.982.247-25' }, principal).catch(() => undefined)
     expect(prisma.representative.findUnique).toHaveBeenCalledWith({
       where: { cpf: '52998224725' },
-      select: { id: true },
+      select: { id: true, kind: true },
     })
   })
 
+  it('does not resolve a guest record through the corporate integration', async () => {
+    prisma.representative.findUnique.mockResolvedValue({
+      id: 'guest-1',
+      kind: RepresentativeKind.GUEST,
+    })
+
+    const err = await service.startService({ cpf: '52998224725' }, principal).catch((e) => e)
+
+    expect(err).toBeInstanceOf(NotFoundException)
+    expect(err.getResponse()).toMatchObject({ code: 'REPRESENTATIVE_NOT_FOUND' })
+    expect(prisma.ticket.findMany).not.toHaveBeenCalled()
+  })
+
   it('rejects when the representative has no active ticket', async () => {
-    prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
+    prisma.representative.findUnique.mockResolvedValue({
+      id: 'rep-1',
+      kind: RepresentativeKind.REGISTERED,
+    })
     prisma.ticket.findMany.mockResolvedValue([])
     const err = await service.startService({ reCode: 'RE1' }, principal).catch((e) => e)
     expect(err.getResponse()).toMatchObject({ code: 'NO_ACTIVE_TICKET' })
   })
 
   it('rejects when the representative is active in more than one ER', async () => {
-    prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
+    prisma.representative.findUnique.mockResolvedValue({
+      id: 'rep-1',
+      kind: RepresentativeKind.REGISTERED,
+    })
     prisma.ticket.findMany.mockResolvedValue([
       { id: 't1', erId: 'er-1' },
       { id: 't2', erId: 'er-2' },
@@ -80,7 +99,10 @@ describe('IntegrationService', () => {
   })
 
   it('rejects when more than one active ticket exists in the same ER (no arbitrary pick)', async () => {
-    prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
+    prisma.representative.findUnique.mockResolvedValue({
+      id: 'rep-1',
+      kind: RepresentativeKind.REGISTERED,
+    })
     prisma.ticket.findMany.mockResolvedValue([
       { id: 't1', erId: 'er-1' },
       { id: 't2', erId: 'er-1' },
@@ -91,7 +113,10 @@ describe('IntegrationService', () => {
   })
 
   it('starts the service: resolves the ticket and delegates with the integration context', async () => {
-    prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
+    prisma.representative.findUnique.mockResolvedValue({
+      id: 'rep-1',
+      kind: RepresentativeKind.REGISTERED,
+    })
     prisma.ticket.findMany.mockResolvedValue([{ id: 'ticket-9', erId: 'er-1' }])
     ticketService.advanceToInService.mockResolvedValue({
       ticket: {
@@ -132,7 +157,10 @@ describe('IntegrationService', () => {
   })
 
   it("finish falls back to today's FINISHED ticket so retries stay idempotent", async () => {
-    prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
+    prisma.representative.findUnique.mockResolvedValue({
+      id: 'rep-1',
+      kind: RepresentativeKind.REGISTERED,
+    })
     prisma.ticket.findMany
       .mockResolvedValueOnce([]) // no active ticket (already finished)
       .mockResolvedValueOnce([{ id: 'ticket-9', erId: 'er-1' }]) // finished today
@@ -160,14 +188,20 @@ describe('IntegrationService', () => {
   })
 
   it('throws NO_ACTIVE_TICKET when neither an active nor a finished-today ticket exists', async () => {
-    prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
+    prisma.representative.findUnique.mockResolvedValue({
+      id: 'rep-1',
+      kind: RepresentativeKind.REGISTERED,
+    })
     prisma.ticket.findMany.mockResolvedValue([])
     const err = await service.finishService({ reCode: 'RE1' }, principal).catch((e) => e)
     expect(err.getResponse()).toMatchObject({ code: 'NO_ACTIVE_TICKET' })
   })
 
   it('passes erId as a disambiguator to the active-ticket lookup', async () => {
-    prisma.representative.findUnique.mockResolvedValue({ id: 'rep-1' })
+    prisma.representative.findUnique.mockResolvedValue({
+      id: 'rep-1',
+      kind: RepresentativeKind.REGISTERED,
+    })
     prisma.ticket.findMany.mockResolvedValue([{ id: 'ticket-9', erId: 'er-1' }])
     ticketService.completeService.mockResolvedValue({
       ticket: {

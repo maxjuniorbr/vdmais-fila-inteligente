@@ -1,5 +1,12 @@
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common'
-import { CounterState, EntryChannel, Prisma, Role, TicketState } from '@prisma/client'
+import {
+  CounterState,
+  EntryChannel,
+  Prisma,
+  RepresentativeKind,
+  Role,
+  TicketState,
+} from '@prisma/client'
 import { PanelGateway } from '../../panel/panel.gateway'
 import { PrismaService } from '../../prisma/prisma.service'
 import { CorrectionAction } from '../dto/ticket-action.dto'
@@ -107,6 +114,7 @@ describe('TicketService', () => {
     tx.representative.findUnique.mockResolvedValue({
       id: 'rep-1',
       fullName: 'Maria Teste',
+      kind: RepresentativeKind.REGISTERED,
     })
     tx.ticket.findFirst.mockResolvedValue(null)
     tx.ticket.findUnique.mockResolvedValue(ticketBase)
@@ -134,7 +142,7 @@ describe('TicketService', () => {
     expect(result.representative).toEqual({ fullName: 'Maria Teste' })
     expect(tx.representative.findUnique).toHaveBeenCalledWith({
       where: { id: 'rep-1' },
-      select: { id: true, fullName: true },
+      select: { id: true, fullName: true, kind: true },
     })
     expect(tx.queue.upsert).toHaveBeenCalled()
     expect(tx.ticket.create).toHaveBeenCalledWith({
@@ -194,6 +202,7 @@ describe('TicketService', () => {
     tx.representative.findUnique.mockResolvedValue({
       id: 'rep-2',
       fullName: 'Joana Teste',
+      kind: RepresentativeKind.REGISTERED,
     })
     tx.ticket.create.mockResolvedValue({
       ...ticketBase,
@@ -225,8 +234,50 @@ describe('TicketService', () => {
     })
   })
 
+  it('lets an authenticated guest create her own ticket', async () => {
+    tx.representative.findUnique.mockResolvedValue({
+      id: 'rep-1',
+      fullName: 'Convidada',
+      kind: RepresentativeKind.GUEST,
+    })
+
+    const result = await service.create(representative, {
+      erId: 'er-1',
+      entryChannel: EntryChannel.QR_CODE,
+    })
+
+    expect(result.code).toBe('A001')
+    expect(tx.ticket.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        representativeId: 'rep-1',
+        checkinAttendantId: undefined,
+      }),
+    })
+  })
+
+  it('does not let assisted check-in create a ticket for a guest record', async () => {
+    tx.representative.findUnique.mockResolvedValue({
+      id: 'guest-1',
+      fullName: 'Convidada',
+      kind: RepresentativeKind.GUEST,
+    })
+
+    await expect(
+      service.create(attendant, {
+        erId: 'er-1',
+        entryChannel: EntryChannel.CHECKIN_ASSISTED,
+        representativeId: 'guest-1',
+      }),
+    ).rejects.toThrow('Representante não encontrada')
+    expect(tx.ticket.create).not.toHaveBeenCalled()
+  })
+
   it('honors isPriority from a staff assisted check-in and counts position priority-aware', async () => {
-    tx.representative.findUnique.mockResolvedValue({ id: 'rep-2', fullName: 'Joana Teste' })
+    tx.representative.findUnique.mockResolvedValue({
+      id: 'rep-2',
+      fullName: 'Joana Teste',
+      kind: RepresentativeKind.REGISTERED,
+    })
     tx.ticket.create.mockResolvedValue({
       ...ticketBase,
       representativeId: 'rep-2',
@@ -459,7 +510,11 @@ describe('TicketService', () => {
       where: { id: 'counter-1' },
       data: { state: CounterState.ACTIVE },
     })
-    expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.service_finished', expect.any(Object))
+    expect(panel.emitToER).toHaveBeenCalledWith(
+      'er-1',
+      'ticket.service_finished',
+      expect.any(Object),
+    )
   })
 
   it('marks a CALLING ticket as NO_SHOW and resets counter', async () => {
@@ -576,7 +631,10 @@ describe('TicketService', () => {
         serviceFinishedAt: new Date(),
       })
 
-      const result = await service.completeService('ticket-1', { client: 'legacy', scopes: ['tickets:finish'] })
+      const result = await service.completeService('ticket-1', {
+        client: 'legacy',
+        scopes: ['tickets:finish'],
+      })
 
       expect(result.idempotent).toBe(false)
       expect(result.ticket.state).toBe(TicketState.FINISHED)
@@ -627,8 +685,18 @@ describe('TicketService', () => {
 
     it('advanceToInService is idempotent when a concurrent call wins the transition (race)', async () => {
       prisma.ticket.findUnique
-        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.CALLING, counterId: 'counter-1', operatorId: 'op-9' })
-        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.IN_SERVICE, counterId: 'counter-1', operatorId: 'op-9' })
+        .mockResolvedValueOnce({
+          ...ticketBase,
+          state: TicketState.CALLING,
+          counterId: 'counter-1',
+          operatorId: 'op-9',
+        })
+        .mockResolvedValueOnce({
+          ...ticketBase,
+          state: TicketState.IN_SERVICE,
+          counterId: 'counter-1',
+          operatorId: 'op-9',
+        })
       tx.ticket.updateMany.mockResolvedValue({ count: 0 })
 
       const result = await service.advanceToInService('ticket-1', ctx)
@@ -639,8 +707,17 @@ describe('TicketService', () => {
 
     it('advanceToInService rethrows when the race left a non-target state', async () => {
       prisma.ticket.findUnique
-        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.CALLING, counterId: 'counter-1', operatorId: 'op-9' })
-        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.CANCELLED, counterId: 'counter-1' })
+        .mockResolvedValueOnce({
+          ...ticketBase,
+          state: TicketState.CALLING,
+          counterId: 'counter-1',
+          operatorId: 'op-9',
+        })
+        .mockResolvedValueOnce({
+          ...ticketBase,
+          state: TicketState.CANCELLED,
+          counterId: 'counter-1',
+        })
       tx.ticket.updateMany.mockResolvedValue({ count: 0 })
 
       await expect(service.advanceToInService('ticket-1', ctx)).rejects.toThrow(BadRequestException)
@@ -648,8 +725,17 @@ describe('TicketService', () => {
 
     it('completeService is idempotent when a concurrent call wins the finish (race)', async () => {
       prisma.ticket.findUnique
-        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.IN_SERVICE, counterId: 'counter-1', operatorId: 'op-9' })
-        .mockResolvedValueOnce({ ...ticketBase, state: TicketState.FINISHED, counterId: 'counter-1' })
+        .mockResolvedValueOnce({
+          ...ticketBase,
+          state: TicketState.IN_SERVICE,
+          counterId: 'counter-1',
+          operatorId: 'op-9',
+        })
+        .mockResolvedValueOnce({
+          ...ticketBase,
+          state: TicketState.FINISHED,
+          counterId: 'counter-1',
+        })
       tx.ticket.updateMany.mockResolvedValue({ count: 0 })
 
       const result = await service.completeService('ticket-1', {})
@@ -866,7 +952,11 @@ describe('TicketService', () => {
       expect(tx.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ eventType: 'ticket_paused' }),
       })
-      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.paused', expect.objectContaining({ ticketId: 'ticket-1' }))
+      expect(panel.emitToER).toHaveBeenCalledWith(
+        'er-1',
+        'ticket.paused',
+        expect.objectContaining({ ticketId: 'ticket-1' }),
+      )
       expect(result.state).toBe(TicketState.PAUSED)
       expect(result.pauseTimeoutSeconds).toBe(300)
     })
@@ -918,7 +1008,9 @@ describe('TicketService', () => {
           pausedSeconds: expect.objectContaining({ increment: expect.any(Number) }),
         }),
       })
-      const updateCall = tx.ticket.updateMany.mock.calls[0][0] as { data: { pausedSeconds: { increment: number } } }
+      const updateCall = tx.ticket.updateMany.mock.calls[0][0] as {
+        data: { pausedSeconds: { increment: number } }
+      }
       expect(updateCall.data).not.toHaveProperty('queuePosition')
       expect(updateCall.data).not.toHaveProperty('code')
       expect(updateCall.data.pausedSeconds.increment).toBeGreaterThanOrEqual(110)
@@ -929,7 +1021,11 @@ describe('TicketService', () => {
           metadata: expect.objectContaining({ inPlace: true, pausedSeconds: expect.any(Number) }),
         }),
       })
-      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.created', expect.objectContaining({ ticketId: 'ticket-1' }))
+      expect(panel.emitToER).toHaveBeenCalledWith(
+        'er-1',
+        'ticket.created',
+        expect.objectContaining({ ticketId: 'ticket-1' }),
+      )
       expect(result.state).toBe(TicketState.WAITING)
       expect(result.code).toBe('A001')
       expect(result.queuePosition).toBe(1)
@@ -955,7 +1051,9 @@ describe('TicketService', () => {
 
       await service.resumeTicket('ticket-1', 'rep-1')
 
-      const updateCall = tx.ticket.updateMany.mock.calls[0][0] as { data: { pausedSeconds: { increment: number } } }
+      const updateCall = tx.ticket.updateMany.mock.calls[0][0] as {
+        data: { pausedSeconds: { increment: number } }
+      }
       expect(updateCall.data.pausedSeconds.increment).toBe(0)
     })
 
@@ -991,7 +1089,11 @@ describe('TicketService', () => {
 
       expect(tx.ticket.updateMany).toHaveBeenCalledWith({
         where: { id: 'ticket-1', state: TicketState.WAITING },
-        data: expect.objectContaining({ state: TicketState.PAUSED, counterId: null, operatorId: null }),
+        data: expect.objectContaining({
+          state: TicketState.PAUSED,
+          counterId: null,
+          operatorId: null,
+        }),
       })
       expect(tx.counter.updateMany).not.toHaveBeenCalled()
       expect(tx.auditEvent.create).toHaveBeenCalledWith({
@@ -1001,7 +1103,11 @@ describe('TicketService', () => {
           metadata: expect.objectContaining({ byStaff: true, fromState: TicketState.WAITING }),
         }),
       })
-      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.paused', expect.objectContaining({ ticketId: 'ticket-1' }))
+      expect(panel.emitToER).toHaveBeenCalledWith(
+        'er-1',
+        'ticket.paused',
+        expect.objectContaining({ ticketId: 'ticket-1' }),
+      )
       expect(result.state).toBe(TicketState.PAUSED)
       expect(result.pauseTimeoutSeconds).toBe(300)
     })
@@ -1071,18 +1177,28 @@ describe('TicketService', () => {
 
     it('rejects pausing a ticket that is not waiting/calling/in-service', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.FINISHED })
-      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(
+        BadRequestException,
+      )
     })
 
     it('rejects an operator from another ER', async () => {
-      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING, erId: 'er-2' })
-      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(ForbiddenException)
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.WAITING,
+        erId: 'er-2',
+      })
+      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(
+        ForbiddenException,
+      )
     })
 
     it('rejects an operator whose counter is paused or absent (no active counter)', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
       prisma.counter.findFirst.mockResolvedValue(null)
-      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(
+        BadRequestException,
+      )
     })
 
     it('rejects pausing a ticket parked at another operator counter', async () => {
@@ -1092,7 +1208,9 @@ describe('TicketService', () => {
         counterId: 'counter-2',
       })
       prisma.counter.findFirst.mockResolvedValue({ id: 'counter-1' })
-      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(ForbiddenException)
+      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(
+        ForbiddenException,
+      )
     })
 
     it('lets a MANAGER pause a ticket parked at another operator counter (cross-counter)', async () => {
@@ -1124,7 +1242,9 @@ describe('TicketService', () => {
     it('rejects pausing when the daily operation is closed', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
       prisma.eR.findUnique.mockResolvedValue({ isDayOpen: false })
-      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(
+        BadRequestException,
+      )
     })
 
     it('lets an ADMIN pause without owning a counter', async () => {
@@ -1146,7 +1266,9 @@ describe('TicketService', () => {
     it('rejects staff-pause when the ticket already moved (CAS finds no row)', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
       tx.ticket.updateMany.mockResolvedValue({ count: 0 })
-      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+      await expect(service.staffPauseTicket('ticket-1', operator)).rejects.toThrow(
+        BadRequestException,
+      )
     })
   })
 
@@ -1178,7 +1300,11 @@ describe('TicketService', () => {
           metadata: expect.objectContaining({ byStaff: true, inPlace: true }),
         }),
       })
-      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.created', expect.objectContaining({ ticketId: 'ticket-1' }))
+      expect(panel.emitToER).toHaveBeenCalledWith(
+        'er-1',
+        'ticket.created',
+        expect.objectContaining({ ticketId: 'ticket-1' }),
+      )
       expect(result.state).toBe(TicketState.WAITING)
       expect(result.queuePosition).toBe(1)
     })
@@ -1262,25 +1388,37 @@ describe('TicketService', () => {
 
     it('rejects resuming a ticket that is not paused', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.WAITING })
-      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(
+        BadRequestException,
+      )
     })
 
     it('rejects an operator from another ER', async () => {
-      prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED, erId: 'er-2' })
-      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(ForbiddenException)
+      prisma.ticket.findUnique.mockResolvedValue({
+        ...ticketBase,
+        state: TicketState.PAUSED,
+        erId: 'er-2',
+      })
+      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(
+        ForbiddenException,
+      )
     })
 
     it('rejects resuming when the daily operation is closed', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED })
       prisma.eR.findUnique.mockResolvedValue({ isDayOpen: false })
-      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(
+        BadRequestException,
+      )
     })
 
     it('rejects an operator without an active counter', async () => {
       prisma.ticket.findUnique.mockResolvedValue({ ...ticketBase, state: TicketState.PAUSED })
       prisma.eR.findUnique.mockResolvedValue({ isDayOpen: true })
       prisma.counter.findFirst.mockResolvedValue(null)
-      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(BadRequestException)
+      await expect(service.staffResumeTicket('ticket-1', operator)).rejects.toThrow(
+        BadRequestException,
+      )
     })
   })
 
@@ -1302,7 +1440,11 @@ describe('TicketService', () => {
 
       // CAS exige o valor oposto (isPriority: false) para não reaplicar às cegas.
       expect(tx.ticket.updateMany).toHaveBeenCalledWith({
-        where: { id: 'ticket-1', state: { in: [TicketState.WAITING, TicketState.PAUSED] }, isPriority: false },
+        where: {
+          id: 'ticket-1',
+          state: { in: [TicketState.WAITING, TicketState.PAUSED] },
+          isPriority: false,
+        },
         data: { isPriority: true },
       })
       expect(tx.auditEvent.create).toHaveBeenCalledWith({
@@ -1335,7 +1477,11 @@ describe('TicketService', () => {
       await service.setTicketPriority('ticket-1', false, operator)
 
       expect(tx.ticket.updateMany).toHaveBeenCalledWith({
-        where: { id: 'ticket-1', state: { in: [TicketState.WAITING, TicketState.PAUSED] }, isPriority: true },
+        where: {
+          id: 'ticket-1',
+          state: { in: [TicketState.WAITING, TicketState.PAUSED] },
+          isPriority: true,
+        },
         data: { isPriority: false },
       })
       expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.priority_changed', {
@@ -1451,7 +1597,11 @@ describe('TicketService', () => {
           metadata: expect.objectContaining({ selfCancelled: true }),
         }),
       })
-      expect(panel.emitToER).toHaveBeenCalledWith('er-1', 'ticket.cancelled', expect.objectContaining({ ticketId: 'ticket-1' }))
+      expect(panel.emitToER).toHaveBeenCalledWith(
+        'er-1',
+        'ticket.cancelled',
+        expect.objectContaining({ ticketId: 'ticket-1' }),
+      )
       expect(result.state).toBe(TicketState.CANCELLED)
     })
 
@@ -1522,7 +1672,9 @@ describe('TicketService', () => {
     it('throws NotFound when cancelling a ticket that does not exist', async () => {
       tx.ticket.findUnique.mockResolvedValue(null)
 
-      await expect(service.cancel('ghost', 'motivo', manager)).rejects.toThrow('Senha não encontrada')
+      await expect(service.cancel('ghost', 'motivo', manager)).rejects.toThrow(
+        'Senha não encontrada',
+      )
     })
 
     it('rejects cancelling a ticket that is no longer active', async () => {
@@ -1545,7 +1697,9 @@ describe('TicketService', () => {
       Object.setPrototypeOf(conflict, Prisma.PrismaClientKnownRequestError.prototype)
       tx.ticket.updateMany.mockRejectedValue(conflict)
 
-      await expect(service.restore('ticket-1', 'voltou', manager)).rejects.toThrow(ConflictException)
+      await expect(service.restore('ticket-1', 'voltou', manager)).rejects.toThrow(
+        ConflictException,
+      )
     })
 
     it('rejects startService for a non-operator', async () => {
@@ -2029,17 +2183,11 @@ describe('TicketService', () => {
         'ticket.created',
         expect.objectContaining({ ticketId: 'ticket-1' }),
       )
-      expect(panel.emitToER).not.toHaveBeenCalledWith(
-        'er-1',
-        'ticket.cancelled',
-        expect.anything(),
-      )
+      expect(panel.emitToER).not.toHaveBeenCalledWith('er-1', 'ticket.cancelled', expect.anything())
     })
 
     it('leaves paused tickets still within the tolerance untouched', async () => {
-      prisma.ticket.findMany.mockResolvedValue([
-        { ...stale, pausedAt: new Date() },
-      ])
+      prisma.ticket.findMany.mockResolvedValue([{ ...stale, pausedAt: new Date() }])
 
       await service.expireStalePauses()
 

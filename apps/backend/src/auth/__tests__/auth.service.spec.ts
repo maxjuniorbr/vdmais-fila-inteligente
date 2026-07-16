@@ -251,9 +251,9 @@ describe('AuthService', () => {
     })
 
     it('rejects an incomplete queue entry context', async () => {
-      await expect(
-        service.register({ ...registerDto, entryChannel: undefined }),
-      ).rejects.toThrow(UnauthorizedException)
+      await expect(service.register({ ...registerDto, entryChannel: undefined })).rejects.toThrow(
+        UnauthorizedException,
+      )
     })
 
     it('expires the representative session at the end of the business day', async () => {
@@ -317,7 +317,7 @@ describe('AuthService', () => {
     const guestEntryDto = {
       firstName: ' Ana ',
       lastName: ' de  Souza ',
-      phone: '11999990000',
+      cpf: '52998224725',
       erId: 'er-1',
       entryChannel: EntryChannel.QR_CODE,
       entryToken: 'entry-token',
@@ -337,7 +337,7 @@ describe('AuthService', () => {
         data: {
           kind: RepresentativeKind.GUEST,
           fullName: 'Ana de Souza',
-          phone: '11999990000',
+          cpf: '52998224725',
         },
       })
       expect(jwt.sign).toHaveBeenCalledWith(
@@ -360,7 +360,7 @@ describe('AuthService', () => {
       expect(result.access_token).toBe('signed-token')
     })
 
-    it('reuses the guest matched by phone and refreshes the name', async () => {
+    it('reuses the guest matched by CPF and refreshes the name', async () => {
       prisma.representative.findUnique.mockResolvedValue({
         id: 'guest-1',
         kind: RepresentativeKind.GUEST,
@@ -391,7 +391,7 @@ describe('AuthService', () => {
       expect(result.access_token).toBe('signed-token')
     })
 
-    it('rejects a registered representative phone without assuming her identity', async () => {
+    it('rejects a registered representative CPF without assuming her identity', async () => {
       prisma.representative.findUnique.mockResolvedValue({
         id: 're-9',
         kind: RepresentativeKind.REGISTERED,
@@ -401,7 +401,7 @@ describe('AuthService', () => {
       const error = (await service.guestEntry(guestEntryDto).catch((e: Error) => e)) as Error
 
       expect(error).toBeInstanceOf(ConflictException)
-      // The conflict must not leak who owns the phone.
+      // The conflict must not leak who owns the CPF.
       expect(error.message).not.toContain('Maria')
       expect(jwt.sign).not.toHaveBeenCalled()
     })
@@ -428,14 +428,12 @@ describe('AuthService', () => {
       expect(prisma.representative.create).not.toHaveBeenCalled()
     })
 
-    it('recovers from a same-phone create race by reusing the winner', async () => {
-      prisma.representative.findUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
-          id: 'guest-1',
-          kind: RepresentativeKind.GUEST,
-          fullName: 'Ana de Souza',
-        })
+    it('recovers from a same-CPF create race by reusing the winner', async () => {
+      prisma.representative.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 'guest-1',
+        kind: RepresentativeKind.GUEST,
+        fullName: 'Ana de Souza',
+      })
       prisma.representative.create.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError('dup', {
           code: 'P2002',
@@ -485,11 +483,7 @@ describe('AuthService', () => {
         entryChannel: EntryChannel.LINK,
       })
 
-      expect(queueEntryTokens.verify).toHaveBeenCalledWith(
-        'entry-token',
-        'er-1',
-        EntryChannel.LINK,
-      )
+      expect(queueEntryTokens.verify).toHaveBeenCalledWith('entry-token', 'er-1', EntryChannel.LINK)
       // The LINK session is day-scoped (expires at end of the business day), not
       // the global 7-day JWT default.
       expect(jwt.sign).toHaveBeenCalledWith(
@@ -666,9 +660,9 @@ describe('AuthService', () => {
 
     it('rejects an unknown operator', async () => {
       prisma.operator.findUnique.mockResolvedValue(null)
-      await expect(
-        service.staffLogin({ email: 'no@x.com', password: 'x' }),
-      ).rejects.toThrow(UnauthorizedException)
+      await expect(service.staffLogin({ email: 'no@x.com', password: 'x' })).rejects.toThrow(
+        UnauthorizedException,
+      )
       // Equalize timing: a missing operator still runs a bcrypt comparison.
       expect(mockedBcrypt.compare).toHaveBeenCalled()
     })
@@ -701,9 +695,9 @@ describe('AuthService', () => {
       })
       mockedBcrypt.compare.mockResolvedValue(false as never)
 
-      await expect(
-        service.staffLogin({ email: 'admin@x.com', password: 'wrong' }),
-      ).rejects.toThrow(UnauthorizedException)
+      await expect(service.staffLogin({ email: 'admin@x.com', password: 'wrong' })).rejects.toThrow(
+        UnauthorizedException,
+      )
       expect(auditLog.log).not.toHaveBeenCalled()
     })
 
@@ -717,9 +711,9 @@ describe('AuthService', () => {
         sessionVersion: 0,
       })
       mockedBcrypt.compare.mockResolvedValue(false as never)
-      await expect(
-        service.staffLogin({ email: 'op@x.com', password: 'wrong' }),
-      ).rejects.toThrow(UnauthorizedException)
+      await expect(service.staffLogin({ email: 'op@x.com', password: 'wrong' })).rejects.toThrow(
+        UnauthorizedException,
+      )
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'authentication_failed' }),
       )

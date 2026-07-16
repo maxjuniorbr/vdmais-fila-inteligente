@@ -9,7 +9,9 @@ const FIELD_LABELS: Record<string, string> = {
   email: 'E-mail',
   entryChannel: 'Canal de entrada',
   erId: 'ER',
+  firstName: 'Nome',
   fullName: 'Nome completo',
+  lastName: 'Sobrenome',
   name: 'Nome',
   number: 'Número do caixa',
   password: 'Senha',
@@ -21,7 +23,7 @@ const FIELD_LABELS: Record<string, string> = {
   role: 'Perfil',
 }
 
-const CUSTOM_MESSAGE_CONSTRAINTS = new Set(['isCpf', 'isNotFutureDate', 'matches'])
+const CUSTOM_MESSAGE_CONSTRAINTS = new Set(['isCleanName', 'isCpf', 'isNotFutureDate', 'matches'])
 
 function fieldLabel(property: string): string {
   return FIELD_LABELS[property] ?? property

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { TicketState } from '@prisma/client'
+import { RepresentativeKind, TicketState } from '@prisma/client'
 import { getBusinessDate } from '../common/business-date'
 import { normalizeReCode, onlyDigits } from '../common/representative-identifiers'
 import { PrismaService } from '../prisma/prisma.service'
@@ -53,7 +53,10 @@ export class IntegrationService {
     return this._present(result)
   }
 
-  private _ctx(dto: IntegrationActionDto, principal: IntegrationPrincipal): IntegrationActionContext {
+  private _ctx(
+    dto: IntegrationActionDto,
+    principal: IntegrationPrincipal,
+  ): IntegrationActionContext {
     return {
       client: principal.client,
       scopes: principal.scopes,
@@ -120,9 +123,9 @@ export class IntegrationService {
 
     const representative = await this.prisma.representative.findUnique({
       where,
-      select: { id: true },
+      select: { id: true, kind: true },
     })
-    if (!representative) {
+    if (representative?.kind !== RepresentativeKind.REGISTERED) {
       throw new NotFoundException({
         code: 'REPRESENTATIVE_NOT_FOUND',
         message: 'Revendedora não encontrada',

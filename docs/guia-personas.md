@@ -38,11 +38,21 @@ Revendedora e precisa ser atendida.
 3. **Check-in assistido:** quando está sem celular/internet, um atendente a
    coloca na fila (ver persona Atendente).
 
+> **Entrada como convidada (por ER):** quando o ER habilita esse modo, a tela de
+> entrada pede só **nome, sobrenome e CPF**, sem cadastro e sem opção de login. O CPF
+> autodeclarado identifica o registro dentro da fila — reler o QR devolve a mesma senha —
+> e é validado por dígito verificador, sem consulta externa de titularidade nesta fase;
+> sequências falsas (`111…`) são recusadas. Nomes ofensivos/de brincadeira
+> também são bloqueados. Se o CPF já pertencer a um cadastro, o sistema **avisa** e
+> oferece o login como próximo passo (única situação em que a tela de login aparece
+> nesse modo — não assume a identidade de ninguém).
+
 **Jornada passo a passo:**
 
 1. Acessa a fila pelo QR Code ou link.
-2. Faz **login** (código de RE ou CPF + senha) ou cria um **cadastro mínimo**
-   (nome, CPF, data de nascimento, telefone, código de RE).
+2. Faz **login** (código de RE ou CPF + senha), cria um **cadastro mínimo**
+   (nome, CPF, data de nascimento, telefone, código de RE) ou, se o ER permitir,
+   entra como **convidada** (nome + sobrenome + CPF).
 3. O sistema valida os dados e verifica se ela já tem senha ativa naquele ER
    (não é permitido ter duas).
 4. A senha é gerada e ela vai para a tela `/fila/:erId/senha`, que mostra:

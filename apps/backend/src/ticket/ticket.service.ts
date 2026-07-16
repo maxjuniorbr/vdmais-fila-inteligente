@@ -6,7 +6,14 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
-import { CounterState, EntryChannel, Prisma, Role, TicketState } from '@prisma/client'
+import {
+  CounterState,
+  EntryChannel,
+  Prisma,
+  RepresentativeKind,
+  Role,
+  TicketState,
+} from '@prisma/client'
 import { AuthenticatedUser } from '../common/authenticated-user'
 import { getBusinessDate } from '../common/business-date'
 import { PanelGateway } from '../panel/panel.gateway'
@@ -38,7 +45,14 @@ export interface IntegrationActionContext {
 }
 
 export interface IntegrationActionResult {
-  ticket: { id: string; code: string; erId: string; state: TicketState; serviceStartedAt: Date | null; serviceFinishedAt: Date | null }
+  ticket: {
+    id: string
+    code: string
+    erId: string
+    state: TicketState
+    serviceStartedAt: Date | null
+    serviceFinishedAt: Date | null
+  }
   idempotent: boolean
 }
 
@@ -73,11 +87,19 @@ export class TicketService {
           tx.eR.findUnique({ where: { id: dto.erId } }),
           tx.representative.findUnique({
             where: { id: representativeId },
-            select: { id: true, fullName: true },
+            select: { id: true, fullName: true, kind: true },
           }),
         ])
         if (!er) throw new NotFoundException('ER não encontrado')
-        if (!representative) throw new NotFoundException('Representante não encontrada')
+        // A convidada autenticada entra na própria fila pelo mesmo papel
+        // REPRESENTATIVE. O kind só deve barrar o fluxo assistido: atendentes não
+        // podem selecionar registros leves de convidadas como se fossem cadastros.
+        if (
+          !representative ||
+          (checkinAttendantId && representative.kind !== RepresentativeKind.REGISTERED)
+        ) {
+          throw new NotFoundException('Representante não encontrada')
+        }
         if (!er.isDayOpen) {
           throw new BadRequestException('A operação do ER está encerrada hoje')
         }
@@ -544,10 +566,16 @@ export class TicketService {
       return { ticket, idempotent: true }
     }
     if (ticket.state === TicketState.WAITING || ticket.state === TicketState.PAUSED) {
-      throw new ConflictException({ code: 'TICKET_NOT_CALLED', message: 'A senha ainda não foi chamada' })
+      throw new ConflictException({
+        code: 'TICKET_NOT_CALLED',
+        message: 'A senha ainda não foi chamada',
+      })
     }
     if (ticket.state !== TicketState.CALLING) {
-      throw new ConflictException({ code: 'TICKET_ALREADY_CLOSED', message: 'A senha já foi encerrada' })
+      throw new ConflictException({
+        code: 'TICKET_ALREADY_CLOSED',
+        message: 'A senha já foi encerrada',
+      })
     }
     try {
       const updated = await this._transitionToInService(ticket, { source: 'integration', ...ctx })
@@ -576,7 +604,10 @@ export class TicketService {
       })
     }
     if (ticket.state !== TicketState.IN_SERVICE) {
-      throw new ConflictException({ code: 'TICKET_ALREADY_CLOSED', message: 'A senha já foi encerrada' })
+      throw new ConflictException({
+        code: 'TICKET_ALREADY_CLOSED',
+        message: 'A senha já foi encerrada',
+      })
     }
     try {
       const updated = await this._transitionToFinished(ticket, { source: 'integration', ...ctx })
@@ -875,7 +906,9 @@ export class TicketService {
     })
 
     for (const ticket of candidates) {
-      if (this._isPauseExpired(TicketState.PAUSED, ticket.pausedAt, ticket.er.pauseTimeoutSeconds)) {
+      if (
+        this._isPauseExpired(TicketState.PAUSED, ticket.pausedAt, ticket.er.pauseTimeoutSeconds)
+      ) {
         await this._expirePause(ticket)
       }
     }
@@ -1287,7 +1320,9 @@ export class TicketService {
         data: { state: TicketState.NO_SHOW, noShowAt: now },
       })
       if (result.count !== 1) {
-        throw new BadRequestException('A senha deve estar em chamada para registrar não comparecimento')
+        throw new BadRequestException(
+          'A senha deve estar em chamada para registrar não comparecimento',
+        )
       }
 
       await tx.counter.update({
@@ -1315,7 +1350,10 @@ export class TicketService {
     opts: ServiceTransitionOptions,
   ) {
     if (!ticket.counterId) {
-      throw new ConflictException({ code: 'TICKET_NOT_CALLED', message: 'A senha ainda não foi chamada' })
+      throw new ConflictException({
+        code: 'TICKET_NOT_CALLED',
+        message: 'A senha ainda não foi chamada',
+      })
     }
     const counterId = ticket.counterId
     const now = new Date()
@@ -1363,7 +1401,10 @@ export class TicketService {
     opts: ServiceTransitionOptions,
   ) {
     if (!ticket.counterId) {
-      throw new ConflictException({ code: 'TICKET_NOT_IN_SERVICE', message: 'A senha não está em atendimento' })
+      throw new ConflictException({
+        code: 'TICKET_NOT_IN_SERVICE',
+        message: 'A senha não está em atendimento',
+      })
     }
     const counterId = ticket.counterId
     const now = new Date()

@@ -149,7 +149,7 @@ export class AuthService {
     }
 
     const fullName = `${dto.firstName} ${dto.lastName}`.trim().replace(/\s+/g, ' ')
-    const guest = await this._resolveGuest(fullName, onlyDigits(dto.phone))
+    const guest = await this._resolveGuest(fullName, onlyDigits(dto.cpf))
 
     await this.auditLog.logIfERExists({
       eventType: 'queue_entry_started',
@@ -169,19 +169,21 @@ export class AuthService {
     )
   }
 
-  // The phone is the guest's identity: same phone → same person → same record
-  // (and therefore the same active ticket via the per-representative dedup).
-  private async _resolveGuest(fullName: string, phone: string): Promise<{ id: string }> {
-    const existing = await this.prisma.representative.findUnique({ where: { phone } })
+  // The CPF is the guest's identity: same CPF → same person → same record (and
+  // therefore the same active ticket via the per-representative dedup).
+  private async _resolveGuest(fullName: string, cpf: string): Promise<{ id: string }> {
+    const existing = await this.prisma.representative.findUnique({ where: { cpf } })
     if (existing) {
       if (existing.kind !== RepresentativeKind.GUEST) {
-        // Typing a registered RE's phone must not assume her identity nor leak
-        // her name; her path is the password login.
+        // Typing a registered RE's CPF must not assume her identity nor leak her
+        // name; her path is the password login.
+        // Keep the public response generic: the QR/token is shareable and the
+        // endpoint must not become a CPF-account enumeration oracle.
         throw new ConflictException(
-          'Este telefone pertence a um cadastro. Entre com CPF ou código de RE e senha.',
+          'Não foi possível entrar como convidada. Entre com CPF ou código de RE e senha.',
         )
       }
-      // Same phone is the same person; refreshing the name lets a re-scan fix a typo.
+      // Same CPF is the same person; refreshing the name lets a re-scan fix a typo.
       if (existing.fullName !== fullName) {
         return this.prisma.representative.update({
           where: { id: existing.id },
@@ -193,12 +195,12 @@ export class AuthService {
 
     try {
       return await this.prisma.representative.create({
-        data: { kind: RepresentativeKind.GUEST, fullName, phone },
+        data: { kind: RepresentativeKind.GUEST, fullName, cpf },
       })
     } catch (error) {
-      // Two first entries racing on the same phone: the loser reuses the winner's record.
+      // Two first entries racing on the same CPF: the loser reuses the winner's record.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return this._resolveGuest(fullName, phone)
+        return this._resolveGuest(fullName, cpf)
       }
       throw error
     }
@@ -305,7 +307,13 @@ export class AuthService {
       })
     }
 
-    return this._sign(operator.id, operator.role, operator.erId ?? undefined, operator.name, operator.sessionVersion)
+    return this._sign(
+      operator.id,
+      operator.role,
+      operator.erId ?? undefined,
+      operator.name,
+      operator.sessionVersion,
+    )
   }
 
   private async _recordAuthenticationFailure(

@@ -42,7 +42,7 @@ id                       id
 kind: REGISTERED|GUEST   name
 fullName                 email (unique)
 cpf? (unique)            passwordHash
-phone (unique)           role: OPERATOR|ATTENDANT|MANAGER|ADMIN
+phone? (unique)          role: OPERATOR|ATTENDANT|MANAGER|ADMIN
 birthDate?               sessionVersion
 reCode? (unique)         erId? (null para ADMIN)
 passwordHash?            counter? (1:1)
@@ -86,11 +86,23 @@ ticketId? / representativeId? / operatorId?
 metadata (JSON) / createdAt
 ```
 
-> Convidada (`kind: GUEST`): entra na fila só com nome + telefone (via
-> `POST /auth/guest-entry`, habilitado por ER em `guestEntryEnabled`). O telefone —
-> único e obrigatório — é a identidade dela: reler o QR com o mesmo número devolve a
-> mesma senha ativa. CPF, nascimento, código de RE e senha ficam nulos; convidada não
-> faz login por senha.
+> Convidada (`kind: GUEST`): entra na fila só com nome + **CPF** (via
+> `POST /auth/guest-entry`, habilitado por ER em `guestEntryEnabled`). O CPF —
+> único e validado por dígito verificador — é a identidade dela: reler o QR com o
+> mesmo CPF devolve a mesma senha ativa. Telefone, nascimento, código de RE e senha
+> ficam nulos; convidada não faz login por senha.
+
+> **Autorização da convidada:** o endpoint emite uma sessão curta com papel
+> `REPRESENTATIVE` e contexto do ER/canal de entrada, para que a própria `GUEST` possa
+> criar, acompanhar e gerenciar sua senha. Registros `GUEST` não aparecem na busca do
+> check-in assistido e não são aceitos nesse canal nem nas integrações corporativas;
+> essas operações exigem `kind: REGISTERED`.
+
+> **Decisão temporária:** nesta fase o CPF é autodeclarado e seu dígito verificador
+> valida apenas a estrutura, não a titularidade. O fluxo é uma exceção opt-in para
+> eventos controlados de franqueados, não um novo login permanente. Antes de ampliar
+> seu uso, validar o CPF em fonte autorizada ou desabilitar a modalidade — ver
+> [DT-21](./debitos-tecnicos.md#dt-21--cpf-autodeclarado-na-entrada-temporária-de-convidada).
 
 ---
 
@@ -145,7 +157,7 @@ Tokens de entrada na fila (QR Code / link) trafegam no header `x-entry-token` e 
 |---|---|---|---|---|
 | `POST` | `/auth/register` | Público | 20/min por IP (`THROTTLE_REGISTER_PER_MINUTE`) | Cadastro de RE |
 | `POST` | `/auth/login` | Público | 40/min por IP (`THROTTLE_LOGIN_PER_MINUTE`) + trava por credencial | Login de RE |
-| `POST` | `/auth/guest-entry` | Público | 20/min por IP (`THROTTLE_GUEST_ENTRY_PER_MINUTE`) | Entrada de convidada (nome + sobrenome + telefone; exige token de entrada e `guestEntryEnabled` no ER) |
+| `POST` | `/auth/guest-entry` | Público | 20/min por IP (`THROTTLE_GUEST_ENTRY_PER_MINUTE`) | Entrada de convidada (nome + sobrenome + **CPF** válido — `IsCpf` rejeita dígito verificador inválido e sequências como `111…`; nomes passam por `IsCleanName`; exige token de entrada e `guestEntryEnabled` no ER). CPF de RE cadastrada → `409` |
 | `POST` | `/auth/staff-login` | Público | 20/min por IP + trava por credencial | Login da equipe |
 | `POST` | `/representatives` | ATTENDANT, MANAGER | — | Criar RE manualmente |
 | `GET` | `/representatives/search?q=` | ATTENDANT, MANAGER | — | Buscar REs por nome/CPF/código |

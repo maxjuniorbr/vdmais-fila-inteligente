@@ -1,20 +1,24 @@
 import { EntryChannel } from '@prisma/client'
-import { IsEnum, IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator'
+import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator'
+import { IsCpf } from '../validators/is-cpf.validator'
+import { IsCleanName } from '../validators/is-clean-name.validator'
 
 export class GuestEntryDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(70)
+  @IsCleanName()
   firstName!: string
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(70)
+  @IsCleanName()
   lastName!: string
 
   @IsString()
-  @Matches(/^\d{10,11}$/, { message: 'O telefone deve ter 10 ou 11 dígitos' })
-  phone!: string
+  @IsCpf()
+  cpf!: string
 
   @IsString()
   @IsNotEmpty()

@@ -172,7 +172,15 @@ Formulação correta:
 1. RE chega ao ER.
 2. RE escaneia o QR Code da unidade.
 3. Sistema abre a página/app da fila daquele ER.
-4. RE faz login ou cria cadastro mínimo.
+4. RE faz login ou cria cadastro mínimo. **Quando o ER habilita a entrada de
+   convidada (`guestEntryEnabled`), o único caminho exibido é informar nome,
+   sobrenome e CPF** — o CPF identifica a convidada (releitura do QR devolve a mesma
+   senha) e não se pede login/cadastro. O CPF é validado por dígito verificador, o
+   que rejeita sequências falsas (`111…`) e garante unicidade técnica para o valor
+   informado, sem comprovar titularidade nesta fase. Se o CPF já pertencer a um
+   cadastro, o sistema **avisa** e oferece o login como próximo
+   passo explícito (única situação em que essa tela aparece nesse modo — não assume a
+   identidade de ninguém).
 5. Sistema valida dados básicos.
 6. Sistema verifica se já existe senha ativa para aquela RE naquele ER.
 7. Sistema cria a senha.

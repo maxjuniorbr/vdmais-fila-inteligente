@@ -1,13 +1,14 @@
 import { Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common'
+import { RepresentativeKind } from '@prisma/client'
+import { AuthenticatedUser } from '../common/authenticated-user'
+import { Roles } from '../common/decorators/roles.decorator'
 import { PrismaService } from '../prisma/prisma.service'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
-import { Roles } from '../common/decorators/roles.decorator'
 import { maskCpf, maskPhone } from '../common/pii-mask'
 import { normalizeReCode, onlyDigits } from '../common/representative-identifiers'
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
-import { AuthenticatedUser } from '../common/authenticated-user'
 
 @Controller('representatives')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -45,6 +46,7 @@ export class RepresentativeController {
       where: {
         AND: [
           { OR: [{ cpf: digits }, { phone: digits }, { reCode: normalizeReCode(term) }] },
+          { kind: RepresentativeKind.REGISTERED },
           { tickets: { some: { erId } } },
         ],
       },

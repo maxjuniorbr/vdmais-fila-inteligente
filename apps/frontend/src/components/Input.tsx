@@ -1,4 +1,5 @@
 import type { CSSProperties, InputHTMLAttributes } from 'react'
+import { forwardRef } from 'react'
 import { layout } from '../styles/layout'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -6,15 +7,18 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   containerStyle?: CSSProperties
 }
 
-export function Input({ label, containerStyle, style, className, ...rest }: Readonly<InputProps>) {
+export const Input = forwardRef<HTMLInputElement, Readonly<InputProps>>(function Input(
+  { label, containerStyle, style, className, ...rest },
+  ref,
+) {
   const cls = ['gb-control', className].filter(Boolean).join(' ')
   if (label) {
     return (
       <label style={{ ...layout.formLabel, ...containerStyle }}>
         {label}
-        <input className={cls} style={{ ...layout.formInput, ...style }} {...rest} />
+        <input ref={ref} className={cls} style={{ ...layout.formInput, ...style }} {...rest} />
       </label>
     )
   }
-  return <input className={cls} style={{ ...layout.formInput, ...style }} {...rest} />
-}
+  return <input ref={ref} className={cls} style={{ ...layout.formInput, ...style }} {...rest} />
+})

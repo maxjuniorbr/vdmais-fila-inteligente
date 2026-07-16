@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module'
 import { validationExceptionFactory } from '../src/common/validation-exception.factory'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { QueueEntryTokenService } from '../src/auth/queue-entry-token.service'
+import { calculateCpfCheckDigit } from '../src/auth/validators/is-cpf.validator'
 
 describe('Guest entry by QR (e2e)', () => {
   let app: INestApplication
@@ -18,9 +19,17 @@ describe('Guest entry by QR (e2e)', () => {
   let firstTicketCode: string
 
   const suffix = Date.now()
-  const guestPhone = `118${String(suffix).slice(-8)}`
-  const sameNamePhone = `117${String(suffix).slice(-8)}`
-  const registeredPhone = `116${String(suffix).slice(-8)}`
+  // Build valid CPFs (correct check digits) so the DTO accepts them and the tests
+  // exercise identity/conflict logic, not format rejection.
+  const makeCpf = (base9: string) => {
+    const d1 = calculateCpfCheckDigit(base9, 9)
+    const d2 = calculateCpfCheckDigit(`${base9}${d1}`, 10)
+    return `${base9}${d1}${d2}`
+  }
+  const tail = String(suffix).slice(-8)
+  const guestCpf = makeCpf(`1${tail}`)
+  const sameNameCpf = makeCpf(`2${tail}`)
+  const registeredCpf = makeCpf(`3${tail}`)
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -62,8 +71,7 @@ describe('Guest entry by QR (e2e)', () => {
     await prisma.representative.create({
       data: {
         fullName: 'Maria Cadastrada E2E',
-        cpf: String(suffix).slice(-11).padStart(11, '0'),
-        phone: registeredPhone,
+        cpf: registeredCpf,
         birthDate: new Date('1990-01-01'),
         reCode: `E2E_GUEST_${suffix}`,
         passwordHash: 'not-used-in-this-spec',
@@ -80,7 +88,7 @@ describe('Guest entry by QR (e2e)', () => {
       await prisma.eR.deleteMany({ where: { id: { in: erIds } } })
     }
     await prisma.representative.deleteMany({
-      where: { phone: { in: [guestPhone, sameNamePhone, registeredPhone] } },
+      where: { cpf: { in: [guestCpf, sameNameCpf, registeredCpf] } },
     })
     await app.close()
   })
@@ -91,11 +99,11 @@ describe('Guest entry by QR (e2e)', () => {
       .send({ erId, entryChannel: EntryChannel.QR_CODE, entryToken: qrEntryToken, ...payload })
   }
 
-  it('joins the queue with name and phone only', async () => {
+  it('joins the queue with name and CPF only', async () => {
     const entry = await guestEntry({
       firstName: 'Ana',
       lastName: 'Silva',
-      phone: guestPhone,
+      cpf: guestCpf,
     }).expect(200)
     expect(entry.body.user.role).toBe('REPRESENTATIVE')
     const token = entry.body.access_token as string
@@ -114,17 +122,17 @@ describe('Guest entry by QR (e2e)', () => {
     expect(status.body.code).toBe(firstTicketCode)
     expect(status.body.state).toBe(TicketState.WAITING)
 
-    const guest = await prisma.representative.findUnique({ where: { phone: guestPhone } })
+    const guest = await prisma.representative.findUnique({ where: { cpf: guestCpf } })
     expect(guest?.kind).toBe(RepresentativeKind.GUEST)
-    expect(guest?.cpf).toBeNull()
+    expect(guest?.phone).toBeNull()
     expect(guest?.passwordHash).toBeNull()
   })
 
-  it('recognizes a re-scan by phone: same ticket back, name typo fixed', async () => {
+  it('recognizes a re-scan by CPF: same ticket back, name typo fixed', async () => {
     const reEntry = await guestEntry({
       firstName: 'Anna',
       lastName: 'Silva',
-      phone: guestPhone,
+      cpf: guestCpf,
     }).expect(200)
     const token = reEntry.body.access_token as string
 
@@ -140,15 +148,15 @@ describe('Guest entry by QR (e2e)', () => {
       .expect(200)
     expect(status.body.code).toBe(firstTicketCode)
 
-    const guest = await prisma.representative.findUnique({ where: { phone: guestPhone } })
+    const guest = await prisma.representative.findUnique({ where: { cpf: guestCpf } })
     expect(guest?.fullName).toBe('Anna Silva')
   })
 
-  it('keeps guests with the same name apart by phone', async () => {
+  it('keeps guests with the same name apart by CPF', async () => {
     const entry = await guestEntry({
       firstName: 'Anna',
       lastName: 'Silva',
-      phone: sameNamePhone,
+      cpf: sameNameCpf,
     }).expect(200)
     const token = entry.body.access_token as string
 
@@ -160,11 +168,11 @@ describe('Guest entry by QR (e2e)', () => {
     expect(created.body.code).not.toBe(firstTicketCode)
   })
 
-  it('rejects a registered phone with a login hint and no identity leak', async () => {
+  it('rejects a registered CPF with a login hint and no identity leak', async () => {
     const response = await guestEntry({
       firstName: 'Outra',
       lastName: 'Pessoa',
-      phone: registeredPhone,
+      cpf: registeredCpf,
     }).expect(409)
     expect(JSON.stringify(response.body)).not.toContain('Maria')
   })
@@ -178,7 +186,7 @@ describe('Guest entry by QR (e2e)', () => {
         entryToken: noGuestEntryToken,
         firstName: 'Ana',
         lastName: 'Silva',
-        phone: sameNamePhone,
+        cpf: sameNameCpf,
       })
       .expect(403)
   })
@@ -187,20 +195,28 @@ describe('Guest entry by QR (e2e)', () => {
     await guestEntry({
       firstName: 'Ana',
       lastName: 'Silva',
-      phone: sameNamePhone,
+      cpf: sameNameCpf,
       entryToken: noGuestEntryToken,
     }).expect(401)
   })
 
-  it('rejects an invalid phone', async () => {
-    await guestEntry({ firstName: 'Ana', lastName: 'Silva', phone: '11abc' }).expect(400)
+  it('rejects an invalid CPF (bad check digit)', async () => {
+    await guestEntry({ firstName: 'Ana', lastName: 'Silva', cpf: '12345678900' }).expect(400)
   })
 
-  it('does not let a guest log in with the phone as credential', async () => {
+  it('rejects a junk repeated-digit CPF', async () => {
+    await guestEntry({ firstName: 'Ana', lastName: 'Silva', cpf: '11111111111' }).expect(400)
+  })
+
+  it('rejects an offensive guest name', async () => {
+    await guestEntry({ firstName: 'Caralho', lastName: 'Silva', cpf: sameNameCpf }).expect(400)
+  })
+
+  it('does not let a guest log in with the CPF as credential', async () => {
     await request(app.getHttpServer())
       .post('/auth/login')
       .send({
-        credential: guestPhone,
+        credential: guestCpf,
         password: 'qualquer-senha',
         erId,
         entryChannel: EntryChannel.QR_CODE,

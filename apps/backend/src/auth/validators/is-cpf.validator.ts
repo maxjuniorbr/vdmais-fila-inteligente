@@ -1,13 +1,16 @@
 import { registerDecorator, ValidationOptions } from 'class-validator'
 
-function hasValidCheckDigit(cpf: string, length: number): boolean {
+export function calculateCpfCheckDigit(cpf: string, length: number): number {
   const sum = cpf
     .slice(0, length)
     .split('')
     .reduce((total, digit, index) => total + Number(digit) * (length + 1 - index), 0)
   const remainder = (sum * 10) % 11
-  const expected = remainder === 10 ? 0 : remainder
-  return expected === Number(cpf[length])
+  return remainder === 10 ? 0 : remainder
+}
+
+function hasValidCheckDigit(cpf: string, length: number): boolean {
+  return calculateCpfCheckDigit(cpf, length) === Number(cpf[length])
 }
 
 export function isValidCpf(value: string): boolean {

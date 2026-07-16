@@ -120,10 +120,17 @@ const erDetail = {
   isDayOpen: true,
   pauseTimeoutSeconds: 300,
   callTimeoutSeconds: 600,
+  guestEntryEnabled: false,
   createdAt: '2026-01-01T12:00:00.000Z',
   counters: [{ id: 'c1', number: 1, state: 'UNAVAILABLE', _count: { tickets: 0 } }],
   operators: [
-    { id: 'o1', name: 'Operadora 1', email: 'op1@x.com', role: 'OPERATOR', createdAt: '2026-01-01T12:00:00.000Z' },
+    {
+      id: 'o1',
+      name: 'Operadora 1',
+      email: 'op1@x.com',
+      role: 'OPERATOR',
+      createdAt: '2026-01-01T12:00:00.000Z',
+    },
   ],
   hasPanelToken: false,
   entryAccess: {
@@ -145,6 +152,7 @@ const erSummary = {
   isDayOpen: true,
   pauseTimeoutSeconds: 300,
   callTimeoutSeconds: 600,
+  guestEntryEnabled: false,
   createdAt: '2026-01-01T12:00:00.000Z',
   _count: { counters: 1, operators: 1 },
 }
@@ -170,9 +178,10 @@ describe('AdminPage — ER management', () => {
   it('opens the management panel with access links, counters and team', async () => {
     await openManagement()
     expect(screen.getByText('QR Code presencial')).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: 'Testar entrada (abre em nova aba)' }),
-    ).toHaveAttribute('href', expect.stringMatching(/\/fila\/er-1#entry=qr-entry-token$/))
+    expect(screen.getByRole('link', { name: 'Testar entrada (abre em nova aba)' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/fila\/er-1#entry=qr-entry-token$/),
+    )
     expect(screen.getByRole('link', { name: 'Testar link (abre em nova aba)' })).toHaveAttribute(
       'href',
       expect.stringMatching(/\/fila\/er-1\?source=link#entry=link-entry-token$/),
@@ -224,7 +233,10 @@ describe('AdminPage — ER management', () => {
       Promise.resolve(
         path === '/admin/ers'
           ? [erSummary]
-          : { ...erDetail, counters: [{ id: 'c1', number: 1, state: 'UNAVAILABLE', _count: { tickets: 5 } }] },
+          : {
+              ...erDetail,
+              counters: [{ id: 'c1', number: 1, state: 'UNAVAILABLE', _count: { tickets: 5 } }],
+            },
       ),
     )
     await openManagement()
@@ -237,7 +249,10 @@ describe('AdminPage — ER management', () => {
       Promise.resolve(
         path === '/admin/ers'
           ? [erSummary]
-          : { ...erDetail, counters: [{ id: 'c1', number: 1, state: 'ACTIVE', _count: { tickets: 0 } }] },
+          : {
+              ...erDetail,
+              counters: [{ id: 'c1', number: 1, state: 'ACTIVE', _count: { tickets: 0 } }],
+            },
       ),
     )
     await openManagement()
@@ -277,6 +292,32 @@ describe('AdminPage — ER management', () => {
         name: 'ER Renomeado',
         pauseTimeoutSeconds: 300,
         callTimeoutSeconds: 600,
+        guestEntryEnabled: false,
+      }),
+    )
+  })
+
+  it('toggles guest entry and saves it with the ER settings', async () => {
+    vi.mocked(api.patch).mockResolvedValue({})
+    await openManagement()
+
+    const toggle = screen.getByRole('switch', {
+      name: 'Entrada de convidada (nome + CPF, sem cadastro)',
+    })
+    expect(toggle).not.toBeChecked()
+    // Save stays disabled until something actually changes.
+    expect(screen.getByRole('button', { name: 'Salvar alteração' })).toBeDisabled()
+
+    fireEvent.click(toggle)
+    expect(toggle).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alteração' }))
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith('/admin/ers/er-1', {
+        name: 'ER Centro',
+        pauseTimeoutSeconds: 300,
+        callTimeoutSeconds: 600,
+        guestEntryEnabled: true,
       }),
     )
   })
@@ -285,9 +326,7 @@ describe('AdminPage — ER management', () => {
     vi.mocked(api.post).mockResolvedValue({ token: 'tv-secret' })
     await openManagement()
     fireEvent.click(screen.getByRole('button', { name: 'Gerar token de acesso' }))
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/admin/ers/er-1/panel-token'),
-    )
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/ers/er-1/panel-token'))
     expect(await screen.findByText(/\?token=tv-secret/)).toBeInTheDocument()
   })
 
@@ -328,9 +367,7 @@ describe('AdminPage — ER management', () => {
     vi.mocked(api.delete).mockResolvedValue(undefined)
     await openManagement()
     fireEvent.click(screen.getByRole('button', { name: 'Revogar acesso' }))
-    await waitFor(() =>
-      expect(api.delete).toHaveBeenCalledWith('/admin/ers/er-1/panel-token'),
-    )
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/admin/ers/er-1/panel-token'))
   })
 
   it('surfaces an error when generating the panel token fails', async () => {
@@ -385,9 +422,10 @@ describe('AdminPage — ER management', () => {
     expect(screen.getByText('Dia fechado')).toBeInTheDocument()
     expect(screen.getByText('Operação fechada')).toBeInTheDocument()
     expect(screen.getByText('caixas disponíveis')).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: 'Testar entrada (abre em nova aba)' }),
-    ).toHaveAttribute('href', expect.stringMatching(/\/fila\/er-1$/))
+    expect(screen.getByRole('link', { name: 'Testar entrada (abre em nova aba)' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/fila\/er-1$/),
+    )
     expect(screen.getByRole('link', { name: 'Testar link (abre em nova aba)' })).toHaveAttribute(
       'href',
       expect.stringMatching(/\/fila\/er-1\?source=link$/),
@@ -504,7 +542,10 @@ describe('AdminPage — navigation, auth and form errors', () => {
   it('logs out and redirects to the central login', async () => {
     authenticate()
     vi.mocked(api.get).mockResolvedValue([])
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 200 })),
+    )
 
     renderPage()
     await screen.findByText('Cadastrar ER')

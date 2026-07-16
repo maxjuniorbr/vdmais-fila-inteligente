@@ -25,7 +25,7 @@ apps/frontend/src/
 | Rota | Página | Perfil | Descrição |
 |---|---|---|---|
 | `/` | `HomePage` | Público | Login da equipe (porta de entrada); após autenticar, roteia por perfil — perfil de área única redireciona direto, ADMIN vê o menu de áreas |
-| `/fila/:erId` | `QueueEntryPage` | RE (público) | Entrada na fila via QR Code ou link |
+| `/fila/:erId` | `QueueEntryPage` | RE (público) | Entrada na fila via QR Code ou link; com `guestEntryEnabled` no ER, o único caminho exibido é o formulário de convidada (nome + CPF) — login/cadastro não aparecem, e só surgem quando um CPF já cadastrado retorna 409 |
 | `/fila/:erId/senha` | `TicketConfirmationPage` | RE | Confirmação de senha e posição na fila |
 | `/checkin` | `CheckinAttendantPage` | ATTENDANT | Check-in assistido — buscar/criar RE e gerar senha |
 | `/operacao` | `OperationPage` | OPERATOR | Gestão do caixa e chamada de senhas |

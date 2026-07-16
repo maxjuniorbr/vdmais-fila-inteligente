@@ -36,7 +36,7 @@ export class UpdateERDto {
   @Max(86400)
   callTimeoutSeconds?: number
 
-  // Entrada de convidada (só nome + telefone) — desligada por padrão.
+  // Entrada de convidada (nome + sobrenome + CPF) — desligada por padrão.
   @IsOptional()
   @IsBoolean()
   guestEntryEnabled?: boolean
