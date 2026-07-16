@@ -302,7 +302,7 @@ describe('AdminPage — ER management', () => {
     await openManagement()
 
     const toggle = screen.getByRole('switch', {
-      name: 'Entrada de convidada (nome + CPF, sem cadastro)',
+      name: 'Entrada de convidado(a) (nome + CPF, sem cadastro)',
     })
     expect(toggle).not.toBeChecked()
     // Save stays disabled until something actually changes.

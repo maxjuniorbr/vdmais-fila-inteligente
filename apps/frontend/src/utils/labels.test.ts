@@ -38,9 +38,9 @@ describe('labels', () => {
 
   it('maps roles and falls back for unknown', () => {
     expect(roleLabel('ATTENDANT')).toBe('Atendente')
-    expect(roleLabel('MANAGER')).toBe('Gestora')
-    expect(roleLabel('ADMIN')).toBe('Administrador')
-    expect(roleLabel('OPERATOR')).toBe('Operadora')
+    expect(roleLabel('MANAGER')).toBe('Gestor(a)')
+    expect(roleLabel('ADMIN')).toBe('Administrador(a)')
+    expect(roleLabel('OPERATOR')).toBe('Operador(a)')
     expect(roleLabel('???')).toBe('Perfil não informado')
   })
 

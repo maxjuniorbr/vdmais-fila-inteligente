@@ -389,11 +389,11 @@ describe('TicketConfirmationPage', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronta — pausar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronto(a) — pausar' }))
 
     expect(await screen.findByText('Pausada')).toBeInTheDocument()
     expect(screen.getByText('Tempo restante para retomar')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Estou pronta — retomar senha' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Estou pronto(a) — retomar senha' })).toBeInTheDocument()
   })
 
   it('falls back to the active ticket when joining returns a 409 conflict', async () => {
@@ -491,11 +491,11 @@ describe('TicketConfirmationPage', () => {
     expect(screen.getByText('#3')).toBeInTheDocument()
 
     // Pausar: a RE não está pronta.
-    fireEvent.click(screen.getByRole('button', { name: 'Não estou pronta — pausar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Não estou pronto(a) — pausar' }))
     expect(await screen.findByText('Pausada')).toBeInTheDocument()
 
     // Retomar: volta para a fila com o MESMO code e a MESMA posição (#3).
-    fireEvent.click(screen.getByRole('button', { name: 'Estou pronta — retomar senha' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Estou pronto(a) — retomar senha' }))
     expect(await screen.findByText('#3')).toBeInTheDocument()
     // A mesma senha atravessa pausar→retomar sem ser reemitida.
     expect(screen.getByText('A001')).toBeInTheDocument()
@@ -673,8 +673,8 @@ describe('TicketConfirmationPage', () => {
     // Protects the counter flow: once called, the RE can't leave or pause and slip
     // out from under the attendant.
     expect(screen.queryByText('Sair da fila')).not.toBeInTheDocument()
-    expect(screen.queryByText('Não estou pronta — pausar')).not.toBeInTheDocument()
-    expect(screen.queryByText('Estou pronta — retomar senha')).not.toBeInTheDocument()
+    expect(screen.queryByText('Não estou pronto(a) — pausar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Estou pronto(a) — retomar senha')).not.toBeInTheDocument()
   })
 
   it('hides the leave and pause actions while the ticket is in service', async () => {
@@ -690,8 +690,8 @@ describe('TicketConfirmationPage', () => {
     await screen.findByText('Em atendimento')
 
     expect(screen.queryByText('Sair da fila')).not.toBeInTheDocument()
-    expect(screen.queryByText('Não estou pronta — pausar')).not.toBeInTheDocument()
-    expect(screen.queryByText('Estou pronta — retomar senha')).not.toBeInTheDocument()
+    expect(screen.queryByText('Não estou pronto(a) — pausar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Estou pronto(a) — retomar senha')).not.toBeInTheDocument()
   })
 
   // The three mutating actions (join/pause/leave) share a "no message body" branch:
@@ -732,7 +732,7 @@ describe('TicketConfirmationPage', () => {
           : null,
       act: async () =>
         fireEvent.click(
-          await screen.findByRole('button', { name: 'Não estou pronta — pausar' }),
+          await screen.findByRole('button', { name: 'Não estou pronto(a) — pausar' }),
         ),
       expected: 'Erro',
     },
@@ -803,7 +803,7 @@ describe('TicketConfirmationPage', () => {
         url.includes('/tickets/t-1/pause') ? Promise.reject('boom') : null,
       act: async () =>
         fireEvent.click(
-          await screen.findByRole('button', { name: 'Não estou pronta — pausar' }),
+          await screen.findByRole('button', { name: 'Não estou pronto(a) — pausar' }),
         ),
       expected: 'Erro ao atualizar senha',
     },
@@ -852,7 +852,7 @@ describe('TicketConfirmationPage', () => {
     expect(await screen.findByText('Pausada')).toBeInTheDocument()
     expect(screen.queryByText('Tempo restante para retomar')).not.toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: 'Estou pronta — retomar senha' }),
+      screen.getByRole('button', { name: 'Estou pronto(a) — retomar senha' }),
     ).toBeInTheDocument()
   })
 
@@ -890,7 +890,7 @@ describe('TicketConfirmationPage', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
-    const pauseBtn = await screen.findByRole('button', { name: 'Não estou pronta — pausar' })
+    const pauseBtn = await screen.findByRole('button', { name: 'Não estou pronto(a) — pausar' })
     // Drop the token, then trigger a re-render: the render-time token read now hits
     // its empty-string fallback while the component stays interactive.
     sessionStorage.removeItem('token')
@@ -931,7 +931,7 @@ describe('TicketConfirmationPage', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronta — pausar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronto(a) — pausar' }))
 
     expect(await screen.findByText('Não foi possível pausar')).toBeInTheDocument()
     expect(screen.getByText('A001')).toBeInTheDocument()
@@ -961,7 +961,7 @@ describe('TicketConfirmationPage', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronta — pausar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Não estou pronto(a) — pausar' }))
 
     expect(await screen.findByText('network down')).toBeInTheDocument()
   })

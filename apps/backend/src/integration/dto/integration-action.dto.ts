@@ -3,13 +3,13 @@ import { IsOptional, IsString, MaxLength } from 'class-validator'
 import { IDEMPOTENCY_KEY_MAX_LENGTH } from '../integration.constants'
 
 export class IntegrationActionDto {
-  @ApiPropertyOptional({ description: 'Código oficial da revendedora (reCode). Informe reCode OU cpf.' })
+  @ApiPropertyOptional({ description: 'Código oficial do(a) revendedor(a) (reCode). Informe reCode OU cpf.' })
   @IsOptional()
   @IsString()
   @MaxLength(50)
   reCode?: string
 
-  @ApiPropertyOptional({ description: 'CPF da revendedora, com ou sem máscara. Informe reCode OU cpf.' })
+  @ApiPropertyOptional({ description: 'CPF do(a) revendedor(a), com ou sem máscara. Informe reCode OU cpf.' })
   @IsOptional()
   @IsString()
   @MaxLength(20)

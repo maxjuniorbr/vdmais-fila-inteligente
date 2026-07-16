@@ -162,7 +162,7 @@ describe('CounterService', () => {
     )
 
     await expect(service.openCounter('counter-1', operator)).rejects.toThrow(
-      'A operadora já possui outro caixa aberto',
+      'O(a) operador(a) já possui outro caixa aberto',
     )
   })
 

@@ -160,7 +160,7 @@ export class SimulationService {
       }
       const operator = freePool.shift()
       if (!operator) {
-        results.push({ counterId, opened: false, reason: 'Sem operadora livre disponível' })
+        results.push({ counterId, opened: false, reason: 'Sem operador(a) livre disponível' })
         continue
       }
       try {
@@ -230,12 +230,12 @@ export class SimulationService {
     }
   }
 
-  /** "Não estou pronta": WAITING → PAUSED. */
+  /** "Não estou pronto(a)": WAITING → PAUSED. */
   async pauseTicket(ticketId: string) {
     return this.ticketService.pauseTicket(ticketId, await this.ticketRepresentative(ticketId))
   }
 
-  /** "Estou pronta": PAUSED → WAITING, retomada no lugar (mesma posição/código). */
+  /** "Estou pronto(a)": PAUSED → WAITING, retomada no lugar (mesma posição/código). */
   async resumeTicket(ticketId: string) {
     return this.ticketService.resumeTicket(ticketId, await this.ticketRepresentative(ticketId))
   }
@@ -278,7 +278,7 @@ export class SimulationService {
       select: { erId: true, operatorId: true },
     })
     if (!ticket) throw new NotFoundException('Senha não encontrada')
-    if (!ticket.operatorId) throw new BadRequestException('A senha não tem operadora atribuída')
+    if (!ticket.operatorId) throw new BadRequestException('A senha não tem operador(a) atribuído(a)')
     return { erId: ticket.erId, operatorId: ticket.operatorId }
   }
 

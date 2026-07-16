@@ -22,11 +22,13 @@ const ENTRY_CHANNEL_LABELS: Record<string, string> = {
   CHECKIN_ASSISTED: 'Check-in assistido',
 }
 
+// Forma dupla ("Operador(a)") porque o gênero da pessoa não é cadastrado;
+// papéis com substantivo comum-de-dois (Atendente) ficam naturalmente neutros.
 const ROLE_LABELS: Record<string, string> = {
-  OPERATOR: 'Operadora',
+  OPERATOR: 'Operador(a)',
   ATTENDANT: 'Atendente',
-  MANAGER: 'Gestora',
-  ADMIN: 'Administrador',
+  MANAGER: 'Gestor(a)',
+  ADMIN: 'Administrador(a)',
 }
 
 export function ticketStateLabel(state: string): string {

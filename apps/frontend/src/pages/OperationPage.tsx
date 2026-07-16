@@ -23,7 +23,7 @@ import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { layout } from '../styles/layout'
 import { formatDuration } from '../utils/format'
-import { counterStateLabel, PRIORITY_LABEL, PRIORITY_TONE, ticketStateLabel } from '../utils/labels'
+import { counterStateLabel, PRIORITY_LABEL, PRIORITY_TONE, roleLabel, ticketStateLabel } from '../utils/labels'
 
 // Motivos canônicos de pausa do caixa (§9.4); "outro" exige um detalhe livre.
 // Os valores devem casar com COUNTER_PAUSE_REASONS no backend.
@@ -372,8 +372,8 @@ export function OperationPage() {
   return (
     <div style={styles.shell}>
       <AppHeader
-        title="Painel da Operadora"
-        subtitle={getStaffName() || 'Operador'}
+        title="Painel de Operação"
+        subtitle={getStaffName() || roleLabel('OPERATOR')}
         onLogout={() => void logout()}
       />
 
@@ -382,7 +382,7 @@ export function OperationPage() {
 
         {overview && !overview.isDayOpen && (
           <Alert tone="warning">
-            Operação encerrada. Aguarde a gestora abrir a operação do dia para assumir um caixa e
+            Operação encerrada. Aguarde a gestão abrir a operação do dia para assumir um caixa e
             chamar senhas.
           </Alert>
         )}

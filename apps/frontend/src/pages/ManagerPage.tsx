@@ -33,6 +33,7 @@ import {
   entryChannelLabel,
   PRIORITY_LABEL,
   PRIORITY_TONE,
+  roleLabel,
   ticketStateLabel,
 } from '../utils/labels'
 
@@ -457,8 +458,8 @@ export function ManagerPage() {
   return (
     <div style={styles.shell}>
       <AppHeader
-        title="Painel da Gestora"
-        subtitle={er?.name ?? (getStaffName() || 'Gestora')}
+        title="Painel de Gestão"
+        subtitle={er?.name ?? (getStaffName() || roleLabel('MANAGER'))}
         onLogout={() => {
           void logoutStaffSession().then(() => {
             setAuthenticated(false)
@@ -511,7 +512,7 @@ export function ManagerPage() {
           <section style={styles.card}>
             <h2 style={styles.cardTitle}>ER acompanhado</h2>
             <p style={styles.adminContext}>
-              Como administrador, selecione o ER que deseja acompanhar ou operar nesta tela.
+              Como administrador(a), selecione o ER que deseja acompanhar ou operar nesta tela.
             </p>
             <Select
               label="Espaço de Revendedora"
@@ -625,9 +626,9 @@ export function ManagerPage() {
                   {counterStateLabel(counter.state)}
                 </Badge>
                 <div style={styles.counterOperatorRow}>
-                  <span style={styles.counterOperatorLabel}>Operadora</span>
+                  <span style={styles.counterOperatorLabel}>{roleLabel('OPERATOR')}</span>
                   <span style={styles.counterOperatorName}>
-                    {counter.operator?.name ?? 'Sem operadora'}
+                    {counter.operator?.name ?? 'Sem operador(a)'}
                   </span>
                 </div>
               </article>
@@ -915,7 +916,7 @@ function DayDistribution({ metrics }: Readonly<{ metrics: Metrics }>) {
     calls: metrics.callsByOperator[key] ?? 0,
   }))
   const operatorColumns: Column<(typeof operatorRows)[number]>[] = [
-    { key: 'operator', header: 'Operadora', render: (row) => row.operator },
+    { key: 'operator', header: 'Operador(a)', render: (row) => row.operator },
     { key: 'services', header: 'Atendimentos', align: 'right', render: (row) => row.services },
     { key: 'calls', header: 'Chamadas', align: 'right', render: (row) => row.calls },
   ]
@@ -973,13 +974,13 @@ function DayDistribution({ metrics }: Readonly<{ metrics: Metrics }>) {
     },
     {
       id: 'operadora',
-      label: 'Por operadora',
+      label: 'Por operador(a)',
       content: (
         <Table
           columns={operatorColumns}
           rows={operatorRows}
           getRowKey={(row) => row.id}
-          emptyMessage="Sem atendimentos por operadora."
+          emptyMessage="Sem atendimentos por operador(a)."
         />
       ),
     },

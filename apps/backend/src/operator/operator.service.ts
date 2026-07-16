@@ -16,7 +16,7 @@ export class OperatorService {
       where: { id: user.userId },
       select: { id: true, name: true, email: true, role: true, erId: true },
     })
-    if (!operator) throw new NotFoundException('Usuário da equipe não encontrado')
+    if (!operator) throw new NotFoundException('Conta da equipe não encontrada')
     return operator
   }
 }

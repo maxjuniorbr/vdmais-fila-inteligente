@@ -7,7 +7,7 @@ import { QueueEntryPage } from './QueueEntryPage'
 // Valid CPF (correct check digits) so the client-side validation accepts it.
 const VALID_CPF = '52998224725'
 const CONFLICT_MESSAGE =
-  'Não foi possível entrar como convidada. Entre com CPF ou código de RE e senha.'
+  'Não foi possível entrar como convidado(a). Entre com CPF ou código de RE e senha.'
 
 interface GuestStubOptions {
   guestEntryEnabled?: boolean
@@ -179,7 +179,7 @@ describe('QueueEntryPage guest flow', () => {
   })
 
   it('offers the account path if guest entry is disabled while the page is open', async () => {
-    stubFetch({ guestStatus: 403, guestBody: { message: 'Entrada de convidada desativada' } })
+    stubFetch({ guestStatus: 403, guestBody: { message: 'Entrada de convidado(a) desativada' } })
     renderPage()
     const user = userEvent.setup()
 
@@ -188,7 +188,7 @@ describe('QueueEntryPage guest flow', () => {
     await user.type(screen.getByLabelText('CPF'), VALID_CPF)
     fireEvent.click(screen.getByRole('button', { name: 'Entrar na fila' }))
 
-    expect(await screen.findByText('Entrada de convidada desativada')).toBeInTheDocument()
+    expect(await screen.findByText('Entrada de convidado(a) desativada')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Entrar com meu cadastro' })).toBeInTheDocument()
   })
 
@@ -234,6 +234,6 @@ describe('QueueEntryPage guest flow', () => {
     await screen.findByText('ER Teste')
     expect(screen.getByRole('tab', { name: 'Já tenho cadastro' })).toBeInTheDocument()
     expect(screen.queryByLabelText('CPF')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Entrar como convidada' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Entrar como convidado(a)' })).not.toBeInTheDocument()
   })
 })

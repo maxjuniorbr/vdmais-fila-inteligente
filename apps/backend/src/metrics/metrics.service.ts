@@ -23,7 +23,7 @@ export class MetricsService {
 
   async getDailyMetrics(erId: string, user: AuthenticatedUser) {
     if (user.role !== Role.MANAGER && user.role !== Role.ADMIN) {
-      throw new ForbiddenException('Somente gestoras podem acessar as métricas diárias')
+      throw new ForbiddenException('Somente gestores(as) podem acessar as métricas diárias')
     }
     if (user.role !== Role.ADMIN && (!user.erId || user.erId !== erId)) {
       throw new ForbiddenException('Não é possível acessar métricas de outro ER')

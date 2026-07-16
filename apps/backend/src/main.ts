@@ -30,7 +30,7 @@ function setupIntegrationDocs(app: NestExpressApplication) {
     .setTitle('VDMais Fila Inteligente — API de Integração')
     .setDescription(
       'Endpoints de integração M2M para sistemas corporativos marcarem início e fim do ' +
-        'atendimento da revendedora. Autentique com Bearer JWT (OAuth2 client_credentials) ' +
+        'atendimento do(a) revendedor(a). Autentique com Bearer JWT (OAuth2 client_credentials) ' +
         'portando o scope `tickets:start` ou `tickets:finish`. Idempotência opcional via ' +
         'header `Idempotency-Key`.',
     )

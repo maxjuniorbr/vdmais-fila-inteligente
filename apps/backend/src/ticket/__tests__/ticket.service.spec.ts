@@ -268,7 +268,7 @@ describe('TicketService', () => {
         entryChannel: EntryChannel.CHECKIN_ASSISTED,
         representativeId: 'guest-1',
       }),
-    ).rejects.toThrow('Representante não encontrada')
+    ).rejects.toThrow('Representante não encontrado(a)')
     expect(tx.ticket.create).not.toHaveBeenCalled()
   })
 
@@ -1660,7 +1660,7 @@ describe('TicketService', () => {
           { ...representative, entryChannel: EntryChannel.CHECKIN_ASSISTED },
           { erId: 'er-1', entryChannel: EntryChannel.CHECKIN_ASSISTED },
         ),
-      ).rejects.toThrow('O check-in assistido requer uma atendente')
+      ).rejects.toThrow('O check-in assistido requer um(a) atendente')
     })
 
     it('rejects an attendant creating a ticket outside the assisted channel', async () => {
@@ -1727,7 +1727,7 @@ describe('TicketService', () => {
       })
 
       await expect(service.startService('ticket-1', operator)).rejects.toThrow(
-        'A senha pertence a outra operadora',
+        'A senha pertence a outro(a) operador(a)',
       )
     })
 
@@ -1870,7 +1870,7 @@ describe('TicketService', () => {
 
     it('rejects restore from a non-manager', async () => {
       await expect(service.restore('ticket-1', 'voltou', operator)).rejects.toThrow(
-        'Somente gestoras podem restaurar senhas',
+        'Somente gestores(as) podem restaurar senhas',
       )
       expect(prisma.$transaction).not.toHaveBeenCalled()
     })

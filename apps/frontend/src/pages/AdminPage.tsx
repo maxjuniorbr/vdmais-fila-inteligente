@@ -337,7 +337,7 @@ function ERDetailSection({
         <SummaryItem
           label="Operação hoje"
           value={er.isDayOpen ? 'Aberta' : 'Fechada'}
-          detail="Controlada pela gestora"
+          detail="Controlada pela gestão"
         />
         <SummaryItem
           label="Caixas cadastrados"
@@ -347,7 +347,7 @@ function ERDetailSection({
         <SummaryItem
           label="Contas de equipe"
           value={er.operators.length}
-          detail="operadoras, atendentes e gestoras"
+          detail="operadores(as), atendentes e gestores(as)"
         />
       </div>
 
@@ -645,7 +645,7 @@ function EditERForm({
       />
       <div style={styles.settingRow}>
         <Switch
-          label="Entrada de convidada (nome + CPF, sem cadastro)"
+          label="Entrada de convidado(a) (nome + CPF, sem cadastro)"
           checked={guestEntryEnabled}
           onChange={(event) => setGuestEntryEnabled(event.target.checked)}
         />
@@ -767,9 +767,9 @@ function CreateStaffForm({
         required
       />
       <Select label="Perfil" value={role} onChange={(event) => setRole(event.target.value)}>
-        <option value="OPERATOR">Operadora</option>
+        <option value="OPERATOR">Operador(a)</option>
         <option value="ATTENDANT">Atendente (check-in)</option>
-        <option value="MANAGER">Gestora</option>
+        <option value="MANAGER">Gestor(a)</option>
       </Select>
       <Button type="submit" disabled={loading}>
         {loading ? 'Criando...' : 'Criar conta'}

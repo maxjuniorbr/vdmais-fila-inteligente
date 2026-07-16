@@ -273,7 +273,7 @@ describe('ManagerPage', () => {
     expect(screen.getByText('Caixa 1')).toBeInTheDocument()
     expect(screen.queryByText('Caixa Caixa 1')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Por operadora' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Por operador(a)' }))
     expect(screen.getByText('Chamadas')).toBeInTheDocument()
   })
 
@@ -930,7 +930,7 @@ describe('ManagerPage', () => {
     expect(screen.getByText('Caixa 1')).toBeInTheDocument()
     expect(screen.getByText('Caixa 2')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Por operadora' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Por operador(a)' }))
     expect(screen.getByText('Ana')).toBeInTheDocument()
     expect(screen.getByText('Bruno')).toBeInTheDocument()
   })

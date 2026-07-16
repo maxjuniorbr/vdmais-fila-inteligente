@@ -99,7 +99,7 @@ describe('OperationPage coverage', () => {
     )
 
     expect(screen.getByText('central-login')).toBeInTheDocument()
-    expect(screen.queryByText('Painel da Operadora')).not.toBeInTheDocument()
+    expect(screen.queryByText('Painel de Operação')).not.toBeInTheDocument()
   })
 
   it('drops back to the central login when the session expires mid-use', async () => {
@@ -112,13 +112,13 @@ describe('OperationPage coverage', () => {
         </Routes>
       </MemoryRouter>,
     )
-    expect(await screen.findByText('Painel da Operadora')).toBeInTheDocument()
+    expect(await screen.findByText('Painel de Operação')).toBeInTheDocument()
 
     // 401 do servidor → notifySessionExpired derruba a tela protegida.
     act(() => notifySessionExpired())
 
     expect(await screen.findByText('central-login')).toBeInTheDocument()
-    expect(screen.queryByText('Painel da Operadora')).not.toBeInTheDocument()
+    expect(screen.queryByText('Painel de Operação')).not.toBeInTheDocument()
   })
 
   it('shows an error when an action fails', async () => {
@@ -252,7 +252,7 @@ describe('OperationPage coverage', () => {
       </MemoryRouter>,
     )
 
-    await screen.findByText('Painel da Operadora')
+    await screen.findByText('Painel de Operação')
     fireEvent.click(screen.getByRole('button', { name: /sair|logout/i }))
 
     await waitFor(() => expect(sessionStorage.getItem('token')).toBeNull())

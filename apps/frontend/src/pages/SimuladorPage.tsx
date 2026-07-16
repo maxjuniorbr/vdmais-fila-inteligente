@@ -259,14 +259,14 @@ function SimuladorInner({ onLogout }: Readonly<{ onLogout: () => void }>) {
   function pauseRe(rep: RepresentativeRow, ticketId: string) {
     void runAction(`re-${rep.id}`, async () => {
       await api.post('/simulation/queue/pause', { ticketId })
-      return `${rep.reCode} marcada como "não estou pronta".`
+      return `${rep.reCode} marcada como "não estou pronto(a)".`
     })
   }
 
   function resumeRe(rep: RepresentativeRow, ticketId: string) {
     void runAction(`re-${rep.id}`, async () => {
       await api.post('/simulation/queue/resume', { ticketId })
-      return `${rep.reCode} pronta — de volta à fila.`
+      return `${rep.reCode} de volta à fila.`
     })
   }
 
@@ -312,7 +312,7 @@ function SimuladorInner({ onLogout }: Readonly<{ onLogout: () => void }>) {
       return (
         <>
           <Button size="sm" variant="secondary" onClick={() => pauseRe(rep, ticket.id)} disabled={disabled}>
-            Não estou pronta
+            Não estou pronto(a)
           </Button>
           <Button size="sm" variant="danger" onClick={() => cancelRe(rep, ticket.id)} disabled={disabled}>
             Sair da fila
@@ -324,7 +324,7 @@ function SimuladorInner({ onLogout }: Readonly<{ onLogout: () => void }>) {
       return (
         <>
           <Button size="sm" variant="primary" onClick={() => resumeRe(rep, ticket.id)} disabled={disabled}>
-            Estou pronta
+            Estou pronto(a)
           </Button>
           <Button size="sm" variant="danger" onClick={() => cancelRe(rep, ticket.id)} disabled={disabled}>
             Sair da fila
@@ -413,7 +413,7 @@ function SimuladorInner({ onLogout }: Readonly<{ onLogout: () => void }>) {
 
         <Section
           title="Abrir caixas"
-          action={<span style={styles.hint}>{freeOperators.length} operadora(s) livre(s)</span>}
+          action={<span style={styles.hint}>Operadores(as) livres: {freeOperators.length}</span>}
         >
           {counters.length === 0 ? (
             <p style={styles.empty}>Nenhum caixa cadastrado neste ER.</p>

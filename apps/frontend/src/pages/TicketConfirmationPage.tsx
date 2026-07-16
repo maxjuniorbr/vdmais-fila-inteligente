@@ -158,7 +158,7 @@ function TicketStatus({
         <p style={styles.positionLabel}>Situação</p>
         <p style={{ ...styles.position, color: brand.warning }}>Pausada</p>
         <p style={styles.hint}>
-          Quando estiver pronta, retome sua senha. Você volta à sua posição, atrás de
+          Quando estiver pronto(a), retome sua senha. Você volta à sua posição, atrás de
           eventuais senhas preferenciais que entraram durante a pausa.
         </p>
       </>
@@ -441,7 +441,7 @@ export function TicketConfirmationPage() {
     const messages: Record<string, { title: string; text: string }> = {
       FINISHED: {
         title: 'Atendimento concluído',
-        text: 'Obrigada pela visita! Seu atendimento foi finalizado.',
+        text: 'Agradecemos a visita! Seu atendimento foi finalizado.',
       },
       CANCELLED: {
         title: 'Senha cancelada',
@@ -449,7 +449,7 @@ export function TicketConfirmationPage() {
       },
       NO_SHOW: {
         title: 'Não comparecimento',
-        text: 'Você foi chamada mas não compareceu. Se precisar, entre na fila novamente.',
+        text: 'Sua senha foi chamada, mas você não compareceu. Se precisar, entre na fila novamente.',
       },
     }
     const msg = messages[ticket.state] ?? messages.FINISHED
@@ -478,9 +478,9 @@ export function TicketConfirmationPage() {
     )
   }
 
-  let pauseLabel = 'Não estou pronta — pausar'
+  let pauseLabel = 'Não estou pronto(a) — pausar'
   if (actionLoading) pauseLabel = '...'
-  else if (isPaused) pauseLabel = 'Estou pronta — retomar senha'
+  else if (isPaused) pauseLabel = 'Estou pronto(a) — retomar senha'
 
   return (
     <div style={styles.container}>

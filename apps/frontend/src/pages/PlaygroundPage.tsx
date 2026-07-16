@@ -295,7 +295,7 @@ function PlaygroundInner() {
                   {
                     id: 'detalhes',
                     label: 'Detalhes',
-                    content: <p style={styles.tabText}>Quebra por canal, caixa e operadora.</p>,
+                    content: <p style={styles.tabText}>Quebra por canal, caixa e operador(a).</p>,
                   },
                   {
                     id: 'historico',

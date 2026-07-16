@@ -145,7 +145,7 @@ export class AuthService {
       select: { guestEntryEnabled: true },
     })
     if (!er?.guestEntryEnabled) {
-      throw new ForbiddenException('Entrada como convidada não está habilitada neste espaço')
+      throw new ForbiddenException('Entrada como convidado(a) não está habilitada neste espaço')
     }
 
     const fullName = `${dto.firstName} ${dto.lastName}`.trim().replace(/\s+/g, ' ')
@@ -180,7 +180,7 @@ export class AuthService {
         // Keep the public response generic: the QR/token is shareable and the
         // endpoint must not become a CPF-account enumeration oracle.
         throw new ConflictException(
-          'Não foi possível entrar como convidada. Entre com CPF ou código de RE e senha.',
+          'Não foi possível entrar como convidado(a). Entre com CPF ou código de RE e senha.',
         )
       }
       // Same CPF is the same person; refreshing the name lets a re-scan fix a typo.

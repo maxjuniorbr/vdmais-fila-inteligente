@@ -98,7 +98,7 @@ export class TicketService {
           !representative ||
           (checkinAttendantId && representative.kind !== RepresentativeKind.REGISTERED)
         ) {
-          throw new NotFoundException('Representante não encontrada')
+          throw new NotFoundException('Representante não encontrado(a)')
         }
         if (!er.isDayOpen) {
           throw new BadRequestException('A operação do ER está encerrada hoje')
@@ -348,7 +348,7 @@ export class TicketService {
 
   async restore(ticketId: string, reason: string, user: AuthenticatedUser) {
     if (user.role !== Role.MANAGER && user.role !== Role.ADMIN) {
-      throw new ForbiddenException('Somente gestoras podem restaurar senhas')
+      throw new ForbiddenException('Somente gestores(as) podem restaurar senhas')
     }
     const ticket = await this._getTicket(ticketId)
     this._assertStaffER(ticket.erId, user)
@@ -467,7 +467,7 @@ export class TicketService {
 
   async recall(ticketId: string, user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
-      throw new ForbiddenException('Somente operadoras podem rechamar senhas')
+      throw new ForbiddenException('Somente operadores(as) podem rechamar senhas')
     }
     const ticket = await this._getTicket(ticketId)
     this._assertAssignedOperator(ticket, user)
@@ -526,7 +526,7 @@ export class TicketService {
 
   async startService(ticketId: string, user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
-      throw new ForbiddenException('Somente operadoras podem iniciar atendimentos')
+      throw new ForbiddenException('Somente operadores(as) podem iniciar atendimentos')
     }
     const ticket = await this._getTicket(ticketId)
     this._assertAssignedOperator(ticket, user)
@@ -538,7 +538,7 @@ export class TicketService {
 
   async finishService(ticketId: string, user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
-      throw new ForbiddenException('Somente operadoras podem finalizar atendimentos')
+      throw new ForbiddenException('Somente operadores(as) podem finalizar atendimentos')
     }
     const ticket = await this._getTicket(ticketId)
     this._assertAssignedOperator(ticket, user)
@@ -550,7 +550,7 @@ export class TicketService {
 
   async noShow(ticketId: string, user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
-      throw new ForbiddenException('Somente operadoras podem registrar não comparecimento')
+      throw new ForbiddenException('Somente operadores(as) podem registrar não comparecimento')
     }
     return this._markNoShow(ticketId, user)
   }
@@ -636,7 +636,7 @@ export class TicketService {
 
   async correct(ticketId: string, dto: CorrectTicketDto, user: AuthenticatedUser) {
     if (user.role !== Role.MANAGER && user.role !== Role.ADMIN) {
-      throw new ForbiddenException('Somente gestoras podem corrigir senhas')
+      throw new ForbiddenException('Somente gestores(as) podem corrigir senhas')
     }
     const ticket = await this._getTicket(ticketId)
     this._assertStaffER(ticket.erId, user)
@@ -1472,7 +1472,7 @@ export class TicketService {
         throw new ForbiddenException('O acesso à fila pertence a outro canal')
       }
       if (dto.entryChannel === EntryChannel.CHECKIN_ASSISTED) {
-        throw new ForbiddenException('O check-in assistido requer uma atendente')
+        throw new ForbiddenException('O check-in assistido requer um(a) atendente')
       }
       return { representativeId: user.userId, checkinAttendantId: undefined }
     }
@@ -1500,7 +1500,7 @@ export class TicketService {
   ) {
     this._assertStaffER(ticket.erId, user)
     if (!ticket.counterId || ticket.operatorId !== user.userId) {
-      throw new ForbiddenException('A senha pertence a outra operadora')
+      throw new ForbiddenException('A senha pertence a outro(a) operador(a)')
     }
   }
 

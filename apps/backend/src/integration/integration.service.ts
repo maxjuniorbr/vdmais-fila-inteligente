@@ -102,7 +102,7 @@ export class IntegrationService {
 
     throw new NotFoundException({
       code: 'NO_ACTIVE_TICKET',
-      message: 'Nenhuma senha em chamada ou atendimento para esta revendedora',
+      message: 'Nenhuma senha em chamada ou atendimento para este(a) revendedor(a)',
     })
   }
 
@@ -128,7 +128,7 @@ export class IntegrationService {
     if (representative?.kind !== RepresentativeKind.REGISTERED) {
       throw new NotFoundException({
         code: 'REPRESENTATIVE_NOT_FOUND',
-        message: 'Revendedora não encontrada',
+        message: 'Revendedor(a) não encontrado(a)',
       })
     }
     return representative.id
@@ -142,7 +142,7 @@ export class IntegrationService {
     if (distinctErs.size > 1) {
       throw new ConflictException({
         code: 'MULTIPLE_ACTIVE_TICKETS',
-        message: 'Revendedora em atendimento em mais de um ER; informe erId para desambiguar',
+        message: 'Revendedor(a) em atendimento em mais de um ER; informe erId para desambiguar',
       })
     }
     // For the at-counter path, more than one active ticket in a single ER is an
@@ -151,7 +151,7 @@ export class IntegrationService {
     if (strict && tickets.length > 1) {
       throw new ConflictException({
         code: 'MULTIPLE_ACTIVE_TICKETS',
-        message: 'Mais de uma senha ativa para esta revendedora; ação ambígua',
+        message: 'Mais de uma senha ativa para este(a) revendedor(a); ação ambígua',
       })
     }
     return tickets[0].id

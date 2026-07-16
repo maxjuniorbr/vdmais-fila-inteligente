@@ -19,7 +19,7 @@ interface AccessArea {
 const ACCESS_AREAS: AccessArea[] = [
   {
     roles: ['ADMIN'],
-    audience: 'Administrador',
+    audience: 'Administrador(a)',
     title: 'Administração',
     description: 'Configure ERs, acessos, caixas e contas da equipe.',
     path: '/admin',
@@ -27,16 +27,16 @@ const ACCESS_AREAS: AccessArea[] = [
   },
   {
     roles: ['MANAGER', 'ADMIN'],
-    audience: 'Gestora ou administrador',
+    audience: 'Gestor(a) ou administrador(a)',
     title: 'Gestão da fila',
     description:
-      'Abra a operação, acompanhe a fila e consulte métricas. Administradores selecionam o ER ao entrar.',
+      'Abra a operação, acompanhe a fila e consulte métricas. Perfis de administração selecionam o ER ao entrar.',
     path: '/gestao',
     action: 'Acessar gestão',
   },
   {
     roles: ['OPERATOR'],
-    audience: 'Operadora',
+    audience: 'Operador(a)',
     title: 'Operação',
     description: 'Assuma um caixa, chame senhas e conduza os atendimentos.',
     path: '/operacao',

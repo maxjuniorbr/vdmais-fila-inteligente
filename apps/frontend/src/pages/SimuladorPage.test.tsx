@@ -240,14 +240,14 @@ describe('SimuladorPage', () => {
       vi.mocked(api.post).mockResolvedValue({
         opened: 0,
         skipped: 1,
-        results: [{ counterId: 'c-1', opened: false, reason: 'Sem operadora livre disponível' }],
+        results: [{ counterId: 'c-1', opened: false, reason: 'Sem operador(a) livre disponível' }],
       })
       renderPage()
       await userEvent.click(await screen.findByRole('button', { name: 'Abrir' }))
       await waitFor(() => expect(api.post).toHaveBeenCalled())
       // opened:false é um "não deu, mas tudo bem": informa o motivo em tom info,
       // nunca em tom de erro/sucesso.
-      const toast = await findToast('Sem operadora livre disponível')
+      const toast = await findToast('Sem operador(a) livre disponível')
       expect(toneOf(toast)).toBe('info')
     })
   })
@@ -306,7 +306,7 @@ describe('SimuladorPage', () => {
       await waitFor(() => expect(api.post).toHaveBeenCalledWith('/simulation/queue/add-existing', expect.objectContaining({ representativeIds: ['re-1'] })))
     })
 
-    it('shows Não estou pronta and Sair for a WAITING ticket', async () => {
+    it('shows Não estou pronto(a) and Sair for a WAITING ticket', async () => {
       authenticate()
       vi.mocked(api.get).mockImplementation(async (url: string) => {
         if (url.startsWith('/simulation/ers')) return ERS
@@ -318,11 +318,11 @@ describe('SimuladorPage', () => {
         return []
       })
       renderPage()
-      expect(await screen.findByRole('button', { name: 'Não estou pronta' })).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: 'Não estou pronto(a)' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Sair da fila' })).toBeInTheDocument()
     })
 
-    it('shows Estou pronta and Sair for a PAUSED ticket', async () => {
+    it('shows Estou pronto(a) and Sair for a PAUSED ticket', async () => {
       authenticate()
       vi.mocked(api.get).mockImplementation(async (url: string) => {
         if (url.startsWith('/simulation/ers')) return ERS
@@ -334,11 +334,11 @@ describe('SimuladorPage', () => {
         return []
       })
       renderPage()
-      expect(await screen.findByRole('button', { name: 'Estou pronta' })).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: 'Estou pronto(a)' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Sair da fila' })).toBeInTheDocument()
     })
 
-    it('calls pause API on Não estou pronta click', async () => {
+    it('calls pause API on Não estou pronto(a) click', async () => {
       authenticate()
       vi.mocked(api.get).mockImplementation(async (url: string) => {
         if (url.startsWith('/simulation/ers')) return ERS
@@ -351,11 +351,11 @@ describe('SimuladorPage', () => {
       })
       vi.mocked(api.post).mockResolvedValue({})
       renderPage()
-      await userEvent.click(await screen.findByRole('button', { name: 'Não estou pronta' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Não estou pronto(a)' }))
       await waitFor(() => expect(api.post).toHaveBeenCalledWith('/simulation/queue/pause', { ticketId: 't-1' }))
     })
 
-    it('calls resume API on Estou pronta click', async () => {
+    it('calls resume API on Estou pronto(a) click', async () => {
       authenticate()
       vi.mocked(api.get).mockImplementation(async (url: string) => {
         if (url.startsWith('/simulation/ers')) return ERS
@@ -368,7 +368,7 @@ describe('SimuladorPage', () => {
       })
       vi.mocked(api.post).mockResolvedValue({})
       renderPage()
-      await userEvent.click(await screen.findByRole('button', { name: 'Estou pronta' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Estou pronto(a)' }))
       await waitFor(() => expect(api.post).toHaveBeenCalledWith('/simulation/queue/resume', { ticketId: 't-1' }))
     })
 

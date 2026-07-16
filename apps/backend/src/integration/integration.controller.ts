@@ -23,7 +23,7 @@ export class IntegrationController {
   @HttpCode(200)
   @Scopes(SCOPE_TICKETS_START)
   @ApiOperation({
-    summary: 'Marca o atendimento da revendedora como iniciado (CALLING → IN_SERVICE).',
+    summary: 'Marca o atendimento do(a) revendedor(a) como iniciado (CALLING → IN_SERVICE).',
   })
   @ApiResponse({ status: 200, description: 'Atendimento iniciado (ou já estava; idempotente).' })
   @ApiResponse({ status: 400, description: 'INVALID_IDENTIFIER — informe exatamente um entre reCode e cpf.' })

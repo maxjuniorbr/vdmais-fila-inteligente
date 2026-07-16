@@ -19,7 +19,7 @@ export class CounterService {
   ) {}
 
   listForER(user: AuthenticatedUser) {
-    if (!user.erId) throw new ForbiddenException('Usuário não vinculado a um ER')
+    if (!user.erId) throw new ForbiddenException('Conta não vinculada a um ER')
     return this.prisma.counter.findMany({
       where: { erId: user.erId },
       orderBy: { number: 'asc' },
@@ -39,7 +39,7 @@ export class CounterService {
       throw new BadRequestException('Abra a operação do dia antes de abrir o caixa')
     }
     if (counter.operatorId && counter.operatorId !== user.userId) {
-      throw new ConflictException('O caixa está atribuído a outra operadora')
+      throw new ConflictException('O caixa está atribuído a outro(a) operador(a)')
     }
     if (counter.state !== CounterState.UNAVAILABLE) {
       throw new ConflictException('O caixa já está aberto')
@@ -53,7 +53,7 @@ export class CounterService {
       },
     })
     if (otherCounter) {
-      throw new ConflictException('A operadora já possui outro caixa aberto')
+      throw new ConflictException('O(a) operador(a) já possui outro caixa aberto')
     }
 
     try {
@@ -97,7 +97,7 @@ export class CounterService {
       return updated
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('A operadora já possui outro caixa aberto')
+        throw new ConflictException('O(a) operador(a) já possui outro caixa aberto')
       }
       throw error
     }
@@ -118,7 +118,7 @@ export class CounterService {
     const counter = await this._getCounter(counterId)
     this._assertERAccess(counter.erId, user)
     if (counter.operatorId !== user.userId) {
-      throw new BadRequestException('O caixa pertence a outra operadora')
+      throw new BadRequestException('O caixa pertence a outro(a) operador(a)')
     }
     if (counter.state !== CounterState.ACTIVE) {
       throw new BadRequestException('O caixa deve estar ativo para ser pausado')
@@ -164,7 +164,7 @@ export class CounterService {
     const counter = await this._getCounter(counterId)
     this._assertERAccess(counter.erId, user)
     if (counter.operatorId !== user.userId) {
-      throw new BadRequestException('O caixa pertence a outra operadora')
+      throw new BadRequestException('O caixa pertence a outro(a) operador(a)')
     }
     if (counter.state !== CounterState.PAUSED) {
       throw new BadRequestException('O caixa deve estar pausado para ser retomado')
@@ -267,7 +267,7 @@ export class CounterService {
     const counter = await this._getCounter(counterId)
     this._assertERAccess(counter.erId, user)
     if (counter.operatorId !== user.userId) {
-      throw new BadRequestException('O caixa pertence a outra operadora')
+      throw new BadRequestException('O caixa pertence a outro(a) operador(a)')
     }
     const closeableStates: CounterState[] = [CounterState.ACTIVE, CounterState.PAUSED]
     if (!closeableStates.includes(counter.state)) {
@@ -327,13 +327,13 @@ export class CounterService {
 
   private _assertOperator(user: AuthenticatedUser) {
     if (user.role !== Role.OPERATOR) {
-      throw new ForbiddenException('Somente operadoras podem operar caixas')
+      throw new ForbiddenException('Somente operadores(as) podem operar caixas')
     }
   }
 
   private _assertStaffERAccess(user: AuthenticatedUser) {
     if (user.role !== Role.MANAGER && user.role !== Role.ADMIN) {
-      throw new ForbiddenException('Somente gestoras podem liberar caixas')
+      throw new ForbiddenException('Somente gestores(as) podem liberar caixas')
     }
   }
 

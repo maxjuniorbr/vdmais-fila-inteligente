@@ -157,7 +157,7 @@ describe('SimulationService', () => {
       const result = await service.openCounters('er-1', ['c-1'])
       expect(result.opened).toBe(0)
       expect(result.skipped).toBe(1)
-      expect(result.results[0].reason).toMatch(/sem operadora/i)
+      expect(result.results[0].reason).toMatch(/sem operador\(a\)/i)
     })
 
     it('returns failed operator to pool so the next counter can use it', async () => {

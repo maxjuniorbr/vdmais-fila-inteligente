@@ -25,7 +25,7 @@ export class QueueService {
 
   async callNext(erId: string, counterId: string, user: AuthenticatedUser): Promise<CalledTicket> {
     if (user.role !== Role.OPERATOR) {
-      throw new ForbiddenException('Somente operadoras podem chamar senhas')
+      throw new ForbiddenException('Somente operadores(as) podem chamar senhas')
     }
     this._assertERAccess(erId, user)
     await this.prisma.auditEvent.create({
@@ -51,7 +51,7 @@ export class QueueService {
         throw new BadRequestException('O caixa não pertence a este ER')
       }
       if (counter.operatorId !== user.userId) {
-        throw new ForbiddenException('A operadora deve abrir este caixa antes de chamar')
+        throw new ForbiddenException('O(a) operador(a) deve abrir este caixa antes de chamar')
       }
       if (counter.state !== CounterState.ACTIVE) {
         throw new BadRequestException('O caixa deve estar ativo para chamar a próxima senha')

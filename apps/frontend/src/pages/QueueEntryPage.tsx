@@ -474,7 +474,7 @@ export function QueueEntryPage() {
               style={styles.secondaryAction}
               onClick={() => setView('guest')}
             >
-              Entrar como convidada
+              Entrar como convidado(a)
             </button>
           )}
           <section style={styles.card}>
