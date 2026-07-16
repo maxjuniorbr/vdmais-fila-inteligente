@@ -15,6 +15,7 @@ import { layout } from '../styles/layout'
 import { brand } from '../styles/brand'
 import { unlockCallAlert } from '../utils/callAlert'
 import { cpfCaretPosition, formatCpfInput, isValidCpf, onlyDigits } from '../utils/cpf'
+import { apiFetch } from '../api/config'
 
 type Mode = 'login' | 'register'
 const ACCESS_MODES: Mode[] = ['login', 'register']
@@ -218,7 +219,7 @@ export function QueueEntryPage() {
     setLoadingER(true)
     const headers = entryToken ? { 'x-entry-token': entryToken } : undefined
     const source = sourceIsLink ? '?source=link' : ''
-    fetch(`/api/public/ers/${erId}${source}`, { signal: controller.signal, headers })
+    apiFetch(`/public/ers/${encodeURIComponent(erId)}${source}`, { signal: controller.signal, headers })
       .then(async (response) => {
         const data = (await response.json().catch(() => ({}))) as Partial<PublicER> & {
           message?: unknown
@@ -318,7 +319,7 @@ export function QueueEntryPage() {
   async function handleGuestEntry(e: React.SyntheticEvent) {
     if (!beginEntry(e)) return
     try {
-      const res = await fetch('/api/auth/guest-entry', {
+      const res = await apiFetch('/auth/guest-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -351,7 +352,7 @@ export function QueueEntryPage() {
     if (!beginEntry(e)) return
     try {
       const entryContext = entryToken ? { entryToken, entryChannel: er?.entryChannel } : {}
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...loginForm, erId, ...entryContext }),
@@ -373,7 +374,7 @@ export function QueueEntryPage() {
     if (!beginEntry(e)) return
     try {
       const entryContext = entryToken ? { entryToken, entryChannel: er?.entryChannel } : {}
-      const res = await fetch('/api/auth/register', {
+      const res = await apiFetch('/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...registerForm, erId, ...entryContext }),

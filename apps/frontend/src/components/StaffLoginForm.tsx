@@ -6,6 +6,7 @@ import { Alert } from './Alert'
 import { BrandMark } from './BrandMark'
 import { Button } from './Button'
 import { Input } from './Input'
+import { apiFetch } from '../api/config'
 
 interface StaffLoginFormProps {
   title: string
@@ -31,7 +32,7 @@ export function StaffLoginForm({
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/staff-login', {
+      const response = await apiFetch('/auth/staff-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

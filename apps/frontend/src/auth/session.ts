@@ -1,3 +1,5 @@
+import { apiFetch } from '../api/config'
+
 export type StaffRole = 'OPERATOR' | 'ATTENDANT' | 'MANAGER' | 'ADMIN'
 
 export interface StaffProfile {
@@ -161,7 +163,7 @@ export async function logoutStaffSession() {
   const token = sessionStorage.getItem(TOKEN_KEY)
   try {
     if (token) {
-      await fetch('/api/telemetry/staff/logout', {
+      await apiFetch('/telemetry/staff/logout', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })

@@ -6,6 +6,7 @@ import { useSocket } from '../hooks/useSocket'
 import { brand } from '../styles/brand'
 import { formatDate, formatDuration, formatTimeWithSeconds } from '../utils/format'
 import { PRIORITY_LABEL } from '../utils/labels'
+import { apiFetch } from '../api/config'
 
 interface Call {
   code: string
@@ -143,7 +144,7 @@ export function PanelPage() {
   const fetchPanelState = useCallback(async () => {
     if (!erId) return
     try {
-      const response = await fetch(`/api/panel/${erId}/state`, {
+      const response = await apiFetch(`/panel/${encodeURIComponent(erId)}/state`, {
         headers: panelToken ? { 'x-panel-token': panelToken } : undefined,
       })
       if (response.status === 401) {

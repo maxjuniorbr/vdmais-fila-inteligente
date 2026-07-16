@@ -8,6 +8,7 @@ import { Modal } from '../components/Modal'
 import { brand } from '../styles/brand'
 import { playCallAlert, unlockCallAlert } from '../utils/callAlert'
 import { PRIORITY_SERVICE_LABEL } from '../utils/labels'
+import { apiFetch } from '../api/config'
 
 // A fixed cadence keeps every RE who scanned together polling in sync, hitting
 // the API in bursts; the random jitter drifts the clients apart. On 429 (rate
@@ -191,7 +192,7 @@ export function TicketConfirmationPage() {
 
   const fetchMyStatus = useCallback(
     (token: string) =>
-      fetch(`/api/tickets/my-status?erId=${erId}`, {
+      apiFetch(`/tickets/my-status?erId=${encodeURIComponent(erId ?? '')}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
     [erId],
@@ -267,7 +268,7 @@ export function TicketConfirmationPage() {
     const token = sessionStorage.getItem('token')
     if (!token || sessionStorage.getItem(`ticket-displayed:${ticket.id}`)) return
     sessionStorage.setItem(`ticket-displayed:${ticket.id}`, '1')
-    void fetch(`/api/telemetry/tickets/${ticket.id}/displayed`, {
+    void apiFetch(`/telemetry/tickets/${encodeURIComponent(ticket.id)}/displayed`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -296,7 +297,7 @@ export function TicketConfirmationPage() {
         navigate(getQueueEntryPath(erId), { replace: true })
         return
       }
-      fetch('/api/tickets', {
+      apiFetch('/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ erId, entryChannel }),
@@ -356,7 +357,7 @@ export function TicketConfirmationPage() {
   }, [])
 
   async function fetchCurrentTicket(token: string): Promise<TicketInfo> {
-    const res = await fetch(`/api/tickets/my-active?erId=${erId}`, {
+    const res = await apiFetch(`/tickets/my-active?erId=${encodeURIComponent(erId ?? '')}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) throw new Error('Você já está na fila, mas não foi possível obter a senha.')
@@ -396,7 +397,7 @@ export function TicketConfirmationPage() {
     setError(null)
     try {
       const endpoint = isPaused ? 'resume' : 'pause'
-      const res = await fetch(`/api/tickets/${ticket.id}/${endpoint}`, {
+      const res = await apiFetch(`/tickets/${encodeURIComponent(ticket.id)}/${endpoint}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -416,7 +417,7 @@ export function TicketConfirmationPage() {
     setActionLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/tickets/${ticket.id}/self-cancel`, {
+      const res = await apiFetch(`/tickets/${encodeURIComponent(ticket.id)}/self-cancel`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })

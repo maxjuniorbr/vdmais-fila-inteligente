@@ -19,3 +19,10 @@ export function resolveSocketUrl(apiUrl: string | undefined): string {
 
 export const API_BASE = resolveApiBase(import.meta.env.VITE_API_URL)
 export const SOCKET_URL = resolveSocketUrl(import.meta.env.VITE_API_URL)
+
+// Único ponto de saída para o backend: prefixa a base resolvida, para que nenhum
+// call site fixe '/api' — que quebra quando VITE_API_URL aponta o frontend a um
+// backend em outro host. Codifique segmentos dinâmicos de path/query no call site.
+export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, init)
+}

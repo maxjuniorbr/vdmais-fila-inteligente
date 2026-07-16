@@ -102,6 +102,7 @@ code and are the source of truth — do not restate hex/size literals here:
 - Route guards call `hasStaffSession(allowedRoles)`, which validates the JWT signature, role membership, and expiration in one step. Do not reimplement this check inline.
 - Staff screens hold their authenticated state via the `useStaffSession(allowedRoles)` hook, never a raw `useState(() => hasStaffSession(...))`. The hook listens for the global `SESSION_EXPIRED_EVENT` so a server-side 401 drops the screen back to the login form.
 - Every authenticated staff request must use the API client (`api/client.ts`), including fire-and-forget telemetry. The client calls `notifySessionExpired()` on any 401, clearing the session and dispatching `SESSION_EXPIRED_EVENT`; never issue authenticated staff `fetch` calls directly from pages.
+- Never hardcode `/api` in a `fetch`. Reach the backend through `apiFetch(path, init)` (`api/config.ts`) — the single place that prepends the base resolved from `VITE_API_URL` — or through the `api` client for authenticated staff calls (it wraps `apiFetch`). Public and representative flows call `apiFetch` directly with their own headers (`x-entry-token`, `x-panel-token`, RE `Bearer`); encode dynamic path/query segments with `encodeURIComponent`.
 - Public queue URLs keep the signed access in `#entry=...`, never in query
   parameters. Validate it through `x-entry-token`, forward it in representative
   login/register, and preserve the backend-confirmed channel through

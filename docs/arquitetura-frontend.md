@@ -72,7 +72,10 @@ const [profile, setProfile] = useStaffProfile()
 
 ## Cliente HTTP
 
-Centralizado em `api/client.ts`. Todas as chamadas ao backend passam por ele.
+Duas camadas em `api/`:
+
+- **`apiFetch(path, init)`** (`api/config.ts`) — ponto único que prefixa a base resolvida ao caminho. **Toda** chamada ao backend passa por ele: os fluxos públicos/RE o usam direto e o cliente de staff é montado sobre ele. Nenhum call site fixa `/api`.
+- **`api`** (`api/client.ts`) — o cliente das telas de staff, empilhado sobre o `apiFetch`; adiciona o header de sessão e trata o `401`.
 
 ```typescript
 api.get<T>(path)              → Promise<T>
@@ -81,9 +84,10 @@ api.patch<T>(path, body?)     → Promise<T>
 api.delete<T>(path)           → Promise<T>
 ```
 
-- Base URL HTTP: resolvida em `api/config.ts` a partir de `VITE_API_URL` — quando definida, REST e WebSocket falam **direto** com o backend pela mesma origem (modelo dos ambientes corporativos); quando omitida, cai no caminho relativo `/api`, roteado ao backend pela borda (proxy do Vite em dev, rewrite do `vercel.json`)
-- Header automático: `Authorization: Bearer <token>` quando há sessão ativa
-- 401 automático: chama `notifySessionExpired()` antes de rejeitar a Promise
+- Base URL: resolvida em `api/config.ts` a partir de `VITE_API_URL`. Definida → REST (`apiFetch`) e WebSocket falam **direto** com o backend nesse host (front e back em hosts separados, modelo corporativo); omitida → caminho relativo `/api` (e `/` no socket), roteado ao backend pela borda (proxy do Vite em dev, rewrite do `vercel.json`)
+- Header de sessão (no `api`): `Authorization: Bearer <token>` quando há sessão de staff ativa
+- 401 automático (no `api`): chama `notifySessionExpired()` antes de rejeitar a Promise
+- Fluxos públicos/RE (entrada na fila, senha, login/cadastro, painel) chamam `apiFetch` direto com os próprios headers (`x-entry-token`, `x-panel-token`, Bearer da RE) e codificam segmentos dinâmicos com `encodeURIComponent`
 
 ---
 

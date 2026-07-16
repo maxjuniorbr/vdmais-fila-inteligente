@@ -1,7 +1,5 @@
 import { notifySessionExpired } from '../auth/session'
-import { API_BASE } from './config'
-
-const BASE = API_BASE
+import { apiFetch } from './config'
 
 function authHeaders() {
   return {
@@ -11,7 +9,7 @@ function authHeaders() {
 }
 
 async function request<T>(path: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(path, {
     method,
     headers: authHeaders(),
     body: body ? JSON.stringify(body) : undefined,
