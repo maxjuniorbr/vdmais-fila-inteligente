@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Alert } from '../components/Alert'
-import { consumeQueueEntryPending, getQueueEntryChannel, getQueueEntryPath } from '../auth/session'
+import {
+  consumeQueueEntryPending,
+  getQueueEntryChannel,
+  getQueueEntryPath,
+  hasQueueEntryPending,
+} from '../auth/session'
 import { BrandMark } from '../components/BrandMark'
 import { Button } from '../components/Button'
 import { Modal } from '../components/Modal'
+import { Spinner } from '../components/Spinner'
 import { brand } from '../styles/brand'
 import { playCallAlert, unlockCallAlert } from '../utils/callAlert'
 import { PRIORITY_SERVICE_LABEL } from '../utils/labels'
@@ -172,7 +178,8 @@ function TicketStatus({
       </p>
       {isPriority && <p style={{ ...styles.hint, color: brand.info }}>{PRIORITY_SERVICE_LABEL}</p>}
       <p style={styles.hint}>
-        Fique de olho no painel. Sua senha será chamada pelo número acima.
+        Fique de olho no painel. Sua senha será chamada pelo número acima. Esta tela se
+        atualiza sozinha — não precisa recarregar.
       </p>
     </>
   )
@@ -184,6 +191,10 @@ export function TicketConfirmationPage() {
   const [ticket, setTicket] = useState<TicketInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // Peek (não consome) da intenção de entrada para o texto de carregamento: uma
+  // recarga mostra "Carregando sua senha", não "Entrando na fila" (estado incorreto
+  // percebido como travamento). O consumo real acontece no efeito de entrada.
+  const [enteringOnMount] = useState(() => hasQueueEntryPending(erId))
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmingLeave, setConfirmingLeave] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -365,9 +376,17 @@ export function TicketConfirmationPage() {
   }
 
   if (loading) {
+    const loadingMessage = enteringOnMount ? 'Entrando na fila...' : 'Carregando sua senha...'
     return (
       <div style={styles.container}>
-        <output style={styles.loadingText}>Entrando na fila...</output>
+        <div style={styles.loadingBox}>
+          {/* O spinner é só visual; a mensagem segue como conteúdo do <output>
+              (região de status), preservando a semântica anterior de live region. */}
+          <span aria-hidden="true">
+            <Spinner size={28} label={loadingMessage} />
+          </span>
+          <output style={styles.loadingText}>{loadingMessage}</output>
+        </div>
       </div>
     )
   }
@@ -647,7 +666,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     marginBottom: '0.25rem',
   },
+  loadingBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: `${brand.spacing[12]}px`,
+  },
   loadingText: {
+    margin: 0,
     color: brand.inkSoft,
     fontSize: '1.05rem',
   },

@@ -11,6 +11,7 @@ import {
   getSessionERId,
   getStaffRole,
   getStaffSessionProfile,
+  hasQueueEntryPending,
   hasStaffSession,
   logoutStaffSession,
   saveStaffSession,
@@ -210,5 +211,15 @@ describe('queue entry session', () => {
     // A second read (e.g. a refresh) no longer sees the intent.
     expect(consumeQueueEntryPending('er-1')).toBe(false)
     expect(consumeQueueEntryPending(undefined)).toBe(false)
+  })
+
+  it('peeks the entry intent without consuming it', () => {
+    expect(hasQueueEntryPending('er-1')).toBe(false)
+    markQueueEntryPending('er-1')
+    expect(hasQueueEntryPending('er-1')).toBe(true)
+    // Peeking keeps the one-shot intent available for the real consumer.
+    expect(consumeQueueEntryPending('er-1')).toBe(true)
+    expect(hasQueueEntryPending('er-1')).toBe(false)
+    expect(hasQueueEntryPending(undefined)).toBe(false)
   })
 })

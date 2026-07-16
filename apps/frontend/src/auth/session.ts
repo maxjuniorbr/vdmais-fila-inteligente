@@ -131,6 +131,12 @@ export function consumeQueueEntryPending(erId: string | undefined): boolean {
   return pending
 }
 
+// Non-consuming peek: lets the ticket screen render the right loading copy
+// ("entering" vs "reloading") before the effect consumes the one-shot intent.
+export function hasQueueEntryPending(erId: string | undefined): boolean {
+  return Boolean(erId && sessionStorage.getItem(`queue-entry-pending:${erId}`) === '1')
+}
+
 export function getQueueEntryPath(erId: string | undefined): string {
   if (!erId) return '/'
   const source = getQueueEntryChannel(erId) === 'LINK' ? '?source=link' : ''

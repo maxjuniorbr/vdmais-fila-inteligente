@@ -153,6 +153,53 @@ describe('TicketConfirmationPage', () => {
     expect(postCount(fetchMock)).toBe(0)
   })
 
+  it('shows an animated entering feedback while the ticket is being created', () => {
+    // Fetch pendente para congelar a tela no estado de carregamento.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))
+
+    const { container } = renderPage()
+    // A mensagem é o conteúdo da região de status; o spinner é decorativo.
+    expect(screen.getByRole('status')).toHaveTextContent('Entrando na fila...')
+    expect(container.querySelector('.gb-spinner')).not.toBeNull()
+  })
+
+  it('shows a loading feedback (not "entering") on refresh of an existing ticket', () => {
+    sessionStorage.removeItem('queue-entry-pending:er-1')
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))
+
+    const { container } = renderPage()
+    expect(screen.getByRole('status')).toHaveTextContent('Carregando sua senha...')
+    expect(container.querySelector('.gb-spinner')).not.toBeNull()
+    expect(screen.queryByText('Entrando na fila...')).not.toBeInTheDocument()
+  })
+
+  it('tells the RE the waiting screen refreshes itself', async () => {
+    sessionStorage.removeItem('queue-entry-pending:er-1')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (input.toString().includes('/api/tickets/my-status')) {
+          return new Response(
+            JSON.stringify({
+              id: 't-1',
+              code: 'A001',
+              queuePosition: 1,
+              currentPosition: 2,
+              state: 'WAITING',
+              erId: 'er-1',
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(null, { status: 200 })
+      }),
+    )
+
+    renderPage()
+    await screen.findByText('A001')
+    expect(screen.getByText(/atualiza sozinha/)).toBeInTheDocument()
+  })
+
   it('keeps the no-show state on refresh instead of re-entering the queue', async () => {
     sessionStorage.removeItem('queue-entry-pending:er-1')
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
