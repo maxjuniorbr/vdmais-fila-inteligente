@@ -5,17 +5,7 @@
 		},
 		{
 			"path": "../temp"
-		},
-		{
-			"path": "../vdmais-fila-inteligente-ds"
 		}
 	],
-	"settings": {
-		"typescript.autoClosingTags": false,
-		"claudeCode.initialPermissionMode": "bypassPermissions",
-		"claudeCode.useCtrlEnterToSend": true,
-		"claudeCode.environmentVariables": [
-			
-		]
-	}
+	"settings": {}
 }
