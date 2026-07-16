@@ -1,0 +1,50 @@
+---
+description: Project overview, monorepo commands, commit rules, and code style for vdmais-fila-inteligente
+globs:
+alwaysApply: true
+---
+
+# vdmais-fila-inteligente
+
+Queue management system for beauty-retail reseller spaces (Espaços de Revendedora — "ER"). Representatives (revendedoras) join a per-ER queue by QR code, link, or assisted check-in; operators call and serve them at counters; managers oversee the day. **"ER" means Espaço de Revendedora, not a hospital emergency room.** Monorepo: `apps/backend` (NestJS + Prisma + Postgres) and `apps/frontend` (React + Vite).
+
+## Commands
+
+```bash
+# Backend (from apps/backend)
+npm run lint && npm test     # validate
+npm run build                # nest build + tsc check
+npx prisma migrate status    # check DB parity with migrations
+
+# Frontend (from apps/frontend)
+npm run lint && npm test     # validate
+npm run build                # tsc -b + vite build
+
+# Root (runs both workspaces)
+npm run lint && npm test
+```
+
+Do not run `npm run build` for the backend while a local `npm run dev` backend is running: the build wipes `dist/` and kills the dev server (check port 3000 first).
+
+Backend e2e tests run only in CI — after backend behavior changes, run `npm run test:e2e` (from `apps/backend`) locally before pushing.
+
+Never `git push` on your own: the user pushes, and a push to `master` auto-deploys the Render backend.
+
+## Commit rules (enforced by `.githooks/commit-msg`)
+
+Format: `<type>: <description>` — single line, no body, no scope, ≤72 chars.
+Types: `feat` `fix` `refactor` `style` `chore` `docs` `test`
+English, imperative mood, lowercase, no trailing period. Commit subjects must be fully English — no Portuguese domain phrases.
+
+## Code style
+
+- **Comments explain *why*, not *what*** — add one only for intent, a domain/business
+  rule, or a non-obvious trade-off the code can't convey; never to restate the code.
+- Write code that matches the surrounding file (naming, idioms, comment density).
+
+## MCP servers
+
+The repo's `.mcp.json` (gitignored — holds a Render API token) is Claude Code
+configuration. To use the same servers in Cursor (render, vercel, supabase,
+sonarqube), configure them in `.cursor/mcp.json` — and add `.cursor/mcp.json`
+to `.gitignore` BEFORE creating it, since it will hold the same secrets.

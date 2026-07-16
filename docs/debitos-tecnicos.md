@@ -30,6 +30,7 @@
 | [DT-19](#dt-19--sessão-de-staff-sem-refresh-token-rotativo) | Sessão de staff sem refresh token rotativo | Média | Não |
 | [DT-20](#dt-20--endurecimento-do-websocket-e-validações-de-segurança-no-ambiente-real) | Endurecimento do WebSocket e validações de segurança no ambiente real | Média | Não |
 | [DT-21](#dt-21--cpf-autodeclarado-na-entrada-temporária-de-convidada) | CPF autodeclarado na entrada temporária de convidada | Baixa | Não |
+| [DT-22](#dt-22--contexto-de-ia-duplicado-entre-claudemd-e-cursorrules) | Contexto de IA duplicado entre CLAUDE.md e .cursor/rules | Baixa | Não |
 
 ---
 
@@ -439,3 +440,28 @@ do CPF a uma fonte autorizada ou desabilitar `guestEntryEnabled`. Nessa evoluç�
 reavaliar em conjunto a promoção `GUEST` → `REGISTERED` e a resposta de conflito do
 endpoint público. Relacionado a
 [DT-14](#dt-14--cadastro-mínimo-da-re-será-descontinuado).
+
+---
+
+## DT-22 — Contexto de IA duplicado entre CLAUDE.md e .cursor/rules
+
+**Contexto.** O projeto agora mantém dois conjuntos de arquivos de contexto para
+assistentes de IA que descrevem as mesmas regras: `CLAUDE.md` (raiz) +
+`apps/backend/CLAUDE.md` + `apps/frontend/CLAUDE.md` (lidos pelo Claude Code) e seus
+espelhos `.cursor/rules/project-overview.mdc`, `.cursor/rules/database-migrations.mdc`
+e `.cursor/rules/frontend-design-ux.mdc` (lidos pelo Cursor, que não interpreta
+`CLAUDE.md` nativamente). Da mesma forma, `.claude/commands/commit.md` e
+`.claude/commands/security-audit.md` têm cópias adaptadas em
+`.cursor/skills/commit/SKILL.md` e `.cursor/skills/security-audit/SKILL.md`.
+
+**Impacto.** Duas fontes de verdade para o mesmo conteúdo, mesma classe de problema do
+[DT-5](#dt-5--dupla-contabilidade-de-migrations-e-deploy-manual) (contabilidade dupla):
+uma alteração feita só de um lado (ex.: atualizar uma regra de UX no `CLAUDE.md` do
+frontend) deixa o espelho do Cursor desatualizado sem qualquer erro ou aviso automático.
+Mitigação parcial: o gate de docs do `/commit` (etapa "Check stale docs") já lista os
+pares e cobra atualizar os dois lados na mesma alteração.
+
+**Encaminhamento.** Enquanto o Cursor não ler `CLAUDE.md` nativamente, manter os pares
+sincronizados manualmente via o gate do `/commit`. Se o uso do Cursor no projeto crescer,
+avaliar um único arquivo-fonte com geração automática dos dois formatos (script de build
+de contexto), eliminando a duplicação manual.

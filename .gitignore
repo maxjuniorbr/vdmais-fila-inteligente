@@ -19,6 +19,9 @@ test-results/
 .mcp.json
 .claude/settings.local.json
 
+# Cursor (mcp.json mirrors .mcp.json and holds the same tokens)
+.cursor/mcp.json
+
 # SonarQube local
 .scannerwork/
 .sonarlint/
