@@ -40,7 +40,7 @@ Prisma ou TypeORM, preferencialmente seguindo padrão interno do Grupo
 
 Autenticação:
 Login próprio do MVP
-RE: telefone/OTP ou telefone/senha
+RE: CPF ou código de RE + senha (convidado(a): nome + CPF)
 Operação: login com perfil
 
 Infraestrutura:
@@ -78,7 +78,7 @@ Uso:
 
 - entrada na fila por QR Code;
 - entrada por link;
-- login/cadastro mínimo;
+- login/cadastro mínimo (ou entrada de convidado(a) por nome + CPF, quando o ER habilita);
 - exibição da senha gerada;
 - orientação para acompanhar chamada pela TV;
 - mensagem de erro quando já existir senha ativa.
@@ -282,10 +282,10 @@ Opções:
 
 Recomendação:
 
-> Telefone celular + OTP, com CPF e código de RE no cadastro.
+> A RE entra por **CPF ou código de RE + senha**. O telefone deixou de ser identificador de login e passou a ser **opcional**; para eventos controlados há **entrada de convidado(a) por nome + CPF**, sem cadastro (opt-in por ER).
 > 
 
-Se OTP/SMS for caro ou complexo para o piloto, usar telefone + senha.
+A recomendação original previa **telefone + OTP** (com CPF e código de RE no cadastro); OTP/SMS foi descartado no piloto por custo/complexidade, e a identidade da RE consolidou-se no CPF/código de RE. Ver [Arquitetura Backend](./arquitetura-backend.md), seção *Autenticação*.
 
 O acesso público começa por uma URL assinada emitida na administração:
 
@@ -320,7 +320,7 @@ Perfis mínimos:
 ```
 representative
 operator
-checkin_attendant
+attendant
 manager
 admin
 ```

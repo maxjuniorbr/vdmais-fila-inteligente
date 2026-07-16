@@ -412,14 +412,14 @@ própria; controles de borda documentados porém não verificados no ambiente re
 
 **Encaminhamento.** Validar `Origin`/`Host` e aplicar quotas de conexão no Socket.IO;
 se possível, servir o WS no mesmo domínio do app. Executar as validações no ambiente
-real — oportuno no go-live AWS/Apigee (10/08): headers efetivos, WS através do gateway e
+real — oportuno no go-live do ambiente corporativo (AWS/Apigee): headers efetivos, WS através do gateway e
 pentest dinâmico. Relacionado a [DT-2](#dt-2--websocket-socketio-sem-adaptador-compartilhado).
 
 ---
 
 ## DT-21 — CPF autodeclarado na entrada temporária de convidada
 
-**Contexto.** Para eventos controlados de franqueados, um ER pode habilitar
+**Contexto.** Para eventos controlados, um ER pode habilitar
 `guestEntryEnabled` e permitir entrada com nome, sobrenome e CPF, sem cadastro ou senha.
 O CPF é validado por dígito verificador e identifica o registro dentro da fila, mas não
 há consulta externa que comprove sua titularidade. A sessão resultante usa o papel
@@ -430,7 +430,7 @@ Também são decisões conscientes desta exceção: CPF de cadastro completo rec
 segue para login; registro `GUEST` não é promovido automaticamente a `REGISTERED`. O
 fluxo é opt-in por ER, exige token assinado de entrada e possui limite por IP.
 
-**Impacto.** O mecanismo atende ao evento sem exigir onboarding completo, mas não deve
+**Impacto.** O mecanismo atende a esse cenário sem exigir onboarding completo, mas não deve
 ser tratado como autenticação definitiva nem habilitado indiscriminadamente. Reentrada
 com o mesmo CPF recupera a identidade leve da convidada dentro da fila.
 

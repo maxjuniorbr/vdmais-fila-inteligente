@@ -100,7 +100,7 @@ metadata (JSON) / createdAt
 
 > **Decisão temporária:** nesta fase o CPF é autodeclarado e seu dígito verificador
 > valida apenas a estrutura, não a titularidade. O fluxo é uma exceção opt-in para
-> eventos controlados de franqueados, não um novo login permanente. Antes de ampliar
+> eventos controlados, não um novo login permanente. Antes de ampliar
 > seu uso, validar o CPF em fonte autorizada ou desabilitar a modalidade — ver
 > [DT-21](./debitos-tecnicos.md#dt-21--cpf-autodeclarado-na-entrada-temporária-de-convidada).
 
