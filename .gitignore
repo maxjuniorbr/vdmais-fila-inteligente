@@ -11,11 +11,11 @@ test-results/
 # TypeScript incremental build cache
 *.tsbuildinfo
 
-# Private keys / certificates (never commit; integration RS256 keys live in .env)
+# Private keys / certificates
 *.pem
 *.key
 
-# Claude Code (MCP token + personal local settings)
+# Claude Code
 .mcp.json
 .claude/settings.local.json
 
@@ -31,9 +31,12 @@ test-results/
 .DS_Store
 Thumbs.db
 
-# Local test credentials (plaintext — never version)
+# Local test credentials
 /docs/credenciais-teste-local.md
 /docs/credenciais-teste-supabase.md
 
-# Local-only working docs (never version)
+# Local-only working docs
 /docs/local-*
+
+# Local-only root scripts
+/scripts/
