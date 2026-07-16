@@ -22,6 +22,7 @@ test-results/
 # SonarQube local
 .scannerwork/
 .sonarlint/
+/scripts/start-sonarqube-mcp.sh
 
 # Editor settings
 .vscode/
@@ -37,6 +38,3 @@ Thumbs.db
 
 # Local-only working docs
 /docs/local-*
-
-# Local-only root scripts
-/scripts/
